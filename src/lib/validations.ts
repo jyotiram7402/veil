@@ -18,12 +18,18 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+// Looser policy for non-admin (invite-gate) passwords so admins can set
+// something short and memorable to share over the phone. Admin passwords
+// still use the strict passwordSchema (>= 8 chars) — enforced at the
+// route level.
+export const gatePasswordSchema = z
+  .string()
+  .min(4, "At least 4 characters")
+  .max(128, "Too long");
+
 export const createUserSchema = z.object({
   username: usernameSchema,
-  // Password is optional now — admin-created users normally sign in via their
-  // invite link (we mint an ephemeral password per visit). Provide a password
-  // only when bootstrapping the first admin.
-  password: passwordSchema.optional(),
+  password: gatePasswordSchema,
   displayName: z.string().trim().max(60).optional(),
   isAdmin: z.boolean().optional(),
 });

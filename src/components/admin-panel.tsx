@@ -4,17 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Copy,
+  KeyRound,
   Link as LinkIcon,
   Loader2,
   MessageSquare,
+  MoreHorizontal,
   Plus,
   Power,
   PowerOff,
   RefreshCcw,
+  Settings as SettingsIcon,
   Shield,
   Trash2,
   UserPlus,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { lastSeen } from "@/lib/format";
 import { useSessionStore } from "@/store/session-store";
@@ -38,6 +47,7 @@ type Invite = {
   enabled: boolean;
   use_count: number;
   last_used_at: string | null;
+  has_password: boolean;
 };
 
 type Row = {
@@ -65,7 +75,7 @@ export function AdminPanel() {
           Users
         </TabButton>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")}>
-          Settings
+          Defaults
         </TabButton>
       </div>
 
@@ -102,6 +112,8 @@ function UsersTab() {
   const [users, setUsers] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [settingsFor, setSettingsFor] = useState<Row | null>(null);
+  const [rotateFor, setRotateFor] = useState<Row | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -143,17 +155,6 @@ function UsersTab() {
     await reload();
   }
 
-  async function rotateInvite(userId: string) {
-    if (!confirm("Replace this user's link? Their old link will stop working immediately.")) return;
-    const res = await fetch(`/api/admin/users/${userId}/invite`, { method: "POST" });
-    if (!res.ok) {
-      toast.error("Couldn't rotate link");
-      return;
-    }
-    await reload();
-    toast.success("New link generated");
-  }
-
   async function revokeInvite(userId: string) {
     if (!confirm("Revoke this link permanently? The user won't be able to sign in.")) return;
     const res = await fetch(`/api/admin/users/${userId}/invite`, { method: "DELETE" });
@@ -179,7 +180,7 @@ function UsersTab() {
   }
 
   async function deleteUser(userId: string) {
-    if (!confirm("Delete this user permanently? Their chat history stays in your archive.")) return;
+    if (!confirm("Delete this user? Their chat history stays in your archive.")) return;
     const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -248,7 +249,6 @@ function UsersTab() {
                     @{u.username} · joined {new Date(u.created_at).toLocaleDateString()} · last seen {lastSeen(u.last_seen_at)}
                   </div>
 
-                  {/* Invite link row */}
                   {!u.is_admin && (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {u.invite ? (
@@ -267,73 +267,81 @@ function UsersTab() {
                           </Button>
                           <span className="text-[10px] text-muted-foreground">
                             used {u.invite.use_count}×
-                            {u.invite.last_used_at &&
-                              ` · ${lastSeen(u.invite.last_used_at)}`}
+                            {u.invite.last_used_at && ` · ${lastSeen(u.invite.last_used_at)}`}
                           </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => toggleInvite(u.id, !u.invite!.enabled)}
-                            title={u.invite.enabled ? "Disable link" : "Enable link"}
-                          >
-                            {u.invite.enabled ? (
-                              <PowerOff className="h-3.5 w-3.5" />
-                            ) : (
-                              <Power className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => rotateInvite(u.id)}
-                            title="Rotate link"
-                          >
-                            <RefreshCcw className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => revokeInvite(u.id)}
-                            title="Revoke permanently"
-                            className="text-destructive"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
                         </>
                       ) : (
-                        <Button size="sm" variant="outline" onClick={() => rotateInvite(u.id)}>
-                          <LinkIcon className="h-3.5 w-3.5" /> Generate invite link
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setRotateFor(u)}
+                        >
+                          <LinkIcon className="h-3.5 w-3.5" /> Set invite link
                         </Button>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* Right-side actions */}
                 {u.id !== me?.id && (
-                  <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1">
                     {!u.is_admin && (
                       <Button size="sm" variant="outline" onClick={() => openChat(u.id)}>
                         <MessageSquare className="h-3.5 w-3.5" /> Chat
                       </Button>
                     )}
-                    {!u.is_admin && (
-                      <div className="flex items-center justify-between gap-2 text-xs px-1">
-                        <span className="text-muted-foreground">Active</span>
-                        <Switch
-                          checked={!u.suspended}
-                          onCheckedChange={(v) => toggleSuspend(u.id, !v)}
-                        />
-                      </div>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      onClick={() => deleteUser(u.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="icon" variant="ghost" aria-label="Actions">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {!u.is_admin && (
+                          <>
+                            <DropdownMenuItem onClick={() => setSettingsFor(u)}>
+                              <SettingsIcon className="h-4 w-4" /> Per-user settings
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setRotateFor(u)}>
+                              <KeyRound className="h-4 w-4" /> Change password / link
+                            </DropdownMenuItem>
+                            {u.invite && (
+                              <DropdownMenuItem
+                                onClick={() => toggleInvite(u.id, !u.invite!.enabled)}
+                              >
+                                {u.invite.enabled ? (
+                                  <>
+                                    <PowerOff className="h-4 w-4" /> Disable link
+                                  </>
+                                ) : (
+                                  <>
+                                    <Power className="h-4 w-4" /> Enable link
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => toggleSuspend(u.id, !u.suspended)}>
+                              {u.suspended ? "Reinstate" : "Suspend"}
+                            </DropdownMenuItem>
+                            {u.invite && (
+                              <DropdownMenuItem
+                                onClick={() => revokeInvite(u.id)}
+                                className="text-destructive"
+                              >
+                                Revoke link
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => deleteUser(u.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete user
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 )}
               </div>
@@ -355,6 +363,26 @@ function UsersTab() {
           void reload();
         }}
       />
+
+      {rotateFor && (
+        <RotateInviteDialog
+          user={rotateFor}
+          open={!!rotateFor}
+          onOpenChange={(v) => !v && setRotateFor(null)}
+          onDone={() => {
+            setRotateFor(null);
+            void reload();
+          }}
+        />
+      )}
+
+      {settingsFor && (
+        <UserSettingsDialog
+          user={settingsFor}
+          open={!!settingsFor}
+          onOpenChange={(v) => !v && setSettingsFor(null)}
+        />
+      )}
     </div>
   );
 }
@@ -384,13 +412,12 @@ function CreateUserDialog({
   }, [open]);
 
   async function submit() {
-    if (!username.trim()) {
-      toast.error("Username is required");
-      return;
+    if (!username.trim()) return toast.error("Username is required");
+    if (!password || password.length < 4) {
+      return toast.error("Password must be at least 4 characters");
     }
     if (isAdmin && password.length < 8) {
-      toast.error("Admin password must be at least 8 characters");
-      return;
+      return toast.error("Admin passwords need at least 8 characters");
     }
     setSaving(true);
     try {
@@ -401,7 +428,7 @@ function CreateUserDialog({
           username: username.trim().toLowerCase(),
           displayName: displayName.trim() || undefined,
           isAdmin,
-          password: isAdmin ? password : undefined,
+          password,
         }),
       });
       if (!res.ok) {
@@ -424,8 +451,8 @@ function CreateUserDialog({
           <DialogTitle>New member</DialogTitle>
           <DialogDescription>
             {isAdmin
-              ? "Admin accounts sign in with a username and password."
-              : "Regular users sign in with their invite link only. We'll generate it on save."}
+              ? "Admin signs in at /login with the password below."
+              : "Pick a password — the user will need it after opening their invite link."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -448,6 +475,17 @@ function CreateUserDialog({
               placeholder="Jay K."
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="newPassword">Password</Label>
+            <Input
+              id="newPassword"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={isAdmin ? "at least 8 characters" : "at least 4 characters"}
+              autoComplete="new-password"
+            />
+          </div>
           <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
             <div className="flex items-center gap-2">
               <Shield className={cn("h-4 w-4", isAdmin ? "text-primary" : "text-muted-foreground")} />
@@ -455,19 +493,6 @@ function CreateUserDialog({
             </div>
             <Switch checked={isAdmin} onCheckedChange={setIsAdmin} />
           </div>
-          {isAdmin && (
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">Password</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="at least 8 characters"
-                autoComplete="new-password"
-              />
-            </div>
-          )}
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
@@ -481,6 +506,261 @@ function CreateUserDialog({
             )}
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RotateInviteDialog({
+  user,
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  user: Row;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onDone: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"new-link" | "password-only">("new-link");
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!password || password.length < 4) {
+      return toast.error("Password must be at least 4 characters");
+    }
+    setSaving(true);
+    try {
+      const url = `/api/admin/users/${user.id}/invite`;
+      const res = await fetch(url, {
+        method: mode === "new-link" ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error ?? "Couldn't update");
+        return;
+      }
+      if (mode === "new-link") {
+        const body = (await res.json()) as { invite: { url: string } };
+        navigator.clipboard.writeText(body.invite.url).catch(() => undefined);
+        toast.success("New link copied — share it with the user");
+      } else {
+        toast.success("Password updated");
+      }
+      onDone();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Change password</DialogTitle>
+          <DialogDescription>
+            for <strong>@{user.username}</strong>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border/60 bg-background/40 p-1 grid grid-cols-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setMode("password-only")}
+              className={cn(
+                "px-3 py-1.5 rounded-md transition-colors",
+                mode === "password-only"
+                  ? "bg-card shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Change password
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("new-link")}
+              className={cn(
+                "px-3 py-1.5 rounded-md transition-colors",
+                mode === "new-link"
+                  ? "bg-card shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              New link + password
+            </button>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="rotatePassword">
+              {mode === "new-link" ? "New password" : "Password"}
+            </Label>
+            <Input
+              id="rotatePassword"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="at least 4 characters"
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-muted-foreground">
+              {mode === "new-link"
+                ? "Issues a fresh URL and password. The old URL stops working immediately."
+                : "Keeps the same URL but changes the password the user types after opening it."}
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function UserSettingsDialog({
+  user,
+  open,
+  onOpenChange,
+}: {
+  user: Row;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
+  const [globalSettings, setGlobalSettings] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const [perUser, global] = await Promise.all([
+        fetch(`/api/admin/users/${user.id}/settings`, { cache: "no-store" }).then((r) =>
+          r.ok ? r.json() : { settings: {} },
+        ),
+        fetch("/api/admin/settings", { cache: "no-store" }).then((r) =>
+          r.ok ? r.json() : { settings: {} },
+        ),
+      ]);
+      setSettings(perUser.settings ?? {});
+      setGlobalSettings(global.settings ?? {});
+    })();
+  }, [open, user.id]);
+
+  async function save(patch: Record<string, unknown>) {
+    if (!settings) return;
+    const optimistic = { ...settings, ...patch };
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null) delete optimistic[k];
+    }
+    setSettings(optimistic);
+    const res = await fetch(`/api/admin/users/${user.id}/settings`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) toast.error("Couldn't save");
+  }
+
+  const rows = settings
+    ? [
+        { key: "uploads_enabled", label: "Allow file uploads" },
+        { key: "typing_indicator", label: "Show typing indicators" },
+        { key: "screen_guard", label: "Screen guard (anti-leak)" },
+        { key: "user_session_ephemeral", label: "Ephemeral session (logout on tab switch)" },
+      ]
+    : [];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Settings for @{user.username}</DialogTitle>
+          <DialogDescription>
+            Per-user overrides. Off = use the default from the Defaults tab.
+          </DialogDescription>
+        </DialogHeader>
+        {!settings ? (
+          <div className="grid place-items-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((row) => {
+              const hasOverride = row.key in (settings ?? {});
+              const effective = hasOverride
+                ? Boolean(settings![row.key])
+                : Boolean(globalSettings[row.key]);
+              return (
+                <div
+                  key={row.key}
+                  className="rounded-lg border border-border/60 p-3 flex items-start justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm">{row.label}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      {hasOverride
+                        ? `Override: ${effective ? "on" : "off"}`
+                        : `Inherits default (${effective ? "on" : "off"})`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={effective}
+                      onCheckedChange={(v) => save({ [row.key]: v })}
+                    />
+                    {hasOverride && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => save({ [row.key]: null })}
+                        title="Clear override, inherit default"
+                      >
+                        reset
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="rounded-lg border border-border/60 p-3">
+              <div className="text-sm">Max message length</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5 mb-2">
+                {"max_message_length" in settings!
+                  ? `Override: ${settings!.max_message_length}`
+                  : `Inherits default (${globalSettings.max_message_length ?? 4000})`}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={100}
+                  max={20000}
+                  defaultValue={String(
+                    settings!.max_message_length ?? globalSettings.max_message_length ?? 4000,
+                  )}
+                  onBlur={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    if (Number.isFinite(n)) save({ max_message_length: n });
+                  }}
+                />
+                {"max_message_length" in settings! && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => save({ max_message_length: null })}
+                  >
+                    reset
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -534,6 +814,10 @@ function SettingsTab() {
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground -mt-3 mb-2">
+        These are the defaults applied to every user. You can override any of
+        them per-user from the user&apos;s row.
+      </p>
       <ToggleRow
         title="Allow file uploads"
         description="Whether users can attach images and files to messages."

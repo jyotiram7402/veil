@@ -11,10 +11,11 @@ import { useRouter } from "next/navigation";
  * The actual cookie kill happens server-side via /api/auth/logout so the
  * httpOnly auth cookie is properly cleared.
  */
-export function useEphemeralSession() {
+export function useEphemeralSession(enabled: boolean = true) {
   const router = useRouter();
 
   useEffect(() => {
+    if (!enabled) return;
     let killed = false;
     const kill = (redirect: boolean) => {
       if (killed) return;
@@ -49,5 +50,5 @@ export function useEphemeralSession() {
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("blur", onBlur);
     };
-  }, [router]);
+  }, [router, enabled]);
 }

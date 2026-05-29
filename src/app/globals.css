@@ -2,33 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------ */
+/*  Theme variables — WhatsApp-inspired palette in both modes          */
+/* ------------------------------------------------------------------ */
 @layer base {
-  :root {
-    --background: 240 6% 7%;
-    --foreground: 0 0% 98%;
-    --surface: 240 5% 11%;
+  :root,
+  .light {
+    --background: 60 5% 96%;
+    --foreground: 200 16% 12%;
+    --surface: 0 0% 100%;
 
-    --card: 240 5% 9%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 16% 12%;
 
-    --primary: 252 90% 65%;
-    --primary-foreground: 240 5% 10%;
+    --primary: 168 76% 30%;          /* WhatsApp green */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 60 5% 92%;
+    --secondary-foreground: 200 16% 12%;
 
-    --muted: 240 4% 14%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 60 5% 90%;
+    --muted-foreground: 200 8% 40%;
 
-    --accent: 240 4% 18%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 60 5% 88%;
+    --accent-foreground: 200 16% 12%;
 
-    --destructive: 0 75% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 4% 18%;
-    --input: 240 4% 18%;
-    --ring: 252 90% 65%;
+    --border: 200 8% 85%;
+    --input: 200 8% 85%;
+    --ring: 168 76% 30%;
+
+    --header: 173 65% 25%;           /* WhatsApp teal-green */
+    --header-foreground: 0 0% 100%;
+
+    --bubble-out: 90 60% 86%;        /* outgoing (light green) */
+    --bubble-in: 0 0% 100%;          /* incoming (white) */
+    --bubble-foreground: 200 16% 12%;
+    --bubble-meta: 200 6% 55%;
+    --tick: 200 80% 50%;             /* blue ticks */
+
+    --chat-bg: 50 30% 92%;           /* warm beige */
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 200 28% 8%;
+    --foreground: 0 0% 96%;
+    --surface: 200 24% 13%;
+
+    --card: 200 24% 13%;
+    --card-foreground: 0 0% 96%;
+
+    --primary: 168 76% 42%;
+    --primary-foreground: 200 28% 8%;
+
+    --secondary: 200 22% 16%;
+    --secondary-foreground: 0 0% 96%;
+
+    --muted: 200 22% 18%;
+    --muted-foreground: 200 12% 65%;
+
+    --accent: 200 22% 20%;
+    --accent-foreground: 0 0% 96%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 96%;
+
+    --border: 200 16% 22%;
+    --input: 200 16% 22%;
+    --ring: 168 76% 42%;
+
+    --header: 200 26% 14%;
+    --header-foreground: 0 0% 96%;
+
+    --bubble-out: 168 60% 22%;       /* outgoing (dark green) */
+    --bubble-in: 200 22% 17%;        /* incoming (dark slate) */
+    --bubble-foreground: 0 0% 96%;
+    --bubble-meta: 200 10% 65%;
+    --tick: 195 80% 65%;
+
+    --chat-bg: 200 28% 8%;
 
     --radius: 0.75rem;
   }
@@ -43,8 +99,7 @@
   body {
     font-feature-settings:
       "rlig" 1,
-      "calt" 1,
-      "ss01" 1;
+      "calt" 1;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -72,18 +127,40 @@
   .glass {
     background: linear-gradient(
       180deg,
-      hsl(var(--card) / 0.7) 0%,
-      hsl(var(--card) / 0.4) 100%
+      hsl(var(--card) / 0.95) 0%,
+      hsl(var(--card) / 0.85) 100%
     );
     backdrop-filter: blur(14px) saturate(160%);
     -webkit-backdrop-filter: blur(14px) saturate(160%);
     border: 1px solid hsl(var(--border) / 0.6);
   }
 
+  /* WhatsApp doodle-ish background: very faint repeating SVG pattern over a
+     warm chat-bg tint. The pattern is encoded inline so we don't fetch any
+     extra assets. */
   .chat-bg {
-    background-image:
-      radial-gradient(at 12% 20%, hsl(252 90% 65% / 0.08) 0px, transparent 50%),
-      radial-gradient(at 88% 80%, hsl(190 90% 55% / 0.06) 0px, transparent 50%);
-    background-color: hsl(var(--background));
+    background-color: hsl(var(--chat-bg));
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'><g fill='none' stroke='%23000' stroke-opacity='0.04' stroke-width='1.3'><circle cx='30' cy='30' r='12'/><circle cx='130' cy='40' r='6'/><circle cx='90' cy='110' r='16'/><circle cx='40' cy='150' r='8'/><path d='M60 70 q12 -16 24 0 t24 0'/><path d='M120 130 q10 -12 20 0'/><path d='M20 90 l16 -10 -16 -10'/><path d='M160 80 l-10 -16'/></g></svg>");
+    background-repeat: repeat;
+  }
+
+  /* Bubble tails — small rotated squares that match the bubble color */
+  .bubble-tail-in {
+    position: absolute;
+    left: -5px;
+    top: 0;
+    width: 10px;
+    height: 14px;
+    background: hsl(var(--bubble-in));
+    clip-path: polygon(100% 0, 100% 100%, 0 0);
+  }
+  .bubble-tail-out {
+    position: absolute;
+    right: -5px;
+    top: 0;
+    width: 10px;
+    height: 14px;
+    background: hsl(var(--bubble-out));
+    clip-path: polygon(0 0, 100% 0, 0 100%);
   }
 }

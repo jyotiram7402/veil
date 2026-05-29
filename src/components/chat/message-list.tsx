@@ -135,6 +135,7 @@ export function MessageList({
                 showSender={!fromMe && !prevFromSame}
                 groupedTop={prevFromSame}
                 groupedBottom={nextFromSame}
+                readByOther={false}
               />
             </div>
           );

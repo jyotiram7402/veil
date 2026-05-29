@@ -18,6 +18,7 @@ type ProfileRow = {
   created_at: string;
   suspended: boolean;
   archived: boolean;
+  settings: Json;
 };
 type ProfileInsert = {
   id: string;
@@ -30,6 +31,7 @@ type ProfileInsert = {
   created_at?: string;
   suspended?: boolean;
   archived?: boolean;
+  settings?: Json;
 };
 type ProfileUpdate = Partial<ProfileInsert>;
 
@@ -113,6 +115,7 @@ type InviteTokenRow = {
   revoked_at: string | null;
   last_used_at: string | null;
   use_count: number;
+  gate_password_hash: string | null;
 };
 type InviteTokenInsert = {
   token: string;
@@ -122,6 +125,7 @@ type InviteTokenInsert = {
   revoked_at?: string | null;
   last_used_at?: string | null;
   use_count?: number;
+  gate_password_hash?: string | null;
 };
 type InviteTokenUpdate = Partial<InviteTokenInsert>;
 

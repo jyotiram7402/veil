@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Download, FileText } from "lucide-react";
+import { Check, CheckCheck, Download, FileText } from "lucide-react";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { ImageLightbox } from "@/components/chat/image-lightbox";
 import { timeShort } from "@/lib/format";
@@ -16,6 +16,8 @@ type Props = {
   showSender: boolean;
   groupedTop: boolean;
   groupedBottom: boolean;
+  /** Whether this outgoing message is considered "read" by the other side. */
+  readByOther?: boolean;
 };
 
 export function MessageBubble({
@@ -25,27 +27,33 @@ export function MessageBubble({
   showSender,
   groupedTop,
   groupedBottom,
+  readByOther,
 }: Props) {
   const [lightbox, setLightbox] = useState(false);
 
   if (message.type === "system") {
     return (
-      <div className="my-2 flex justify-center">
-        <span className="text-[11px] text-muted-foreground italic">{message.content}</span>
+      <div className="my-3 flex justify-center">
+        <span className="rounded-full bg-card/90 px-3 py-1 text-[11px] text-muted-foreground shadow-sm">
+          {message.content}
+        </span>
       </div>
     );
   }
 
+  const isOptimistic = message.id.startsWith("local-");
+  const showTopTail = !groupedTop;
+
   return (
     <div
       className={cn(
-        "group flex w-full items-end gap-2",
+        "group flex w-full items-end gap-2 px-1",
         fromMe ? "justify-end" : "justify-start",
         groupedTop ? "mt-0.5" : "mt-2",
       )}
     >
       {!fromMe && (
-        <div className={cn("w-8 shrink-0", groupedBottom && "invisible")}>
+        <div className={cn("w-7 shrink-0", groupedBottom && "invisible")}>
           {!groupedBottom && sender && (
             <UserAvatar
               userId={sender.id}
@@ -58,28 +66,36 @@ export function MessageBubble({
         </div>
       )}
 
-      <div className={cn("flex flex-col max-w-[78%] sm:max-w-[68%]", fromMe ? "items-end" : "items-start")}>
+      <div
+        className={cn(
+          "flex flex-col max-w-[80%] sm:max-w-[64%]",
+          fromMe ? "items-end" : "items-start",
+        )}
+      >
         {showSender && sender && (
-          <span className="mb-0.5 ml-1 text-[11px] font-medium text-muted-foreground">
+          <span className="mb-0.5 ml-2 text-[11px] font-medium text-primary">
             {sender.display_name ?? sender.username}
           </span>
         )}
 
         <div
           className={cn(
-            "relative px-3 py-2 text-sm shadow-sm",
+            "relative px-2.5 py-1.5 text-sm shadow-sm rounded-lg",
             fromMe
-              ? "bg-primary text-primary-foreground rounded-2xl rounded-br-md"
-              : "bg-card border border-border/60 rounded-2xl rounded-bl-md",
-            groupedTop && fromMe && "rounded-tr-md",
-            groupedTop && !fromMe && "rounded-tl-md",
+              ? "bg-bubble-out text-bubble-foreground rounded-tr-md"
+              : "bg-bubble-in text-bubble-foreground rounded-tl-md",
+            showTopTail && (fromMe ? "rounded-tr-none" : "rounded-tl-none"),
           )}
         >
+          {showTopTail && (
+            <span aria-hidden className={fromMe ? "bubble-tail-out" : "bubble-tail-in"} />
+          )}
+
           {message.type === "image" && message.attachment_url && (
             <button
               type="button"
               onClick={() => setLightbox(true)}
-              className="block mb-1 overflow-hidden rounded-lg max-w-[280px]"
+              className="block mb-1 overflow-hidden rounded-md max-w-[280px]"
             >
               <Image
                 src={message.attachment_url}
@@ -97,12 +113,7 @@ export function MessageBubble({
               href={message.attachment_url}
               target="_blank"
               rel="noreferrer"
-              className={cn(
-                "mb-1 flex items-center gap-2 rounded-lg border px-3 py-2",
-                fromMe
-                  ? "border-white/20 bg-white/10 hover:bg-white/15"
-                  : "border-border/60 bg-background/40 hover:bg-background/60",
-              )}
+              className="mb-1 flex items-center gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-3 py-2"
             >
               <FileText className="h-5 w-5 shrink-0" />
               <div className="min-w-0 flex-1">
@@ -110,7 +121,7 @@ export function MessageBubble({
                   {message.attachment_name ?? "Attachment"}
                 </div>
                 {message.attachment_size != null && (
-                  <div className={cn("text-[11px]", fromMe ? "text-white/70" : "text-muted-foreground")}>
+                  <div className="text-[11px] text-bubble-meta">
                     {formatBytes(message.attachment_size)}
                   </div>
                 )}
@@ -120,17 +131,21 @@ export function MessageBubble({
           )}
 
           {message.content && (
-            <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+            <p className="whitespace-pre-wrap break-words leading-relaxed pr-12">
+              {message.content}
+            </p>
           )}
 
-          <span
-            className={cn(
-              "ml-2 align-middle text-[10px] tabular-nums select-none",
-              fromMe ? "text-white/70" : "text-muted-foreground",
-              "float-right pl-2 pt-1",
-            )}
-          >
+          <span className="absolute bottom-1 right-2 flex items-center gap-0.5 text-[10px] tabular-nums text-bubble-meta select-none">
             {timeShort(message.created_at)}
+            {fromMe &&
+              (isOptimistic ? (
+                <Check className="h-3 w-3 opacity-60" />
+              ) : readByOther ? (
+                <CheckCheck className="h-3 w-3 text-tick" />
+              ) : (
+                <CheckCheck className="h-3 w-3 opacity-70" />
+              ))}
           </span>
         </div>
       </div>

@@ -41,6 +41,17 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        header: {
+          DEFAULT: "hsl(var(--header))",
+          foreground: "hsl(var(--header-foreground))",
+        },
+        bubble: {
+          in: "hsl(var(--bubble-in))",
+          out: "hsl(var(--bubble-out))",
+          foreground: "hsl(var(--bubble-foreground))",
+          meta: "hsl(var(--bubble-meta))",
+        },
+        tick: "hsl(var(--tick))",
       },
       borderRadius: {
         lg: "var(--radius)",

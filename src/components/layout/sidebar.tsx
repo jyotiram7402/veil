@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { ChatList } from "@/components/chat/chat-list";
 import { NewChatDialog } from "@/components/chat/new-chat-dialog";
 import { useSessionStore } from "@/store/session-store";
@@ -78,6 +79,7 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
         </div>
 
         <div className="flex items-center gap-1">
+          <ThemeToggle />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

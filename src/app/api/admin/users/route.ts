@@ -5,11 +5,9 @@ import { usernameToInternalEmail } from "@/lib/auth/username";
 import { createUserSchema } from "@/lib/validations";
 import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
 import { generateInviteToken, generateEphemeralPassword } from "@/lib/invite-token";
+import { hashPassword } from "@/lib/password";
+import { inviteUrlFor } from "@/lib/url";
 import { env } from "@/lib/env";
-
-function inviteUrl(token: string) {
-  return `${env.APP_URL.replace(/\/$/, "")}/i/${token}`;
-}
 
 export async function GET() {
   const session = await getSessionUser();
@@ -18,49 +16,59 @@ export async function GET() {
 
   const admin = supabaseAdmin();
 
-  // pull users + their active invite tokens in two queries
   const { data: users, error } = await admin
     .from("profiles")
     .select(
-      "id, username, display_name, avatar_url, is_admin, last_seen_at, created_at, suspended, archived",
+      "id, username, display_name, avatar_url, is_admin, last_seen_at, created_at, suspended, archived, settings",
     )
     .order("created_at", { ascending: false });
   if (error) return jsonError(500, error.message);
 
   const { data: tokens } = await admin
     .from("invite_tokens")
-    .select("user_id, token, enabled, use_count, last_used_at")
+    .select("user_id, token, enabled, use_count, last_used_at, gate_password_hash")
     .is("revoked_at", null);
 
-  const tokenByUser = new Map(
-    (tokens ?? []).map((t) => [
-      t.user_id,
-      {
-        url: inviteUrl(t.token),
-        enabled: t.enabled,
-        use_count: t.use_count,
-        last_used_at: t.last_used_at,
-      },
-    ]),
+  const tokenByUser = new Map<string, { token: string; enabled: boolean; use_count: number; last_used_at: string | null; has_password: boolean }>();
+  for (const t of tokens ?? []) {
+    tokenByUser.set(t.user_id, {
+      token: t.token,
+      enabled: t.enabled,
+      use_count: t.use_count,
+      last_used_at: t.last_used_at,
+      has_password: !!t.gate_password_hash,
+    });
+  }
+
+  const withInvite = await Promise.all(
+    (users ?? []).map(async (u) => {
+      const t = tokenByUser.get(u.id);
+      return {
+        ...u,
+        invite: t
+          ? {
+              url: await inviteUrlFor(t.token),
+              enabled: t.enabled,
+              use_count: t.use_count,
+              last_used_at: t.last_used_at,
+              has_password: t.has_password,
+            }
+          : null,
+      };
+    }),
   );
 
-  return NextResponse.json({
-    users: (users ?? []).map((u) => ({ ...u, invite: tokenByUser.get(u.id) ?? null })),
-  });
+  return NextResponse.json({ users: withInvite });
 }
 
 /**
- * Create a user. Two auth paths:
- *   1. Signed-in admin: normal.
- *   2. Bootstrap: when no profiles exist, x-admin-token header must match
- *      ADMIN_BOOTSTRAP_TOKEN. The created user becomes admin.
+ * Create a user.
  *
- * Body:
- *   { username, displayName?, isAdmin?, password? }
+ * Admin users:    require `password` (used to log in at /login).
+ * Regular users:  require `password` (used to gate the invite link).
  *
- * For regular (non-admin) users we never require a password — we mint a
- * random one internally and immediately issue an invite link. For admins we
- * require a password (admins log in via /login, not invite links).
+ * For the very first profile, we accept `x-admin-token` instead of an admin
+ * session and the new user is auto-promoted to admin.
  */
 export async function POST(req: Request) {
   if (!rateLimit(`admin-users:${clientKey(req)}`, 20, 60_000)) {
@@ -81,9 +89,8 @@ export async function POST(req: Request) {
       .select("id", { head: true, count: "exact" });
     if (countErr) return jsonError(500, countErr.message);
 
-    if ((count ?? 0) > 0) {
-      return jsonError(403, "Admin only");
-    }
+    if ((count ?? 0) > 0) return jsonError(403, "Admin only");
+
     const token = req.headers.get("x-admin-token");
     if (!env.ADMIN_BOOTSTRAP_TOKEN || token !== env.ADMIN_BOOTSTRAP_TOKEN) {
       return jsonError(403, "Bootstrap token required and must match");
@@ -94,11 +101,10 @@ export async function POST(req: Request) {
   const { username, password, displayName, isAdmin } = parsed.data;
   const finalIsAdmin = isBootstrap ? true : Boolean(isAdmin);
 
-  if (finalIsAdmin && !password) {
-    return jsonError(400, "Admin users require a password");
+  if (!password) {
+    return jsonError(400, finalIsAdmin ? "Admin needs a password" : "Set an invite password");
   }
 
-  // Check the username is free
   const { data: existing } = await admin
     .from("profiles")
     .select("id")
@@ -106,13 +112,14 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (existing) return jsonError(409, "Username already taken");
 
-  // Non-admin users get a random initial password — it'll be rotated on every
-  // invite-link visit anyway, so it never needs to be known to anyone.
-  const initialPassword = password ?? generateEphemeralPassword();
+  // Auth user: admin uses the password to log in. For regular users we never
+  // need it to be valid for /login — we rotate it to junk on every invite
+  // visit anyway. We seed with the same value just to satisfy the API.
+  const seedPassword = finalIsAdmin ? password : generateEphemeralPassword();
 
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: usernameToInternalEmail(username),
-    password: initialPassword,
+    password: seedPassword,
     email_confirm: true,
     user_metadata: { username },
   });
@@ -134,11 +141,12 @@ export async function POST(req: Request) {
   let invite: { token: string; url: string } | null = null;
   if (!finalIsAdmin) {
     const token = generateInviteToken();
+    const gate_password_hash = await hashPassword(password);
     const { error: tokenErr } = await admin
       .from("invite_tokens")
-      .insert({ token, user_id: created.user.id, enabled: true });
+      .insert({ token, user_id: created.user.id, enabled: true, gate_password_hash });
     if (!tokenErr) {
-      invite = { token, url: inviteUrl(token) };
+      invite = { token, url: await inviteUrlFor(token) };
     }
   }
 

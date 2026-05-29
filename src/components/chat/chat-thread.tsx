@@ -96,18 +96,18 @@ export function ChatThread({
   }, [messages.length, onMessageVisible]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col chat-bg">
       <header
         className={cn(
-          "flex h-14 items-center gap-3 border-b border-border/60 px-3",
-          "bg-card/40 backdrop-blur",
+          "flex h-14 items-center gap-3 px-3",
+          "bg-header text-header-foreground",
         )}
       >
         <Button
           asChild
           size="icon"
           variant="ghost"
-          className="md:hidden"
+          className="md:hidden text-current hover:bg-white/10"
           aria-label="Back to chats"
         >
           <Link href="/chats">
@@ -127,9 +127,15 @@ export function ChatThread({
           className="flex flex-1 min-w-0 flex-col items-start text-left"
         >
           <span className="text-sm font-medium leading-tight truncate w-full">{titleName}</span>
-          <span className="text-[11px] text-muted-foreground truncate w-full">{subtitle}</span>
+          <span className="text-[11px] opacity-80 truncate w-full">{subtitle}</span>
         </button>
-        <Button size="icon" variant="ghost" onClick={() => setInfoOpen(true)} aria-label="Chat info">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setInfoOpen(true)}
+          aria-label="Chat info"
+          className="text-current hover:bg-white/10"
+        >
           <Info className="h-5 w-5" />
         </Button>
       </header>

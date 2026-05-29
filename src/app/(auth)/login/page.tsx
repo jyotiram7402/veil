@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LoginForm } from "@/components/auth/login-form";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -12,11 +13,14 @@ export default async function LoginPage({
   const { next } = await searchParams;
 
   return (
-    <main className="min-h-screen grid place-items-center px-6 chat-bg">
+    <main className="min-h-screen grid place-items-center px-6 chat-bg relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/20">
-            <span className="text-white font-semibold text-lg">R</span>
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+            <span className="font-semibold text-xl">V</span>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">{APP_NAME}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{APP_TAGLINE}</p>
@@ -27,7 +31,7 @@ export default async function LoginPage({
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Invite only. Ask an admin to create an account for you.
+          Admin sign-in. Regular users use their invite link instead.
         </p>
       </div>
     </main>

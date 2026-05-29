@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { loadMessagesPage } from "@/lib/queries";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
+import { effectiveSettingsForUser } from "@/lib/settings";
 import { UserChat } from "@/components/user-chat";
 import type { Profile } from "@/types/chat";
 
@@ -107,6 +108,8 @@ export default async function UserChatPage() {
     .eq("chat_id", chatId!)
     .eq("user_id", session.id);
 
+  const settings = await effectiveSettingsForUser(session.id);
+
   return (
     <UserChat
       me={session.profile}
@@ -114,6 +117,7 @@ export default async function UserChatPage() {
       chatId={chatId!}
       initialMessages={initialMessages}
       initialHasMore={initialMessages.length === MESSAGE_PAGE_SIZE}
+      settings={settings}
     />
   );
 }

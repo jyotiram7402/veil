@@ -18,7 +18,17 @@ type StagedFile = {
   previewUrl?: string;
 };
 
-export function Composer({ chatId, me }: { chatId: string; me: Profile }) {
+export function Composer({
+  chatId,
+  me,
+  uploadsEnabled = true,
+  maxLength = 4000,
+}: {
+  chatId: string;
+  me: Profile;
+  uploadsEnabled?: boolean;
+  maxLength?: number;
+}) {
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<StagedFile | null>(null);
   const [sending, setSending] = useState(false);
@@ -235,25 +245,29 @@ export function Composer({ chatId, me }: { chatId: string; me: Profile }) {
             if (f) void onPickFile(f);
           }}
         />
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={sending}
-          aria-label="Attach"
-        >
-          <Paperclip className="h-5 w-5" />
-        </Button>
+        {uploadsEnabled && (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+            aria-label="Attach"
+          >
+            <Paperclip className="h-5 w-5" />
+          </Button>
+        )}
         <Textarea
           ref={textareaRef}
           value={text}
           onChange={(e) => {
-            setText(e.target.value);
+            const v = e.target.value;
+            setText(v.length > maxLength ? v.slice(0, maxLength) : v);
             notifyTyping();
           }}
           onKeyDown={onKeyDown}
           rows={1}
+          maxLength={maxLength}
           placeholder="Type a message"
           className="flex-1 max-h-40"
         />
