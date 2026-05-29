@@ -1,9 +1,10 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/database";
+import type { supabaseServer } from "@/lib/supabase/server";
 import type { ChatSummary, MessageWithSender, Profile } from "@/types/chat";
 
-type SB = SupabaseClient<Database>;
+// Derive the client type from the factory itself so we stay aligned with
+// whatever generics supabase-js currently uses (the 3-generic shape in 2.x).
+type SB = Awaited<ReturnType<typeof supabaseServer>>;
 
 type ChatListRow = {
   last_read_at: string;
