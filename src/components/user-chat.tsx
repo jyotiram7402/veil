@@ -11,6 +11,7 @@ import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { SessionLock } from "@/components/session-lock";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import { useResumeSync } from "@/hooks/use-resume-sync";
 import { usePresence } from "@/hooks/use-presence";
 import { useTypingPrune } from "@/hooks/use-typing-prune";
 import { useChatStore } from "@/store/chat-store";
@@ -61,6 +62,7 @@ export function UserChat({
   }, [me, adminProfile]);
 
   useChatRealtime({ chatId, me, memberProfiles });
+  useResumeSync(chatId, me);
 
   const adminOnline = usePresenceStore((s) => s.online.has(adminProfile.id));
   const subtitle = adminOnline ? "online" : `last seen ${lastSeen(adminProfile.last_seen_at)}`;

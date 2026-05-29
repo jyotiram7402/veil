@@ -6,6 +6,7 @@ import { ChevronLeft, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/store/chat-store";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import { useResumeSync } from "@/hooks/use-resume-sync";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
@@ -64,6 +65,7 @@ export function ChatThread({
   }, [members]);
 
   useChatRealtime({ chatId, me, memberProfiles });
+  useResumeSync(chatId, me);
 
   const other = chatType === "direct" ? members.find((m) => m.id !== me.id) : null;
   const titleName = chatType === "group" ? (chatName ?? "Group") : (other?.display_name ?? other?.username ?? "Direct message");

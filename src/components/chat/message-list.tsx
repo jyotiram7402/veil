@@ -136,6 +136,7 @@ export function MessageList({
                 groupedTop={prevFromSame}
                 groupedBottom={nextFromSame}
                 readByOther={false}
+                canDeleteAny={me.is_admin}
               />
             </div>
           );

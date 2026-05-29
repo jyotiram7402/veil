@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { Check, CheckCheck, Download, FileText } from "lucide-react";
+import { Check, CheckCheck, Download, FileText, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { ImageLightbox } from "@/components/chat/image-lightbox";
+import { useChatStore } from "@/store/chat-store";
+import { useLongPress } from "@/hooks/use-long-press";
 import { timeShort } from "@/lib/format";
 import { formatBytes, cn } from "@/lib/utils";
 import type { MessageWithSender, Profile } from "@/types/chat";
@@ -16,8 +19,9 @@ type Props = {
   showSender: boolean;
   groupedTop: boolean;
   groupedBottom: boolean;
-  /** Whether this outgoing message is considered "read" by the other side. */
   readByOther?: boolean;
+  /** When true, caller is an admin in this chat — they can delete anyone's message. */
+  canDeleteAny?: boolean;
 };
 
 export function MessageBubble({
@@ -28,8 +32,52 @@ export function MessageBubble({
   groupedTop,
   groupedBottom,
   readByOther,
+  canDeleteAny,
 }: Props) {
   const [lightbox, setLightbox] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const removeMessage = useChatStore((s) => s.removeMessage);
+
+  // Close menu on outside click / escape
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("touchstart", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
+
+  const isOptimistic = message.id.startsWith("local-");
+  const canDelete = !isOptimistic && message.type !== "system" && (fromMe || canDeleteAny);
+
+  const openMenu = useCallback(
+    (x: number, y: number) => {
+      if (!canDelete) return;
+      setMenu({ x, y });
+    },
+    [canDelete],
+  );
+
+  const longPress = useLongPress(openMenu);
+
+  const onDelete = useCallback(async () => {
+    setMenu(null);
+    // Optimistic remove
+    removeMessage(message.chat_id, message.id);
+    const res = await fetch(`/api/messages/${message.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.error(body.error ?? "Couldn't delete");
+      // We don't roll back the optimistic remove — realtime DELETE will
+      // re-sync or the user can refresh. Keeping it simple.
+    }
+  }, [message.chat_id, message.id, removeMessage]);
 
   if (message.type === "system") {
     return (
@@ -41,7 +89,6 @@ export function MessageBubble({
     );
   }
 
-  const isOptimistic = message.id.startsWith("local-");
   const showTopTail = !groupedTop;
 
   return (
@@ -79,8 +126,9 @@ export function MessageBubble({
         )}
 
         <div
+          {...longPress}
           className={cn(
-            "relative px-2.5 py-1.5 text-sm shadow-sm rounded-lg",
+            "relative px-2.5 py-1.5 text-sm shadow-sm rounded-lg cursor-default",
             fromMe
               ? "bg-bubble-out text-bubble-foreground rounded-tr-md"
               : "bg-bubble-in text-bubble-foreground rounded-tl-md",
@@ -156,6 +204,26 @@ export function MessageBubble({
           name={message.attachment_name ?? "Image"}
           onClose={() => setLightbox(false)}
         />
+      )}
+
+      {menu && canDelete && (
+        <div
+          className="fixed z-[70] min-w-[10rem] rounded-lg border border-border/60 bg-card shadow-xl py-1"
+          style={{
+            left: Math.min(menu.x, window.innerWidth - 180),
+            top: Math.min(menu.y, window.innerHeight - 80),
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent/50"
+          >
+            <Trash2 className="h-4 w-4" /> Delete message
+          </button>
+        </div>
       )}
     </div>
   );

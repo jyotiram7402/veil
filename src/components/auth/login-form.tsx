@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +46,14 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <motion.form
+      initial={{ y: 12, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 0.15, duration: 0.4 }}
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-4"
+      noValidate
+    >
       <div className="space-y-2">
         <Label htmlFor="username">Username</Label>
         <Input
@@ -80,6 +88,6 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       <Button type="submit" className="w-full" disabled={submitting}>
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
       </Button>
-    </form>
+    </motion.form>
   );
 }

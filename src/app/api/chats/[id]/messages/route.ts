@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { messageInputSchema } from "@/lib/validations";
 import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
-import { loadMessagesPage } from "@/lib/queries";
+import { loadMessagesAfter, loadMessagesPage } from "@/lib/queries";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -13,13 +13,25 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const url = new URL(req.url);
   const before = url.searchParams.get("before") ?? undefined;
-  const limit = Math.min(
-    Math.max(parseInt(url.searchParams.get("limit") ?? `${MESSAGE_PAGE_SIZE}`, 10) || MESSAGE_PAGE_SIZE, 1),
-    100,
-  );
+  const after = url.searchParams.get("after") ?? undefined;
 
   const supabase = await supabaseServer();
   try {
+    // Resume-sync path: fetch every message strictly newer than `after`,
+    // ascending. Capped at 200 so a long absence can't blow up memory.
+    if (after) {
+      const messages = await loadMessagesAfter(supabase, id, after, 200);
+      return NextResponse.json({ messages, mode: "after" });
+    }
+
+    const limit = Math.min(
+      Math.max(
+        parseInt(url.searchParams.get("limit") ?? `${MESSAGE_PAGE_SIZE}`, 10) ||
+          MESSAGE_PAGE_SIZE,
+        1,
+      ),
+      100,
+    );
     const messages = await loadMessagesPage(supabase, id, { before, limit });
     return NextResponse.json({ messages, hasMore: messages.length === limit });
   } catch (err) {

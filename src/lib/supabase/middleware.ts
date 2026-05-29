@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 import { env } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/login", "/expired", "/api/auth/login", "/api/admin/users"];
+const PUBLIC_PATHS = ["/", "/login", "/expired", "/api/auth/login", "/api/admin/users"];
 const ADMIN_ONLY_PREFIXES = ["/chats", "/settings", "/admin", "/archive"];
 const USER_ONLY_PREFIXES = ["/chat"];
 

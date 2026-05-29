@@ -91,6 +91,9 @@ export function SessionLock({
         if (res.ok) {
           setLocked(false);
           setPassword("");
+          // Tell the chat hooks to pull anything that landed while we were
+          // away. Realtime doesn't replay missed inserts on reconnect.
+          window.dispatchEvent(new Event("veil:resume"));
           return;
         }
         if (res.status === 401) {

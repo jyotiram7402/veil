@@ -93,13 +93,18 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
 
   const summaries = rows
     .filter((r): r is ChatListRow & { chat: NonNullable<ChatListRow["chat"]> } => !!r.chat)
-    // Hide direct chats whose other party has been archived (soft-deleted).
-    // The history is preserved server-side; it's just not in the active list.
+    // Hide:
+    //   - orphan chats: the other party was hard-deleted, so chat_members is
+    //     down to just me. Without this, the chat list shows a row labeled
+    //     with the admin's own name.
+    //   - chats whose other party is archived. History is preserved
+    //     server-side, but the active sidebar shouldn't surface them.
     .filter((r) => {
       if (r.chat.type !== "direct") return true;
       const others = (r.chat.members ?? [])
         .map((m) => m.user)
         .filter((u): u is NonNullable<typeof u> => !!u && u.id !== userId);
+      if (others.length === 0) return false;
       return !others.some((u) => u.archived);
     })
     .map((r) => {
@@ -135,6 +140,35 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
     (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
   );
   return summaries;
+}
+
+/**
+ * Resume-sync fetch: every message in `chatId` strictly newer than `after`,
+ * ascending. Used by useResumeSync to close the gap whenever the realtime
+ * websocket was offline (background tab, screen lock, network blip).
+ */
+export async function loadMessagesAfter(
+  supabase: SB,
+  chatId: string,
+  after: string,
+  limit: number = 200,
+): Promise<MessageWithSender[]> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select(
+      `
+        id, chat_id, sender_id, content, type,
+        attachment_url, attachment_name, attachment_size, attachment_mime,
+        reply_to, created_at, edited_at, deleted_at,
+        sender:profiles(id, username, display_name, avatar_url)
+      `,
+    )
+    .eq("chat_id", chatId)
+    .gt("created_at", after)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as unknown as MessageWithSender[];
 }
 
 export async function loadMessagesPage(

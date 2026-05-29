@@ -267,11 +267,11 @@ function UsersTab({ archived }: { archived: boolean }) {
             <li
               key={u.id}
               className={cn(
-                "rounded-xl border border-border/60 bg-card/40 p-4",
+                "rounded-xl border border-border/60 bg-card/40 p-3 sm:p-4",
                 (u.suspended || u.archived) && "opacity-70",
               )}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2 sm:gap-3">
                 <UserAvatar
                   userId={u.id}
                   username={u.username}
