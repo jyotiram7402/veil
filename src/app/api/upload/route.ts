@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
@@ -9,6 +8,10 @@ import {
   AVATAR_MAX_BYTES,
   IMAGE_MIME_TYPES,
 } from "@/lib/constants";
+
+// Node runtime needed for the streaming multipart body. Default in App
+// Router is already Node, but pinning it makes the intent explicit.
+export const runtime = "nodejs";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
@@ -38,9 +41,9 @@ export async function POST(req: Request) {
 
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
     const path = `${session.id}/avatar-${Date.now()}.${ext}`;
-    const buf = Buffer.from(await file.arrayBuffer());
+    const bytes = new Uint8Array(await file.arrayBuffer());
 
-    const { error } = await supabase.storage.from("avatars").upload(path, buf, {
+    const { error } = await supabase.storage.from("avatars").upload(path, bytes, {
       contentType: file.type,
       upsert: true,
     });
@@ -58,10 +61,11 @@ export async function POST(req: Request) {
     }
 
     const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(0, 120);
-    const path = `${chatId}/${randomUUID()}-${safeName}`;
-    const buf = Buffer.from(await file.arrayBuffer());
+    const uuid = globalThis.crypto.randomUUID();
+    const path = `${chatId}/${uuid}-${safeName}`;
+    const bytes = new Uint8Array(await file.arrayBuffer());
 
-    const { error } = await supabase.storage.from("attachments").upload(path, buf, {
+    const { error } = await supabase.storage.from("attachments").upload(path, bytes, {
       contentType: file.type,
       upsert: false,
     });
