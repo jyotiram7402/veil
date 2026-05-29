@@ -48,7 +48,11 @@ export function SessionLock({
     return () => document.removeEventListener("keydown", onKey, true);
   }, []);
 
-  // Relock on any focus loss / visibility change
+  // Relock when the tab actually goes away. We deliberately do NOT listen
+  // for `window.blur` — on mobile that fires for things like tapping the
+  // address bar, the keyboard hiding, or the OS swipe-up gesture, which
+  // would lock the chat constantly and prevent the user from receiving
+  // messages while they're staring right at the screen.
   useEffect(() => {
     const relock = () => {
       setLocked(true);
@@ -59,11 +63,9 @@ export function SessionLock({
       if (document.visibilityState === "hidden") relock();
     };
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("blur", relock);
     window.addEventListener("pagehide", relock);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("blur", relock);
       window.removeEventListener("pagehide", relock);
     };
   }, []);

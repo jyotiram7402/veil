@@ -102,6 +102,19 @@
       "calt" 1;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
+    /* Honor the iOS notch / Android status-bar safe areas without
+       overriding individual component padding. */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* svh ("small viewport height") doesn't change when the mobile URL bar
+     hides — that's what we want for chat. Fallback to 100dvh for browsers
+     that don't support svh yet. */
+  .h-screen-mobile {
+    height: 100dvh;
+    height: 100svh;
   }
 
   ::selection {

@@ -10,6 +10,7 @@ import { Composer } from "@/components/chat/composer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { SessionLock } from "@/components/session-lock";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LiveIndicator } from "@/components/chat/live-indicator";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
 import { usePresence } from "@/hooks/use-presence";
@@ -73,8 +74,11 @@ export function UserChat({
   }
 
   const chat = (
-    <div className="flex h-[100dvh] flex-col chat-bg">
-      <header className="flex h-14 items-center gap-3 px-3 bg-header text-header-foreground">
+    <div className="flex h-screen-mobile flex-col chat-bg">
+      <header
+        className="flex h-14 items-center gap-3 px-3 bg-header text-header-foreground"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <UserAvatar
           userId={adminProfile.id}
           username={adminProfile.username}
@@ -84,8 +88,9 @@ export function UserChat({
           showPresence
         />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">
+          <div className="text-sm font-medium truncate flex items-center gap-2">
             {adminProfile.display_name ?? adminProfile.username}
+            <LiveIndicator />
           </div>
           <div className="text-[11px] opacity-80 truncate">{subtitle}</div>
         </div>

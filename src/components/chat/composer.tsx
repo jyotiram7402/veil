@@ -208,6 +208,7 @@ export function Composer({
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
       className="border-t border-border/60 bg-card/40 backdrop-blur px-3 py-3 sm:px-6"
+      style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
       {staged && (
         <div className="mb-2 flex items-center gap-3 rounded-xl border border-border/60 bg-background/60 p-2">

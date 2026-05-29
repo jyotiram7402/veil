@@ -23,6 +23,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  // Cover the iOS safe areas so the chat extends edge-to-edge under the
+  // notch / home indicator instead of leaving white strips.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -30,6 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
         <ThemeScript />
+        {/* iOS "Add to Home Screen" hints */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Veil" />
+        <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
       <body className="min-h-screen font-sans antialiased">
         <TooltipProvider delayDuration={200}>{children}</TooltipProvider>

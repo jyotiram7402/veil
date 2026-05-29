@@ -56,7 +56,7 @@ export function AppShell({
   });
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden chat-bg">
+    <div className="flex h-screen-mobile overflow-hidden chat-bg">
       <aside
         className={cn(
           "w-full md:w-[340px] md:min-w-[300px] md:max-w-[380px] flex-shrink-0",

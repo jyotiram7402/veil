@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/store/chat-store";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
+import { LiveIndicator } from "@/components/chat/live-indicator";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
@@ -128,7 +129,10 @@ export function ChatThread({
           onClick={() => setInfoOpen(true)}
           className="flex flex-1 min-w-0 flex-col items-start text-left"
         >
-          <span className="text-sm font-medium leading-tight truncate w-full">{titleName}</span>
+          <span className="text-sm font-medium leading-tight truncate w-full flex items-center gap-2">
+            {titleName}
+            <LiveIndicator />
+          </span>
           <span className="text-[11px] opacity-80 truncate w-full">{subtitle}</span>
         </button>
         <Button
