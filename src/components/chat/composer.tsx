@@ -202,6 +202,9 @@ export function Composer({ chatId, me }: { chatId: string; me: Profile }) {
       {staged && (
         <div className="mb-2 flex items-center gap-3 rounded-xl border border-border/60 bg-background/60 p-2">
           {staged.isImage && staged.previewUrl ? (
+            // next/image can't optimize a blob: URL — this is a tiny local
+            // preview only, so a plain img is the right call.
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={staged.previewUrl}
               alt="preview"

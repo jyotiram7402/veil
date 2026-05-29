@@ -122,7 +122,7 @@ export function SettingsForm({ me }: { me: Profile }) {
         <div>
           <div className="text-lg font-medium">@{profile.username}</div>
           <p className="text-sm text-muted-foreground">
-            Your username can't be changed. Ask an admin if you need a new one.
+            Your username can&apos;t be changed. Ask an admin if you need a new one.
           </p>
         </div>
       </section>
