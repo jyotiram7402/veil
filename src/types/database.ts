@@ -1,107 +1,130 @@
-// Hand-maintained mirror of supabase/schema.sql. Regenerate with
-// `supabase gen types typescript` once you connect a local Supabase CLI.
+// Hand-maintained mirror of supabase/schema.sql. Each table's Row/Insert/Update
+// is defined as a standalone type up front so the Database interface below
+// doesn't self-reference — supabase-js v2 resolves the inline
+// `Partial<Database["public"]["Tables"]["x"]["Insert"]>` form to `never` in
+// strict mode.
 
 export type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
+
+// -------- profiles --------
+type ProfileRow = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  is_admin: boolean;
+  last_seen_at: string;
+  created_at: string;
+};
+type ProfileInsert = {
+  id: string;
+  username: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  is_admin?: boolean;
+  last_seen_at?: string;
+  created_at?: string;
+};
+type ProfileUpdate = Partial<ProfileInsert>;
+
+// -------- chats --------
+type ChatRow = {
+  id: string;
+  type: "direct" | "group";
+  name: string | null;
+  avatar_url: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type ChatInsert = {
+  id?: string;
+  type: "direct" | "group";
+  name?: string | null;
+  avatar_url?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+type ChatUpdate = Partial<ChatInsert>;
+
+// -------- chat_members --------
+type ChatMemberRow = {
+  chat_id: string;
+  user_id: string;
+  role: "admin" | "member";
+  joined_at: string;
+  last_read_at: string;
+};
+type ChatMemberInsert = {
+  chat_id: string;
+  user_id: string;
+  role?: "admin" | "member";
+  joined_at?: string;
+  last_read_at?: string;
+};
+type ChatMemberUpdate = Partial<ChatMemberInsert>;
+
+// -------- messages --------
+type MessageRow = {
+  id: string;
+  chat_id: string;
+  sender_id: string | null;
+  content: string | null;
+  type: "text" | "image" | "file" | "system";
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_size: number | null;
+  attachment_mime: string | null;
+  reply_to: string | null;
+  created_at: string;
+  edited_at: string | null;
+  deleted_at: string | null;
+};
+type MessageInsert = {
+  id?: string;
+  chat_id: string;
+  sender_id: string | null;
+  content?: string | null;
+  type?: "text" | "image" | "file" | "system";
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  attachment_size?: number | null;
+  attachment_mime?: string | null;
+  reply_to?: string | null;
+  created_at?: string;
+  edited_at?: string | null;
+  deleted_at?: string | null;
+};
+type MessageUpdate = Partial<MessageInsert>;
 
 export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: {
-          id: string;
-          username: string;
-          display_name: string | null;
-          avatar_url: string | null;
-          bio: string | null;
-          is_admin: boolean;
-          last_seen_at: string;
-          created_at: string;
-        };
-        Insert: {
-          id: string;
-          username: string;
-          display_name?: string | null;
-          avatar_url?: string | null;
-          bio?: string | null;
-          is_admin?: boolean;
-          last_seen_at?: string;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Row: ProfileRow;
+        Insert: ProfileInsert;
+        Update: ProfileUpdate;
         Relationships: [];
       };
       chats: {
-        Row: {
-          id: string;
-          type: "direct" | "group";
-          name: string | null;
-          avatar_url: string | null;
-          created_by: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          type: "direct" | "group";
-          name?: string | null;
-          avatar_url?: string | null;
-          created_by?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["chats"]["Insert"]>;
+        Row: ChatRow;
+        Insert: ChatInsert;
+        Update: ChatUpdate;
         Relationships: [];
       };
       chat_members: {
-        Row: {
-          chat_id: string;
-          user_id: string;
-          role: "admin" | "member";
-          joined_at: string;
-          last_read_at: string;
-        };
-        Insert: {
-          chat_id: string;
-          user_id: string;
-          role?: "admin" | "member";
-          joined_at?: string;
-          last_read_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["chat_members"]["Insert"]>;
+        Row: ChatMemberRow;
+        Insert: ChatMemberInsert;
+        Update: ChatMemberUpdate;
         Relationships: [];
       };
       messages: {
-        Row: {
-          id: string;
-          chat_id: string;
-          sender_id: string | null;
-          content: string | null;
-          type: "text" | "image" | "file" | "system";
-          attachment_url: string | null;
-          attachment_name: string | null;
-          attachment_size: number | null;
-          attachment_mime: string | null;
-          reply_to: string | null;
-          created_at: string;
-          edited_at: string | null;
-          deleted_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          chat_id: string;
-          sender_id: string | null;
-          content?: string | null;
-          type?: "text" | "image" | "file" | "system";
-          attachment_url?: string | null;
-          attachment_name?: string | null;
-          attachment_size?: number | null;
-          attachment_mime?: string | null;
-          reply_to?: string | null;
-          created_at?: string;
-          edited_at?: string | null;
-          deleted_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["messages"]["Insert"]>;
+        Row: MessageRow;
+        Insert: MessageInsert;
+        Update: MessageUpdate;
         Relationships: [];
       };
     };
