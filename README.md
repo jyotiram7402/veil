@@ -37,6 +37,7 @@ You need a Supabase project and a Vercel account. Both are free.
    - `supabase/schema.sql`
    - `supabase/policies.sql`
    - `supabase/storage.sql`
+   - `supabase/v2.sql` *(required for v2 — admin↔user-only model + invite links)*
 3. In **Authentication → Providers → Email**, disable "Confirm email."
    (Rooms creates users via the service role, so they should be able to
    sign in immediately.)

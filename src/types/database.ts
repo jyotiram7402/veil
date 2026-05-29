@@ -16,6 +16,8 @@ type ProfileRow = {
   is_admin: boolean;
   last_seen_at: string;
   created_at: string;
+  suspended: boolean;
+  archived: boolean;
 };
 type ProfileInsert = {
   id: string;
@@ -26,6 +28,8 @@ type ProfileInsert = {
   is_admin?: boolean;
   last_seen_at?: string;
   created_at?: string;
+  suspended?: boolean;
+  archived?: boolean;
 };
 type ProfileUpdate = Partial<ProfileInsert>;
 
@@ -100,6 +104,42 @@ type MessageInsert = {
 };
 type MessageUpdate = Partial<MessageInsert>;
 
+// -------- invite_tokens --------
+type InviteTokenRow = {
+  token: string;
+  user_id: string;
+  enabled: boolean;
+  created_at: string;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  use_count: number;
+};
+type InviteTokenInsert = {
+  token: string;
+  user_id: string;
+  enabled?: boolean;
+  created_at?: string;
+  revoked_at?: string | null;
+  last_used_at?: string | null;
+  use_count?: number;
+};
+type InviteTokenUpdate = Partial<InviteTokenInsert>;
+
+// -------- app_settings --------
+type AppSettingRow = {
+  key: string;
+  value: Json;
+  updated_at: string;
+  updated_by: string | null;
+};
+type AppSettingInsert = {
+  key: string;
+  value: Json;
+  updated_at?: string;
+  updated_by?: string | null;
+};
+type AppSettingUpdate = Partial<AppSettingInsert>;
+
 export type Database = {
   public: {
     Tables: {
@@ -127,10 +167,26 @@ export type Database = {
         Update: MessageUpdate;
         Relationships: [];
       };
+      invite_tokens: {
+        Row: InviteTokenRow;
+        Insert: InviteTokenInsert;
+        Update: InviteTokenUpdate;
+        Relationships: [];
+      };
+      app_settings: {
+        Row: AppSettingRow;
+        Insert: AppSettingInsert;
+        Update: AppSettingUpdate;
+        Relationships: [];
+      };
     };
     Functions: {
       get_or_create_direct_chat: {
         Args: { p_other: string };
+        Returns: string;
+      };
+      get_or_create_admin_user_chat: {
+        Args: { p_user: string };
         Returns: string;
       };
       is_chat_member: {
@@ -139,6 +195,10 @@ export type Database = {
       };
       is_chat_admin: {
         Args: { p_chat: string; p_user: string };
+        Returns: boolean;
+      };
+      is_admin: {
+        Args: { p_user: string };
         Returns: boolean;
       };
     };

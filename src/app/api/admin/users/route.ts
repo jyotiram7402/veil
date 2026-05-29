@@ -4,32 +4,63 @@ import { getSessionUser } from "@/lib/auth/session";
 import { usernameToInternalEmail } from "@/lib/auth/username";
 import { createUserSchema } from "@/lib/validations";
 import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
+import { generateInviteToken, generateEphemeralPassword } from "@/lib/invite-token";
 import { env } from "@/lib/env";
 
-/**
- * List users — admin only.
- */
+function inviteUrl(token: string) {
+  return `${env.APP_URL.replace(/\/$/, "")}/i/${token}`;
+}
+
 export async function GET() {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
   if (!session.profile.is_admin) return jsonError(403, "Admin only");
 
   const admin = supabaseAdmin();
-  const { data, error } = await admin
-    .from("profiles")
-    .select("id, username, display_name, avatar_url, is_admin, last_seen_at, created_at")
-    .order("created_at", { ascending: false });
 
+  // pull users + their active invite tokens in two queries
+  const { data: users, error } = await admin
+    .from("profiles")
+    .select(
+      "id, username, display_name, avatar_url, is_admin, last_seen_at, created_at, suspended, archived",
+    )
+    .order("created_at", { ascending: false });
   if (error) return jsonError(500, error.message);
-  return NextResponse.json({ users: data });
+
+  const { data: tokens } = await admin
+    .from("invite_tokens")
+    .select("user_id, token, enabled, use_count, last_used_at")
+    .is("revoked_at", null);
+
+  const tokenByUser = new Map(
+    (tokens ?? []).map((t) => [
+      t.user_id,
+      {
+        url: inviteUrl(t.token),
+        enabled: t.enabled,
+        use_count: t.use_count,
+        last_used_at: t.last_used_at,
+      },
+    ]),
+  );
+
+  return NextResponse.json({
+    users: (users ?? []).map((u) => ({ ...u, invite: tokenByUser.get(u.id) ?? null })),
+  });
 }
 
 /**
- * Create a user. Two ways in:
- *   1. Signed-in admin: normal path.
- *   2. Bootstrap: when there are zero profiles, requires x-admin-token header
- *      matching ADMIN_BOOTSTRAP_TOKEN. The first user created this way is
- *      automatically flagged as admin.
+ * Create a user. Two auth paths:
+ *   1. Signed-in admin: normal.
+ *   2. Bootstrap: when no profiles exist, x-admin-token header must match
+ *      ADMIN_BOOTSTRAP_TOKEN. The created user becomes admin.
+ *
+ * Body:
+ *   { username, displayName?, isAdmin?, password? }
+ *
+ * For regular (non-admin) users we never require a password — we mint a
+ * random one internally and immediately issue an invite link. For admins we
+ * require a password (admins log in via /login, not invite links).
  */
 export async function POST(req: Request) {
   if (!rateLimit(`admin-users:${clientKey(req)}`, 20, 60_000)) {
@@ -41,7 +72,6 @@ export async function POST(req: Request) {
 
   const admin = supabaseAdmin();
 
-  // Determine auth path
   let isBootstrap = false;
   const session = await getSessionUser();
 
@@ -54,7 +84,6 @@ export async function POST(req: Request) {
     if ((count ?? 0) > 0) {
       return jsonError(403, "Admin only");
     }
-    // No users yet — accept the bootstrap token instead.
     const token = req.headers.get("x-admin-token");
     if (!env.ADMIN_BOOTSTRAP_TOKEN || token !== env.ADMIN_BOOTSTRAP_TOKEN) {
       return jsonError(403, "Bootstrap token required and must match");
@@ -63,8 +92,13 @@ export async function POST(req: Request) {
   }
 
   const { username, password, displayName, isAdmin } = parsed.data;
+  const finalIsAdmin = isBootstrap ? true : Boolean(isAdmin);
 
-  // Pre-check that the username is free so we can return a clean 409.
+  if (finalIsAdmin && !password) {
+    return jsonError(400, "Admin users require a password");
+  }
+
+  // Check the username is free
   const { data: existing } = await admin
     .from("profiles")
     .select("id")
@@ -72,9 +106,13 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (existing) return jsonError(409, "Username already taken");
 
+  // Non-admin users get a random initial password — it'll be rotated on every
+  // invite-link visit anyway, so it never needs to be known to anyone.
+  const initialPassword = password ?? generateEphemeralPassword();
+
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: usernameToInternalEmail(username),
-    password,
+    password: initialPassword,
     email_confirm: true,
     user_metadata: { username },
   });
@@ -82,23 +120,31 @@ export async function POST(req: Request) {
     return jsonError(500, createErr?.message ?? "Could not create user");
   }
 
-  const finalIsAdmin = isBootstrap ? true : Boolean(isAdmin);
-
   const { error: profileErr } = await admin.from("profiles").insert({
     id: created.user.id,
     username,
     display_name: displayName ?? null,
     is_admin: finalIsAdmin,
   });
-
   if (profileErr) {
-    // Roll back the auth user so the username doesn't strand.
     await admin.auth.admin.deleteUser(created.user.id).catch(() => undefined);
     return jsonError(500, profileErr.message);
+  }
+
+  let invite: { token: string; url: string } | null = null;
+  if (!finalIsAdmin) {
+    const token = generateInviteToken();
+    const { error: tokenErr } = await admin
+      .from("invite_tokens")
+      .insert({ token, user_id: created.user.id, enabled: true });
+    if (!tokenErr) {
+      invite = { token, url: inviteUrl(token) };
+    }
   }
 
   return NextResponse.json({
     ok: true,
     user: { id: created.user.id, username, isAdmin: finalIsAdmin },
+    invite,
   });
 }

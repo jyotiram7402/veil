@@ -20,7 +20,10 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const createUserSchema = z.object({
   username: usernameSchema,
-  password: passwordSchema,
+  // Password is optional now — admin-created users normally sign in via their
+  // invite link (we mint an ephemeral password per visit). Provide a password
+  // only when bootstrapping the first admin.
+  password: passwordSchema.optional(),
   displayName: z.string().trim().max(60).optional(),
   isAdmin: z.boolean().optional(),
 });

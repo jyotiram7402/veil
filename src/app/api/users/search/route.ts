@@ -11,10 +11,14 @@ export async function GET(req: Request) {
   const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
 
   const supabase = await supabaseServer();
+  // Only admins use this endpoint to pick a person to talk to. We hide
+  // suspended/archived users from the picker.
   const query = supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, last_seen_at")
+    .select("id, username, display_name, avatar_url, last_seen_at, is_admin, suspended, archived, bio")
     .neq("id", session.id)
+    .eq("suspended", false)
+    .eq("archived", false)
     .order("username")
     .limit(25);
 
