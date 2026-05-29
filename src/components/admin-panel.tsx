@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArchiveRestore,
   Copy,
   KeyRound,
   Link as LinkIcon,
@@ -12,7 +13,6 @@ import {
   Plus,
   Power,
   PowerOff,
-  RefreshCcw,
   Settings as SettingsIcon,
   Shield,
   Trash2,
@@ -63,23 +63,32 @@ type Row = {
   invite: Invite | null;
 };
 
-type Tab = "users" | "settings";
+type Tab = "users" | "archive" | "defaults" | "account";
 
 export function AdminPanel() {
   const [tab, setTab] = useState<Tab>("users");
 
   return (
     <div>
-      <div className="rounded-lg border border-border/60 bg-background/40 p-1 inline-flex mb-6">
+      <div className="rounded-lg border border-border/60 bg-background/40 p-1 inline-flex mb-6 flex-wrap gap-1">
         <TabButton active={tab === "users"} onClick={() => setTab("users")}>
           Users
         </TabButton>
-        <TabButton active={tab === "settings"} onClick={() => setTab("settings")}>
+        <TabButton active={tab === "archive"} onClick={() => setTab("archive")}>
+          Archive
+        </TabButton>
+        <TabButton active={tab === "defaults"} onClick={() => setTab("defaults")}>
           Defaults
+        </TabButton>
+        <TabButton active={tab === "account"} onClick={() => setTab("account")}>
+          Account
         </TabButton>
       </div>
 
-      {tab === "users" ? <UsersTab /> : <SettingsTab />}
+      {tab === "users" && <UsersTab archived={false} />}
+      {tab === "archive" && <UsersTab archived={true} />}
+      {tab === "defaults" && <SettingsTab />}
+      {tab === "account" && <AccountTab />}
     </div>
   );
 }
@@ -106,7 +115,7 @@ function TabButton({
   );
 }
 
-function UsersTab() {
+function UsersTab({ archived }: { archived: boolean }) {
   const router = useRouter();
   const me = useSessionStore((s) => s.profile);
   const [users, setUsers] = useState<Row[]>([]);
@@ -118,14 +127,14 @@ function UsersTab() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/users", { cache: "no-store" });
+      const res = await fetch(`/api/admin/users?archived=${archived}`, { cache: "no-store" });
       if (!res.ok) return;
       const body = (await res.json()) as { users: Row[] };
       setUsers(body.users);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [archived]);
 
   useEffect(() => {
     void reload();
@@ -179,15 +188,45 @@ function UsersTab() {
     await reload();
   }
 
-  async function deleteUser(userId: string) {
-    if (!confirm("Delete this user? Their chat history stays in your archive.")) return;
+  async function archiveUser(userId: string) {
+    if (!confirm("Move to Archive? Their chats stay safe, but they can no longer sign in.")) return;
     const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.error(body.error ?? "Couldn't archive");
+      return;
+    }
+    setUsers((u) => u.filter((x) => x.id !== userId));
+    toast.success("Moved to Archive");
+  }
+
+  async function restoreUser(userId: string) {
+    if (!confirm("Restore this user? You'll need to issue them a new invite link.")) return;
+    const res = await fetch(`/api/admin/users/${userId}/restore`, { method: "POST" });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.error(body.error ?? "Couldn't restore");
+      return;
+    }
+    setUsers((u) => u.filter((x) => x.id !== userId));
+    toast.success("Restored");
+  }
+
+  async function deleteForever(userId: string) {
+    if (
+      !confirm(
+        "Permanently delete this user and ALL their messages? This cannot be undone.",
+      )
+    )
+      return;
+    const res = await fetch(`/api/admin/users/${userId}?hard=1`, { method: "DELETE" });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       toast.error(body.error ?? "Couldn't delete");
       return;
     }
     setUsers((u) => u.filter((x) => x.id !== userId));
+    toast.success("Deleted permanently");
   }
 
   function copyLink(url: string) {
@@ -200,15 +239,27 @@ function UsersTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">{users.length} members</p>
-        <Button onClick={() => setCreateOpen(true)}>
-          <UserPlus className="h-4 w-4" /> New member
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          {users.length} {archived ? "archived" : "members"}
+        </p>
+        {!archived && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <UserPlus className="h-4 w-4" /> New member
+          </Button>
+        )}
       </div>
 
       {loading ? (
         <div className="grid place-items-center py-12">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : users.length === 0 ? (
+        <div className="rounded-xl border border-border/60 bg-card/40 p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            {archived
+              ? "No archived users yet. Deleted accounts will land here."
+              : "No members yet. Create one with the button above."}
+          </p>
         </div>
       ) : (
         <ul className="space-y-2">
@@ -217,7 +268,7 @@ function UsersTab() {
               key={u.id}
               className={cn(
                 "rounded-xl border border-border/60 bg-card/40 p-4",
-                (u.suspended || u.archived) && "opacity-60",
+                (u.suspended || u.archived) && "opacity-70",
               )}
             >
               <div className="flex items-start gap-3">
@@ -227,10 +278,10 @@ function UsersTab() {
                   displayName={u.display_name}
                   avatarUrl={u.avatar_url}
                   size="md"
-                  showPresence
+                  showPresence={!archived}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium truncate">
                       {u.display_name ?? u.username}
                     </span>
@@ -239,9 +290,14 @@ function UsersTab() {
                         <Shield className="h-3 w-3" /> admin
                       </span>
                     )}
-                    {u.suspended && (
+                    {u.suspended && !u.archived && (
                       <span className="rounded-full bg-amber-500/15 text-amber-400 px-2 py-0.5 text-[10px] font-medium">
                         suspended
+                      </span>
+                    )}
+                    {u.archived && (
+                      <span className="rounded-full bg-zinc-500/15 text-muted-foreground px-2 py-0.5 text-[10px] font-medium">
+                        archived
                       </span>
                     )}
                   </div>
@@ -249,7 +305,7 @@ function UsersTab() {
                     @{u.username} · joined {new Date(u.created_at).toLocaleDateString()} · last seen {lastSeen(u.last_seen_at)}
                   </div>
 
-                  {!u.is_admin && (
+                  {!archived && !u.is_admin && (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {u.invite ? (
                         <>
@@ -285,7 +341,7 @@ function UsersTab() {
 
                 {u.id !== me?.id && (
                   <div className="flex items-center gap-1">
-                    {!u.is_admin && (
+                    {!archived && !u.is_admin && (
                       <Button size="sm" variant="outline" onClick={() => openChat(u.id)}>
                         <MessageSquare className="h-3.5 w-3.5" /> Chat
                       </Button>
@@ -297,49 +353,66 @@ function UsersTab() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {!u.is_admin && (
+                        {archived ? (
                           <>
-                            <DropdownMenuItem onClick={() => setSettingsFor(u)}>
-                              <SettingsIcon className="h-4 w-4" /> Per-user settings
+                            <DropdownMenuItem onClick={() => restoreUser(u.id)}>
+                              <ArchiveRestore className="h-4 w-4" /> Restore user
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setRotateFor(u)}>
-                              <KeyRound className="h-4 w-4" /> Change password / link
-                            </DropdownMenuItem>
-                            {u.invite && (
-                              <DropdownMenuItem
-                                onClick={() => toggleInvite(u.id, !u.invite!.enabled)}
-                              >
-                                {u.invite.enabled ? (
-                                  <>
-                                    <PowerOff className="h-4 w-4" /> Disable link
-                                  </>
-                                ) : (
-                                  <>
-                                    <Power className="h-4 w-4" /> Enable link
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => toggleSuspend(u.id, !u.suspended)}>
-                              {u.suspended ? "Reinstate" : "Suspend"}
-                            </DropdownMenuItem>
-                            {u.invite && (
-                              <DropdownMenuItem
-                                onClick={() => revokeInvite(u.id)}
-                                className="text-destructive"
-                              >
-                                Revoke link
-                              </DropdownMenuItem>
-                            )}
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => deleteForever(u.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete forever
+                            </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <>
+                            {!u.is_admin && (
+                              <>
+                                <DropdownMenuItem onClick={() => setSettingsFor(u)}>
+                                  <SettingsIcon className="h-4 w-4" /> Per-user settings
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setRotateFor(u)}>
+                                  <KeyRound className="h-4 w-4" /> Change password / link
+                                </DropdownMenuItem>
+                                {u.invite && (
+                                  <DropdownMenuItem
+                                    onClick={() => toggleInvite(u.id, !u.invite!.enabled)}
+                                  >
+                                    {u.invite.enabled ? (
+                                      <>
+                                        <PowerOff className="h-4 w-4" /> Disable link
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Power className="h-4 w-4" /> Enable link
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => toggleSuspend(u.id, !u.suspended)}>
+                                  {u.suspended ? "Reinstate" : "Suspend"}
+                                </DropdownMenuItem>
+                                {u.invite && (
+                                  <DropdownMenuItem
+                                    onClick={() => revokeInvite(u.id)}
+                                    className="text-destructive"
+                                  >
+                                    Revoke link
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => archiveUser(u.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" /> Move to Archive
+                            </DropdownMenuItem>
                           </>
                         )}
-                        <DropdownMenuItem
-                          onClick={() => deleteUser(u.id)}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" /> Delete user
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -671,8 +744,7 @@ function UserSettingsDialog({
     ? [
         { key: "uploads_enabled", label: "Allow file uploads" },
         { key: "typing_indicator", label: "Show typing indicators" },
-        { key: "screen_guard", label: "Screen guard (anti-leak)" },
-        { key: "user_session_ephemeral", label: "Ephemeral session (logout on tab switch)" },
+        { key: "screen_guard", label: "Lock screen on blur" },
       ]
     : [];
 
@@ -682,7 +754,8 @@ function UserSettingsDialog({
         <DialogHeader>
           <DialogTitle>Settings for @{user.username}</DialogTitle>
           <DialogDescription>
-            Per-user overrides. Off = use the default from the Defaults tab.
+            Per-user overrides. <strong>reset</strong> clears the override and the user
+            inherits the default again.
           </DialogDescription>
         </DialogHeader>
         {!settings ? (
@@ -815,8 +888,7 @@ function SettingsTab() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground -mt-3 mb-2">
-        These are the defaults applied to every user. You can override any of
-        them per-user from the user&apos;s row.
+        Defaults applied to every user. Override per-user from the user&apos;s row.
       </p>
       <ToggleRow
         title="Allow file uploads"
@@ -833,17 +905,10 @@ function SettingsTab() {
         disabled={saving}
       />
       <ToggleRow
-        title="Screen guard (anti-leak overlay)"
-        description="Best-effort blur + watermark in user chat. Cannot prevent screenshots completely."
+        title="Lock screen on blur"
+        description="Hide the chat behind a password prompt whenever the user looks away."
         value={Boolean(settings.screen_guard)}
         onChange={(v) => save({ screen_guard: v })}
-        disabled={saving}
-      />
-      <ToggleRow
-        title="Ephemeral user sessions"
-        description="End user session when their tab is hidden. They must re-open the invite link to return."
-        value={Boolean(settings.user_session_ephemeral)}
-        onChange={(v) => save({ user_session_ephemeral: v })}
         disabled={saving}
       />
 
@@ -890,6 +955,159 @@ function ToggleRow({
         <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
       </div>
       <Switch checked={value} onCheckedChange={onChange} disabled={disabled} />
+    </div>
+  );
+}
+
+function AccountTab() {
+  const me = useSessionStore((s) => s.profile);
+  const router = useRouter();
+
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    if (me) {
+      setUsername(me.username);
+      setDisplayName(me.display_name ?? "");
+    }
+  }, [me]);
+
+  if (!me) {
+    return (
+      <div className="grid place-items-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  async function saveProfile() {
+    const patch: Record<string, unknown> = {};
+    if (username && username !== me!.username) patch.username = username.trim().toLowerCase();
+    if (displayName !== (me!.display_name ?? "")) patch.displayName = displayName.trim() || null;
+    if (Object.keys(patch).length === 0) {
+      toast.info("Nothing to save");
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const res = await fetch("/api/admin/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error ?? "Couldn't save");
+        return;
+      }
+      toast.success("Profile updated");
+      router.refresh();
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function savePassword() {
+    if (!currentPassword) return toast.error("Enter your current password");
+    if (newPassword.length < 8) return toast.error("New password must be at least 8 characters");
+    if (newPassword !== confirmPassword) return toast.error("Passwords don't match");
+
+    setSavingPassword(true);
+    try {
+      const res = await fetch("/api/admin/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error ?? "Couldn't change password");
+        return;
+      }
+      toast.success("Password updated");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-md">
+      <section className="space-y-4 rounded-xl border border-border/60 bg-card/40 p-5">
+        <h2 className="text-sm font-semibold">Profile</h2>
+        <div className="space-y-2">
+          <Label htmlFor="acctUsername">Username</Label>
+          <Input
+            id="acctUsername"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="lowercase, numbers, _"
+            autoComplete="off"
+          />
+          <p className="text-xs text-muted-foreground">
+            Changing this updates the username you sign in with at /login.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="acctDisplay">Display name</Label>
+          <Input
+            id="acctDisplay"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="(optional)"
+            maxLength={60}
+          />
+        </div>
+        <Button onClick={saveProfile} disabled={savingProfile}>
+          {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save profile"}
+        </Button>
+      </section>
+
+      <section className="space-y-4 rounded-xl border border-border/60 bg-card/40 p-5">
+        <h2 className="text-sm font-semibold">Password</h2>
+        <div className="space-y-2">
+          <Label htmlFor="curPwd">Current password</Label>
+          <Input
+            id="curPwd"
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="newPwd">New password</Label>
+          <Input
+            id="newPwd"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+            placeholder="at least 8 characters"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="newPwd2">Confirm new password</Label>
+          <Input
+            id="newPwd2"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+        </div>
+        <Button onClick={savePassword} disabled={savingPassword}>
+          {savingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : "Change password"}
+        </Button>
+      </section>
     </div>
   );
 }

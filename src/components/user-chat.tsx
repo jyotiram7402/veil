@@ -8,10 +8,9 @@ import { UserAvatar } from "@/components/chat/user-avatar";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
-import { ScreenGuard } from "@/components/screen-guard";
+import { SessionLock } from "@/components/session-lock";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
-import { useEphemeralSession } from "@/hooks/use-ephemeral-session";
 import { usePresence } from "@/hooks/use-presence";
 import { useTypingPrune } from "@/hooks/use-typing-prune";
 import { useChatStore } from "@/store/chat-store";
@@ -47,7 +46,6 @@ export function UserChat({
 
   usePresence(me);
   useTypingPrune();
-  useEphemeralSession(settings.user_session_ephemeral);
 
   const memberProfiles = useMemo(() => {
     const m: Record<string, Pick<Profile, "id" | "username" | "display_name" | "avatar_url">> = {};
@@ -72,9 +70,9 @@ export function UserChat({
     router.replace("/expired");
   }
 
-  const body = (
+  const chat = (
     <div className="flex h-[100dvh] flex-col chat-bg">
-      <header className="flex h-14 items-center gap-3 border-b border-border/60 px-3 bg-[hsl(var(--header))] text-[hsl(var(--header-foreground))]">
+      <header className="flex h-14 items-center gap-3 px-3 bg-header text-header-foreground">
         <UserAvatar
           userId={adminProfile.id}
           username={adminProfile.username}
@@ -102,8 +100,7 @@ export function UserChat({
       </header>
 
       <MessageList chatId={chatId} me={me} memberProfiles={memberProfiles} />
-      {settings.typing_indicator && <TypingIndicator chatId={chatId} />}
-      {!settings.typing_indicator && <div className="h-5" />}
+      {settings.typing_indicator ? <TypingIndicator chatId={chatId} /> : <div className="h-5" />}
       <Composer
         chatId={chatId}
         me={me}
@@ -113,8 +110,11 @@ export function UserChat({
     </div>
   );
 
+  // The screen guard is now the SessionLock itself — opaque cover, password
+  // to unlock. We keep the old screen_guard setting as a no-op kill-switch
+  // (off = no lock at all, on = lock as designed).
   if (settings.screen_guard) {
-    return <ScreenGuard watermark={`@${me.username}`}>{body}</ScreenGuard>;
+    return <SessionLock me={me}>{chat}</SessionLock>;
   }
-  return body;
+  return chat;
 }

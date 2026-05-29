@@ -9,19 +9,27 @@ import { hashPassword } from "@/lib/password";
 import { inviteUrlFor } from "@/lib/url";
 import { env } from "@/lib/env";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
   if (!session.profile.is_admin) return jsonError(403, "Admin only");
 
+  const url = new URL(req.url);
+  const archivedParam = url.searchParams.get("archived"); // "true" | "false" | null
+  const wantArchived =
+    archivedParam === "true" ? true : archivedParam === "false" ? false : null;
+
   const admin = supabaseAdmin();
 
-  const { data: users, error } = await admin
+  let q = admin
     .from("profiles")
     .select(
       "id, username, display_name, avatar_url, is_admin, last_seen_at, created_at, suspended, archived, settings",
     )
     .order("created_at", { ascending: false });
+  if (wantArchived !== null) q = q.eq("archived", wantArchived);
+
+  const { data: users, error } = await q;
   if (error) return jsonError(500, error.message);
 
   const { data: tokens } = await admin

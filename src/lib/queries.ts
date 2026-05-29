@@ -17,7 +17,10 @@ type ChatListRow = {
     created_at: string;
     updated_at: string;
     members: Array<{
-      user: Pick<Profile, "id" | "username" | "display_name" | "avatar_url"> | null;
+      user: (Pick<Profile, "id" | "username" | "display_name" | "avatar_url"> & {
+        archived?: boolean;
+        suspended?: boolean;
+      }) | null;
     }> | null;
   } | null;
 };
@@ -45,7 +48,7 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
         chat:chats(
           id, type, name, avatar_url, created_by, created_at, updated_at,
           members:chat_members(
-            user:profiles(id, username, display_name, avatar_url)
+            user:profiles(id, username, display_name, avatar_url, archived, suspended)
           )
         )
       `,
@@ -90,6 +93,15 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
 
   const summaries = rows
     .filter((r): r is ChatListRow & { chat: NonNullable<ChatListRow["chat"]> } => !!r.chat)
+    // Hide direct chats whose other party has been archived (soft-deleted).
+    // The history is preserved server-side; it's just not in the active list.
+    .filter((r) => {
+      if (r.chat.type !== "direct") return true;
+      const others = (r.chat.members ?? [])
+        .map((m) => m.user)
+        .filter((u): u is NonNullable<typeof u> => !!u && u.id !== userId);
+      return !others.some((u) => u.archived);
+    })
     .map((r) => {
       const chat = r.chat;
       const members = (chat.members ?? [])
