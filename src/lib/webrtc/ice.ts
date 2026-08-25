@@ -14,8 +14,15 @@ const STUN_SERVERS: RTCIceServer[] = [
 ];
 
 function turnFromEnv(): RTCIceServer[] {
-  const urls = process.env.NEXT_PUBLIC_TURN_URL;
-  if (!urls) return [];
+  const raw = process.env.NEXT_PUBLIC_TURN_URL;
+  if (!raw) return [];
+  // Allow a comma-separated list so several TURN endpoints (UDP/TCP/TLS) can be
+  // tried — this dramatically improves connect success on restrictive networks.
+  const urls = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (urls.length === 0) return [];
   const username = process.env.NEXT_PUBLIC_TURN_USERNAME;
   const credential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
   return [{ urls, ...(username ? { username } : {}), ...(credential ? { credential } : {}) }];
