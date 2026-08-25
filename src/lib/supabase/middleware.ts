@@ -18,6 +18,7 @@ function isPublic(pathname: string) {
   // room join flow (public — the access code is the credential)
   if (pathname === "/join" || pathname.startsWith("/join/")) return true;
   if (pathname === "/api/rooms/join") return true;
+  if (pathname.startsWith("/api/debug/")) return true; // TEMPORARY — remove after login debug
   if (pathname.startsWith("/api/auth/")) return true;
   if (pathname.startsWith("/_next")) return true;
   if (pathname.startsWith("/favicon")) return true;
