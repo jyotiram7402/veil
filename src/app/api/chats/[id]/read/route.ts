@@ -16,6 +16,6 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     .eq("chat_id", id)
     .eq("user_id", session.id);
 
-  if (error) return jsonError(500, error.message);
+  if (error) return jsonError(500, "Something went wrong");
   return NextResponse.json({ ok: true, at: now });
 }

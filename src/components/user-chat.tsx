@@ -10,6 +10,8 @@ import { Composer } from "@/components/chat/composer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { SessionLock } from "@/components/session-lock";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CallProvider } from "@/components/call/call-provider";
+import { CallButton } from "@/components/call/call-button";
 import { LiveIndicator } from "@/components/chat/live-indicator";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
@@ -94,6 +96,8 @@ export function UserChat({
           </div>
           <div className="text-[11px] opacity-80 truncate">{subtitle}</div>
         </div>
+        <CallButton mode="voice" className="text-current hover:bg-white/10" />
+        <CallButton mode="video" className="text-current hover:bg-white/10" />
         <ThemeToggle />
         <Button
           size="icon"
@@ -120,8 +124,12 @@ export function UserChat({
   // The screen guard is now the SessionLock itself — opaque cover, password
   // to unlock. We keep the old screen_guard setting as a no-op kill-switch
   // (off = no lock at all, on = lock as designed).
-  if (settings.screen_guard) {
-    return <SessionLock me={me}>{chat}</SessionLock>;
-  }
-  return chat;
+  // CallProvider wraps everything so the WebRTC signaling channel + call
+  // overlay live for the whole time this 1-to-1 chat is open.
+  const inner = settings.screen_guard ? <SessionLock me={me}>{chat}</SessionLock> : chat;
+  return (
+    <CallProvider me={me} other={adminProfile} chatId={chatId}>
+      {inner}
+    </CallProvider>
+  );
 }

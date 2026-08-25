@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/chat/user-avatar";
+import { shareOrCopy } from "@/lib/share";
 import { lastSeen } from "@/lib/format";
 import { useSessionStore } from "@/store/session-store";
 import { cn } from "@/lib/utils";
@@ -229,11 +230,10 @@ function UsersTab({ archived }: { archived: boolean }) {
     toast.success("Deleted permanently");
   }
 
-  function copyLink(url: string) {
-    navigator.clipboard.writeText(url).then(
-      () => toast.success("Link copied"),
-      () => toast.error("Copy failed"),
-    );
+  async function copyLink(url: string) {
+    const how = await shareOrCopy(url, { title: "Invite link" });
+    if (how === "failed") toast.error("Copy failed");
+    else toast.success(how === "shared" ? "Shared" : "Link copied");
   }
 
   return (

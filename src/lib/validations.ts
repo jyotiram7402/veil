@@ -71,3 +71,68 @@ export const createChatSchema = z.discriminatedUnion("kind", [
   createDirectChatSchema,
   createGroupChatSchema,
 ]);
+
+// ---------------------------------------------------------------------------
+// Rooms & invitations
+// ---------------------------------------------------------------------------
+
+export const createRoomSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(80),
+  chatEnabled: z.boolean().optional(),
+  voiceEnabled: z.boolean().optional(),
+  videoEnabled: z.boolean().optional(),
+  maxParticipants: z.number().int().min(2).max(500).optional(),
+  expiresInMinutes: z.number().int().min(1).max(60 * 24 * 30).optional(),
+});
+export type CreateRoomInput = z.infer<typeof createRoomSchema>;
+
+export const updateRoomSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  chatEnabled: z.boolean().optional(),
+  voiceEnabled: z.boolean().optional(),
+  videoEnabled: z.boolean().optional(),
+  maxParticipants: z.number().int().min(2).max(500).nullable().optional(),
+  // Admins may end or (re)lock a room; they can't force 'expired' by hand.
+  status: z.enum(["active", "ended", "locked"]).optional(),
+});
+export type UpdateRoomInput = z.infer<typeof updateRoomSchema>;
+
+export const createInviteSchema = z.object({
+  label: z.string().trim().max(60).optional(),
+  // number = expires in N minutes; null = never; omitted = server default (24h)
+  expiresInMinutes: z.number().int().min(1).max(60 * 24 * 30).nullable().optional(),
+  maxUses: z.number().int().min(1).max(1000).nullable().optional(),
+});
+export type CreateInviteInput = z.infer<typeof createInviteSchema>;
+
+// Temporary display name: optional, short, no control characters and no angle
+// brackets. React escapes on render (so this is defense-in-depth, not the only
+// XSS guard). Empty/whitespace-only normalizes to undefined. Unicode letters
+// (e.g. non-Latin names) are allowed.
+const DISPLAY_NAME_RE = new RegExp("^[^\\u0000-\\u001F\\u007F-\\u009F<>]+$", "u");
+export const displayNameSchema = z
+  .string()
+  .trim()
+  .max(40, "Keep it under 40 characters")
+  .regex(DISPLAY_NAME_RE, "Please use a simpler name")
+  .transform((s) => s.replace(/\s+/g, " "));
+
+// The access code is a "<selector>.<verifier>" split token, not a UUID.
+export const joinRoomSchema = z.object({
+  code: z.string().trim().min(8).max(200),
+  displayName: z
+    .union([displayNameSchema, z.literal("")])
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+});
+export type JoinRoomInput = z.infer<typeof joinRoomSchema>;
+
+export const updateParticipantSchema = z
+  .object({
+    blocked: z.boolean().optional(),
+    canChat: z.boolean().optional(),
+    canVoice: z.boolean().optional(),
+    canVideo: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
+export type UpdateParticipantInput = z.infer<typeof updateParticipantSchema>;

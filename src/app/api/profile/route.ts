@@ -25,6 +25,6 @@ export async function PATCH(req: Request) {
     .select()
     .single();
 
-  if (error) return jsonError(500, error.message);
+  if (error) return jsonError(500, "Something went wrong");
   return NextResponse.json({ profile: data });
 }

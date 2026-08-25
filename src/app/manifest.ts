@@ -8,7 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: APP_TAGLINE,
     start_url: "/",
     display: "standalone",
-    orientation: "portrait",
+    // Allow rotation so installed-PWA video calls can use landscape.
+    orientation: "any",
     background_color: "#0B141A",
     theme_color: "#075E54",
     icons: [

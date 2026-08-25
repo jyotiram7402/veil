@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, MessageSquarePlus, Settings, Shield, Users } from "lucide-react";
+import { DoorOpen, LogOut, MessageSquarePlus, Settings, Shield, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +70,11 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
                   <Shield className="h-4 w-4" /> Members
                 </DropdownMenuItem>
               )}
+              {profile.is_admin && (
+                <DropdownMenuItem onClick={() => router.push("/rooms")}>
+                  <DoorOpen className="h-4 w-4" /> Rooms
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="text-destructive">
                 <LogOut className="h-4 w-4" /> Sign out
@@ -104,6 +109,19 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Members</TooltipContent>
+            </Tooltip>
+          )}
+
+          {profile.is_admin && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="ghost" asChild aria-label="Rooms">
+                  <Link href="/rooms">
+                    <DoorOpen className="h-5 w-5" />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Rooms</TooltipContent>
             </Tooltip>
           )}
         </div>

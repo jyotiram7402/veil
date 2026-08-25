@@ -19,6 +19,6 @@ export async function DELETE(
     .eq("chat_id", id)
     .eq("user_id", userId);
 
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Not allowed");
   return NextResponse.json({ ok: true });
 }

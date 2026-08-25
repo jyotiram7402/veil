@@ -22,6 +22,11 @@ export const env = {
   INTERNAL_EMAIL_DOMAIN: process.env.INTERNAL_EMAIL_DOMAIN ?? "rooms.local",
   ADMIN_BOOTSTRAP_TOKEN: process.env.ADMIN_BOOTSTRAP_TOKEN,
   APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  // Optional TURN relay for WebRTC voice. STUN is built in; TURN is
+  // only needed for peers behind strict/symmetric NATs. See src/lib/webrtc/ice.ts.
+  TURN_URL: process.env.NEXT_PUBLIC_TURN_URL,
+  TURN_USERNAME: process.env.NEXT_PUBLIC_TURN_USERNAME,
+  TURN_CREDENTIAL: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
 };
 
 export function requireServerEnv(): {

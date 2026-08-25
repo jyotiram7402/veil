@@ -19,6 +19,7 @@ type ProfileRow = {
   suspended: boolean;
   archived: boolean;
   settings: Json;
+  is_room_guest: boolean;
 };
 type ProfileInsert = {
   id: string;
@@ -32,27 +33,42 @@ type ProfileInsert = {
   suspended?: boolean;
   archived?: boolean;
   settings?: Json;
+  is_room_guest?: boolean;
 };
 type ProfileUpdate = Partial<ProfileInsert>;
 
 // -------- chats --------
 type ChatRow = {
   id: string;
-  type: "direct" | "group";
+  type: "direct" | "group" | "room";
   name: string | null;
   avatar_url: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  status: "active" | "ended" | "expired" | "locked";
+  expires_at: string | null;
+  ended_at: string | null;
+  max_participants: number | null;
+  chat_enabled: boolean;
+  voice_enabled: boolean;
+  video_enabled: boolean;
 };
 type ChatInsert = {
   id?: string;
-  type: "direct" | "group";
+  type: "direct" | "group" | "room";
   name?: string | null;
   avatar_url?: string | null;
   created_by?: string | null;
   created_at?: string;
   updated_at?: string;
+  status?: "active" | "ended" | "expired" | "locked";
+  expires_at?: string | null;
+  ended_at?: string | null;
+  max_participants?: number | null;
+  chat_enabled?: boolean;
+  voice_enabled?: boolean;
+  video_enabled?: boolean;
 };
 type ChatUpdate = Partial<ChatInsert>;
 
@@ -63,6 +79,11 @@ type ChatMemberRow = {
   role: "admin" | "member";
   joined_at: string;
   last_read_at: string;
+  blocked: boolean;
+  can_chat: boolean;
+  can_voice: boolean;
+  can_video: boolean;
+  removed_at: string | null;
 };
 type ChatMemberInsert = {
   chat_id: string;
@@ -70,6 +91,11 @@ type ChatMemberInsert = {
   role?: "admin" | "member";
   joined_at?: string;
   last_read_at?: string;
+  blocked?: boolean;
+  can_chat?: boolean;
+  can_voice?: boolean;
+  can_video?: boolean;
+  removed_at?: string | null;
 };
 type ChatMemberUpdate = Partial<ChatMemberInsert>;
 
@@ -144,6 +170,91 @@ type AppSettingInsert = {
 };
 type AppSettingUpdate = Partial<AppSettingInsert>;
 
+// -------- room_invites --------
+type RoomInviteRow = {
+  id: string;
+  room_id: string;
+  selector: string;
+  verifier_hash: string;
+  label: string | null;
+  created_by: string | null;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  max_uses: number | null;
+  use_count: number;
+  last_used_at: string | null;
+  claimed_by: string | null;
+};
+type RoomInviteInsert = {
+  id?: string;
+  room_id: string;
+  selector: string;
+  verifier_hash: string;
+  label?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  max_uses?: number | null;
+  use_count?: number;
+  last_used_at?: string | null;
+  claimed_by?: string | null;
+};
+type RoomInviteUpdate = Partial<RoomInviteInsert>;
+
+// -------- room_audit_log --------
+type RoomAuditRow = {
+  id: string;
+  room_id: string | null;
+  actor_id: string | null;
+  action: string;
+  target_id: string | null;
+  meta: Json;
+  created_at: string;
+};
+type RoomAuditInsert = {
+  id?: string;
+  room_id?: string | null;
+  actor_id?: string | null;
+  action: string;
+  target_id?: string | null;
+  meta?: Json;
+  created_at?: string;
+};
+type RoomAuditUpdate = Partial<RoomAuditInsert>;
+
+// -------- call_sessions --------
+type CallSessionRow = {
+  id: string;
+  chat_id: string;
+  caller_id: string;
+  callee_id: string;
+  kind: "voice" | "video";
+  status: "ringing" | "connected" | "ended" | "rejected" | "cancelled" | "missed" | "busy" | "failed";
+  created_at: string;
+  connected_at: string | null;
+  ended_at: string | null;
+  end_reason: string | null;
+  duration_seconds: number | null;
+  event_posted: boolean;
+};
+type CallSessionInsert = {
+  id?: string;
+  chat_id: string;
+  caller_id: string;
+  callee_id: string;
+  kind?: "voice" | "video";
+  status?: CallSessionRow["status"];
+  created_at?: string;
+  connected_at?: string | null;
+  ended_at?: string | null;
+  end_reason?: string | null;
+  duration_seconds?: number | null;
+  event_posted?: boolean;
+};
+type CallSessionUpdate = Partial<CallSessionInsert>;
+
 export type Database = {
   public: {
     Tables: {
@@ -183,6 +294,24 @@ export type Database = {
         Update: AppSettingUpdate;
         Relationships: [];
       };
+      room_invites: {
+        Row: RoomInviteRow;
+        Insert: RoomInviteInsert;
+        Update: RoomInviteUpdate;
+        Relationships: [];
+      };
+      room_audit_log: {
+        Row: RoomAuditRow;
+        Insert: RoomAuditInsert;
+        Update: RoomAuditUpdate;
+        Relationships: [];
+      };
+      call_sessions: {
+        Row: CallSessionRow;
+        Insert: CallSessionInsert;
+        Update: CallSessionUpdate;
+        Relationships: [];
+      };
     };
     Functions: {
       get_or_create_direct_chat: {
@@ -203,6 +332,22 @@ export type Database = {
       };
       is_admin: {
         Args: { p_user: string };
+        Returns: boolean;
+      };
+      is_room_admin: {
+        Args: { p_chat: string; p_user: string };
+        Returns: boolean;
+      };
+      can_access_chat: {
+        Args: { p_chat: string; p_user: string };
+        Returns: boolean;
+      };
+      claim_room_seat: {
+        Args: { p_room: string; p_user: string };
+        Returns: boolean;
+      };
+      can_chat_in: {
+        Args: { p_chat: string; p_user: string };
         Returns: boolean;
       };
     };

@@ -4,7 +4,7 @@ import type { Database } from "@/types/database";
 import { env } from "@/lib/env";
 
 const PUBLIC_PATHS = ["/", "/login", "/expired", "/api/auth/login", "/api/admin/users"];
-const ADMIN_ONLY_PREFIXES = ["/chats", "/settings", "/admin", "/archive"];
+const ADMIN_ONLY_PREFIXES = ["/chats", "/settings", "/admin", "/archive", "/rooms"];
 const USER_ONLY_PREFIXES = ["/chat"];
 
 function startsWithAny(pathname: string, prefixes: string[]): boolean {
@@ -15,6 +15,9 @@ function isPublic(pathname: string) {
   if (PUBLIC_PATHS.includes(pathname)) return true;
   // invite links and auth API are always reachable
   if (pathname.startsWith("/i/")) return true;
+  // room join flow (public — the access code is the credential)
+  if (pathname === "/join" || pathname.startsWith("/join/")) return true;
+  if (pathname === "/api/rooms/join") return true;
   if (pathname.startsWith("/api/auth/")) return true;
   if (pathname.startsWith("/_next")) return true;
   if (pathname.startsWith("/favicon")) return true;

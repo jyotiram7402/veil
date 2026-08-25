@@ -10,7 +10,7 @@ type ChatListRow = {
   last_read_at: string;
   chat: {
     id: string;
-    type: "direct" | "group";
+    type: "direct" | "group" | "room";
     name: string | null;
     avatar_url: string | null;
     created_by: string | null;
@@ -100,6 +100,9 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
     //   - chats whose other party is archived. History is preserved
     //     server-side, but the active sidebar shouldn't surface them.
     .filter((r) => {
+      // Rooms are managed from the admin Rooms page, not the
+      // DM/group sidebar — keep them out of the normal chat list.
+      if (r.chat.type === "room") return false;
       if (r.chat.type !== "direct") return true;
       const others = (r.chat.members ?? [])
         .map((m) => m.user)

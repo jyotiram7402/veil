@@ -23,6 +23,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     role: "member" as const,
   }));
   const { error } = await supabase.from("chat_members").upsert(rows, { onConflict: "chat_id,user_id" });
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Not allowed");
   return NextResponse.json({ ok: true });
 }

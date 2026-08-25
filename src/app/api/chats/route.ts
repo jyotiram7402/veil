@@ -17,6 +17,9 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
+  // Only admins create chats (matches the v2 admin-only model). This gates the
+  // API path; the RPC and RLS enforce it independently at the DB layer too.
+  if (!session.profile.is_admin) return jsonError(403, "Admin only");
 
   const parsed = await parseBody(req, createChatSchema);
   if (!parsed.ok) return parsed.response;
@@ -27,7 +30,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabase.rpc("get_or_create_direct_chat", {
       p_other: parsed.data.otherUserId,
     });
-    if (error) return jsonError(500, error.message);
+    if (error) return jsonError(403, "Could not create chat");
     return NextResponse.json({ chatId: data });
   }
 
@@ -40,7 +43,7 @@ export async function POST(req: Request) {
     .insert({ type: "group", name, created_by: session.id })
     .select()
     .single();
-  if (chatErr || !chat) return jsonError(500, chatErr?.message ?? "Failed");
+  if (chatErr || !chat) return jsonError(403, "Could not create chat");
 
   const rows = uniqueMembers.map((id) => ({
     chat_id: chat.id,
@@ -51,7 +54,7 @@ export async function POST(req: Request) {
   const { error: memErr } = await supabase.from("chat_members").insert(rows);
   if (memErr) {
     await supabase.from("chats").delete().eq("id", chat.id);
-    return jsonError(500, memErr.message);
+    return jsonError(500, "Could not create chat");
   }
 
   return NextResponse.json({ chatId: chat.id });

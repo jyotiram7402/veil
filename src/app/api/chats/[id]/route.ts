@@ -49,7 +49,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const { error } = await supabase.from("chats").update(patch).eq("id", id);
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Not allowed");
   return NextResponse.json({ ok: true });
 }
 
@@ -60,6 +60,6 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
 
   const supabase = await supabaseServer();
   const { error } = await supabase.from("chats").delete().eq("id", id);
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Not allowed");
   return NextResponse.json({ ok: true });
 }

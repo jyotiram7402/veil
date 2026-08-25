@@ -13,6 +13,8 @@ import { Composer } from "@/components/chat/composer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { ChatInfoDrawer } from "@/components/chat/chat-info-drawer";
+import { CallProvider } from "@/components/call/call-provider";
+import { CallButton } from "@/components/call/call-button";
 import { usePresenceStore } from "@/store/presence-store";
 import { lastSeen } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -98,7 +100,7 @@ export function ChatThread({
     onMessageVisible();
   }, [messages.length, onMessageVisible]);
 
-  return (
+  const body = (
     <div className="flex h-full flex-col chat-bg">
       <header
         className={cn(
@@ -135,6 +137,12 @@ export function ChatThread({
           </span>
           <span className="text-[11px] opacity-80 truncate w-full">{subtitle}</span>
         </button>
+        {chatType === "direct" && other && (
+          <>
+            <CallButton mode="voice" className="text-current hover:bg-white/10" />
+            <CallButton mode="video" className="text-current hover:bg-white/10" />
+          </>
+        )}
         <Button
           size="icon"
           variant="ghost"
@@ -162,4 +170,14 @@ export function ChatThread({
       />
     </div>
   );
+
+  // 1-to-1 chats get voice calling; group chats do not.
+  if (chatType === "direct" && other) {
+    return (
+      <CallProvider me={me} other={other} chatId={chatId}>
+        {body}
+      </CallProvider>
+    );
+  }
+  return body;
 }

@@ -26,6 +26,10 @@ export const viewport: Viewport = {
   // Cover the iOS safe areas so the chat extends edge-to-edge under the
   // notch / home indicator instead of leaving white strips.
   viewportFit: "cover",
+  // When the on-screen keyboard opens, resize the layout viewport instead of
+  // overlaying it — keeps the chat composer visible above the keyboard on
+  // Android/Chromium without JS. iOS Safari falls back to its default behavior.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -26,6 +26,7 @@ export async function GET(req: Request) {
     .select(
       "id, username, display_name, avatar_url, is_admin, last_seen_at, created_at, suspended, archived, settings",
     )
+    .eq("is_room_guest", false)
     .order("created_at", { ascending: false });
   if (wantArchived !== null) q = q.eq("archived", wantArchived);
 

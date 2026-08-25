@@ -76,6 +76,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     )
     .single();
 
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Not allowed");
   return NextResponse.json({ message: data });
 }

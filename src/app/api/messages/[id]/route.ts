@@ -15,6 +15,6 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   const { id } = await ctx.params;
   const supabase = await supabaseServer();
   const { error } = await supabase.from("messages").delete().eq("id", id);
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Not allowed");
   return NextResponse.json({ ok: true });
 }

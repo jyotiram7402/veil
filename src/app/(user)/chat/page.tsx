@@ -21,6 +21,23 @@ export default async function UserChatPage() {
     redirect("/expired");
   }
 
+  // Room guests don't use the admin↔user DM view (and have no lock-screen
+  // password). Send them to their room, or back to the join page.
+  if (session.profile.is_room_guest) {
+    const guestSb = await supabaseServer();
+    const { data: roomMember } = await guestSb
+      .from("chat_members")
+      .select("chat_id, chat:chats(id, type, status)")
+      .eq("user_id", session.id)
+      .limit(1)
+      .maybeSingle();
+    const room = (roomMember?.chat ?? null) as { id: string; type: string; status: string } | null;
+    if (room && room.type === "room" && (room.status === "active" || room.status === "locked")) {
+      redirect(`/room/${room.id}`);
+    }
+    redirect("/join");
+  }
+
   const supabase = await supabaseServer();
   const admin = supabaseAdmin();
 

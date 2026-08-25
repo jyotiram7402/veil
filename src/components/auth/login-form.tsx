@@ -38,7 +38,11 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
         toast.error(body.error ?? "Could not sign you in");
         return;
       }
-      router.replace(nextPath && nextPath.startsWith("/") ? nextPath : "/chats");
+      // Open-redirect guard: only same-origin absolute paths. Reject "//host",
+      // "/\\host", and anything that isn't a plain "/path".
+      const safeNext =
+        nextPath && /^\/(?!\/|\\)/.test(nextPath) ? nextPath : "/chats";
+      router.replace(safeNext);
       router.refresh();
     } finally {
       setSubmitting(false);
