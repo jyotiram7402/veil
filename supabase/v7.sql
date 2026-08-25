@@ -21,7 +21,9 @@
 --    We gate broadcast/presence on 'call:' topics to members of that chat.
 --    Non-'call:' topics are not matched here, so public channels are unaffected.
 -- ---------------------------------------------------------------------------
-alter table if exists realtime.messages enable row level security;
+-- NOTE: realtime.messages already has RLS enabled by Supabase (its table is
+-- owned by an internal role, so ENABLE ROW LEVEL SECURITY here would fail with
+-- "must be owner" and isn't needed). We only add the authorization policies.
 
 drop policy if exists "call signaling: members can read" on realtime.messages;
 create policy "call signaling: members can read"
