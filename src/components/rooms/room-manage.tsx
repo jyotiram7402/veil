@@ -89,8 +89,17 @@ export function RoomManage({ roomId }: { roomId: string }) {
         setError(res.status === 403 ? "You don't manage this room." : "Room not found.");
         return;
       }
+      const body = (await res.json().catch(() => null)) as Partial<Detail> | null;
+      if (!body?.room) {
+        setError("Room not found.");
+        return;
+      }
       setError(null);
-      setDetail((await res.json()) as Detail);
+      setDetail({
+        room: body.room,
+        participants: Array.isArray(body.participants) ? body.participants : [],
+        invites: Array.isArray(body.invites) ? body.invites : [],
+      });
     } catch {
       setError("Network error. Try again.");
     } finally {
@@ -110,27 +119,34 @@ export function RoomManage({ roomId }: { roomId: string }) {
       reloadTimer.current = setTimeout(() => void load(), 350);
     };
     const supabase = supabaseBrowser();
-    const channel = supabase
-      .channel(`admin-room:${roomId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "chat_members", filter: `chat_id=eq.${roomId}` },
-        debounced,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "chats", filter: `id=eq.${roomId}` },
-        debounced,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "room_invites", filter: `room_id=eq.${roomId}` },
-        debounced,
-      )
-      .subscribe();
+    // Unique topic per mount + guarded: a realtime hiccup must never crash the
+    // management page (see rooms-admin for the reused-channel failure mode).
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(`admin-room:${roomId}:${Math.random().toString(36).slice(2)}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "chat_members", filter: `chat_id=eq.${roomId}` },
+          debounced,
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "chats", filter: `id=eq.${roomId}` },
+          debounced,
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "room_invites", filter: `room_id=eq.${roomId}` },
+          debounced,
+        )
+        .subscribe();
+    } catch {
+      channel = null;
+    }
     return () => {
       if (reloadTimer.current) clearTimeout(reloadTimer.current);
-      void supabase.removeChannel(channel);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [me?.id, roomId, load]);
 

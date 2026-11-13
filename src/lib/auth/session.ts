@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { Profile } from "@/types/chat";
@@ -10,8 +11,11 @@ export type SessionUser = {
 /**
  * Returns the current user + profile, or null if signed out.
  * Use from Server Components / Route Handlers.
+ *
+ * Wrapped in React `cache` so the layout and page of the same request share
+ * one lookup instead of each doing their own auth + profile round trips.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await supabaseServer();
   const {
     data: { user },
@@ -26,7 +30,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   if (!profile) return null;
   return { id: user.id, profile };
-}
+});
 
 /** Same as getSessionUser but redirects to /login when signed out. */
 export async function requireSessionUser(): Promise<SessionUser> {

@@ -18,7 +18,6 @@ function isPublic(pathname: string) {
   // room join flow (public — the access code is the credential)
   if (pathname === "/join" || pathname.startsWith("/join/")) return true;
   if (pathname === "/api/rooms/join") return true;
-  if (pathname.startsWith("/api/debug/")) return true; // TEMPORARY — remove after login debug
   if (pathname.startsWith("/api/auth/")) return true;
   if (pathname.startsWith("/_next")) return true;
   if (pathname.startsWith("/favicon")) return true;
@@ -58,6 +57,14 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!user) {
+    // Go straight to sign-in instead of making visitors sit through the
+    // animated splash screen first.
+    if (pathname === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
     if (isPublic(pathname)) return response;
     const url = request.nextUrl.clone();
     url.pathname = "/login";

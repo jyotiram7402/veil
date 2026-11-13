@@ -58,8 +58,10 @@ export function RoomsAdmin() {
     try {
       const res = await fetch("/api/rooms", { cache: "no-store" });
       if (!res.ok) return;
-      const body = (await res.json()) as { rooms: RoomRow[] };
-      setRooms(body.rooms);
+      const body = (await res.json().catch(() => null)) as { rooms?: RoomRow[] } | null;
+      setRooms(Array.isArray(body?.rooms) ? body.rooms : []);
+    } catch {
+      // network hiccup — keep whatever we already have on screen
     } finally {
       setLoading(false);
     }
@@ -77,15 +79,24 @@ export function RoomsAdmin() {
       reloadTimer.current = setTimeout(() => void reload(), 400);
     };
     const supabase = supabaseBrowser();
-    const channel = supabase
-      .channel(`admin-rooms:${me.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "chats" }, debouncedReload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "chat_members" }, debouncedReload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "room_invites" }, debouncedReload)
-      .subscribe();
+    // Unique topic per mount: newer supabase-js returns an existing channel for a
+    // reused name, and re-subscribing it throws ("subscribe can only be called a
+    // single time"), which would crash the page on quick re-visits. Live updates
+    // are a nice-to-have here, so any realtime failure must never break the page.
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(`admin-rooms:${me.id}:${Math.random().toString(36).slice(2)}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "chats" }, debouncedReload)
+        .on("postgres_changes", { event: "*", schema: "public", table: "chat_members" }, debouncedReload)
+        .on("postgres_changes", { event: "*", schema: "public", table: "room_invites" }, debouncedReload)
+        .subscribe();
+    } catch {
+      channel = null;
+    }
     return () => {
       if (reloadTimer.current) clearTimeout(reloadTimer.current);
-      void supabase.removeChannel(channel);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [me?.id, reload]);
 

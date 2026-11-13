@@ -5,7 +5,10 @@ import { useChatStore } from "@/store/chat-store";
 import { useSyncStore } from "@/store/sync-store";
 import type { MessageWithSender, Profile } from "@/types/chat";
 
-const POLL_INTERVAL_MS = 2_000;
+// Safety net only — realtime delivers messages instantly, and we also resync
+// immediately on focus / visibility / reconnect. Each poll costs several
+// round trips, so polling every 2s kept the app constantly busy.
+const POLL_INTERVAL_MS = 5_000;
 
 /**
  * Two-layer message catch-up:
