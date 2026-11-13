@@ -27,7 +27,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { useSessionStore } from "@/store/session-store";
 import { shareOrCopy } from "@/lib/share";
 import { lastSeen } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { apiErrorMessage, cn } from "@/lib/utils";
 import { EXPIRY_OPTIONS, statusBadgeClass } from "@/components/rooms/room-shared";
 
 type Room = {
@@ -157,8 +157,8 @@ export function RoomManage({ roomId }: { roomId: string }) {
       body: JSON.stringify(patch),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      toast.error(body.error ?? "Couldn't update");
+      const body = await res.json().catch(() => ({}));
+      toast.error(apiErrorMessage(body, "Couldn't update"));
       return;
     }
     if (successMsg) toast.success(successMsg);
@@ -413,8 +413,8 @@ function ParticipantRow({
         body: JSON.stringify(patch),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(body.error ?? "Couldn't update participant");
+        const body = await res.json().catch(() => ({}));
+        toast.error(apiErrorMessage(body, "Couldn't update participant"));
         return;
       }
       onChanged();
@@ -429,8 +429,8 @@ function ParticipantRow({
     try {
       const res = await fetch(`/api/rooms/${roomId}/participants/${p.user_id}`, { method: "DELETE" });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(body.error ?? "Couldn't remove");
+        const body = await res.json().catch(() => ({}));
+        toast.error(apiErrorMessage(body, "Couldn't remove"));
         return;
       }
       toast.success("Participant removed");
@@ -544,8 +544,8 @@ function InvitesSection({
         }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(body.error ?? "Couldn't create invite");
+        const body = await res.json().catch(() => ({}));
+        toast.error(apiErrorMessage(body, "Couldn't create invite"));
         return;
       }
       const body = (await res.json()) as { invite: { url: string } };

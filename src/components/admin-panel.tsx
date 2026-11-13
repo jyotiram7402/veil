@@ -41,7 +41,7 @@ import { UserAvatar } from "@/components/chat/user-avatar";
 import { shareOrCopy } from "@/lib/share";
 import { lastSeen } from "@/lib/format";
 import { useSessionStore } from "@/store/session-store";
-import { cn } from "@/lib/utils";
+import { apiErrorMessage, cn, normalizeUsernameInput } from "@/lib/utils";
 
 type Invite = {
   url: string;
@@ -485,7 +485,11 @@ function CreateUserDialog({
   }, [open]);
 
   async function submit() {
-    if (!username.trim()) return toast.error("Username is required");
+    const u = normalizeUsernameInput(username);
+    if (!u) return toast.error("Username is required");
+    if (u.length < 3) {
+      return toast.error("Username needs at least 3 characters (e.g. rk1 or rahul)");
+    }
     if (!password || password.length < 4) {
       return toast.error("Password must be at least 4 characters");
     }
@@ -498,15 +502,15 @@ function CreateUserDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: username.trim().toLowerCase(),
+          username: u,
           displayName: displayName.trim() || undefined,
           isAdmin,
           password,
         }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(body.error ?? "Couldn't create");
+        const body = await res.json().catch(() => ({}));
+        toast.error(apiErrorMessage(body, "Couldn't create"));
         return;
       }
       const body = (await res.json()) as { invite: { url: string } | null };
@@ -534,10 +538,17 @@ function CreateUserDialog({
             <Input
               id="newUsername"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="lowercase, numbers, _"
+              onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
+              placeholder="e.g. rahul"
               autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-describedby="newUsernameHint"
             />
+            <p id="newUsernameHint" className="text-xs text-muted-foreground">
+              3–24 characters: lowercase letters, numbers, or _.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="newDisplayName">Display name (optional)</Label>
@@ -1002,8 +1013,8 @@ function AccountTab() {
         body: JSON.stringify(patch),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(body.error ?? "Couldn't save");
+        const body = await res.json().catch(() => ({}));
+        toast.error(apiErrorMessage(body, "Couldn't save"));
         return;
       }
       toast.success("Profile updated");
@@ -1026,8 +1037,8 @@ function AccountTab() {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(body.error ?? "Couldn't change password");
+        const body = await res.json().catch(() => ({}));
+        toast.error(apiErrorMessage(body, "Couldn't change password"));
         return;
       }
       toast.success("Password updated");
@@ -1048,7 +1059,7 @@ function AccountTab() {
           <Input
             id="acctUsername"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
             placeholder="lowercase, numbers, _"
             autoComplete="off"
           />

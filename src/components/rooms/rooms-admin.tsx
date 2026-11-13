@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useSessionStore } from "@/store/session-store";
-import { cn } from "@/lib/utils";
+import { apiErrorMessage, cn } from "@/lib/utils";
 import { EXPIRY_OPTIONS, statusBadgeClass } from "@/components/rooms/room-shared";
 
 type RoomRow = {
@@ -293,8 +293,8 @@ function CreateRoomDialog({
         }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(body.error ?? "Couldn't create room");
+        const body = await res.json().catch(() => ({}));
+        toast.error(apiErrorMessage(body, "Couldn't create room"));
         return;
       }
       const body = (await res.json()) as { roomId?: string };
