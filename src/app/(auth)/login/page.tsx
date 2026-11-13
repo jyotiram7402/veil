@@ -13,7 +13,7 @@ export default async function LoginPage({
   const { next } = await searchParams;
 
   return (
-    <main className="min-h-screen grid place-items-center px-6 chat-bg relative">
+    <main className="min-h-[100svh] grid place-items-center px-6 chat-bg relative">
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>

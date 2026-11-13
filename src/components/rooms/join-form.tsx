@@ -72,7 +72,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
               required
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="pl-9 font-mono text-xs"
+              className="pl-9 font-mono text-base sm:text-sm"
               placeholder="••••••••••••"
             />
           </div>

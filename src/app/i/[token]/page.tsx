@@ -40,7 +40,7 @@ export default async function InviteGatePage({
   if (profile.is_admin) redirect("/login");
 
   return (
-    <main className="min-h-screen grid place-items-center px-6 chat-bg">
+    <main className="min-h-[100svh] grid place-items-center px-6 chat-bg">
       <GateForm
         token={token}
         displayName={profile.display_name ?? profile.username}

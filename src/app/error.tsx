@@ -18,7 +18,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <main className="min-h-screen grid place-items-center px-6 text-center">
+    <main className="min-h-[100svh] grid place-items-center px-6 text-center">
       <div>
         <h1 className="text-2xl font-semibold">Something went sideways</h1>
         <p className="mt-2 text-muted-foreground max-w-sm">

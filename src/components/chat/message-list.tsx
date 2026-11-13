@@ -141,6 +141,15 @@ export function MessageList({
           </div>
         )}
 
+        {messages.length === 0 && !loadingOlder && (
+          <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
+            <p className="text-sm text-muted-foreground">No messages yet</p>
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Say hello to start the conversation.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-1">
           {messages.map((m, i) => {
             const prev = i > 0 ? messages[i - 1]! : null;
