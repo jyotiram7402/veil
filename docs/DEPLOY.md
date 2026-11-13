@@ -1,5 +1,9 @@
 # Deploying to Vercel
 
+> First-time quick guide. For the current production setup (full env-var list
+> including TURN, security headers, rollback) see `../DEPLOYMENT.md` and
+> `../PRODUCTION_RUNBOOK.md`.
+
 The whole app runs on Vercel's free hobby tier. There's nothing else to
 host — Supabase handles the database, auth, realtime, and file storage.
 

@@ -15,8 +15,8 @@ they work on Windows, macOS, and Linux.
 ## 1. Clone
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/rooms.git
-cd rooms
+git clone https://github.com/jyotiram7402/veil.git
+cd veil
 ```
 
 ## 2. Install dependencies
@@ -36,7 +36,8 @@ At the end of that you'll have:
 - A project URL like `https://xxxxx.supabase.co`
 - An **anon** key (public)
 - A **service_role** key (server-only — keep it secret)
-- The three SQL files run, in order: `schema.sql`, `policies.sql`, `storage.sql`
+- Every SQL file run in the order listed in [`../supabase/README.md`](../supabase/README.md):
+  `schema.sql`, `policies.sql`, `storage.sql`, then `v2.sql` … `v9.sql`
 
 ## 4. Set environment variables
 
@@ -58,7 +59,9 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 If you don't have `openssl`, any 32+ character random string works for
-`ADMIN_BOOTSTRAP_TOKEN`. It's used exactly once.
+`ADMIN_BOOTSTRAP_TOKEN`. It's used exactly once. The optional
+`NEXT_PUBLIC_TURN_*` variables (voice/video across networks) are explained
+in `.env.example`.
 
 ## 5. Run
 
@@ -95,7 +98,8 @@ and password with the person privately.
 ## What now?
 
 - `npm run dev` — runs the dev server with hot reload
-- `npm run build` — production build (Next.js does its full type check)
+- `npm run build` — production build (type errors and lint are **skipped**,
+  see `next.config.ts` — always run `npm run typecheck`)
 - `npm run start` — runs the production build
 - `npm run typecheck` — `tsc --noEmit`, fastest way to catch a regression
 

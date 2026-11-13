@@ -48,3 +48,7 @@ next-env.d.ts
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# claude code (personal, per-machine)
+CLAUDE.local.md
+.claude/settings.local.json

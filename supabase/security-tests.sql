@@ -2,7 +2,8 @@
 --  Veil / MyVoxa — RLS negative-test harness
 --
 --  Framework-free regression tests for the security-sensitive RLS policies.
---  Run in the Supabase SQL editor (or psql as a superuser). Each block asserts
+--  Run with psql (it uses psql `\set` variables, which the Supabase dashboard
+--  SQL editor does not support). Each block asserts
 --  that an UNAUTHORIZED action FAILS. A failing assertion raises an exception.
 --
 --  How it works: we impersonate a signed-in user by setting the `authenticated`

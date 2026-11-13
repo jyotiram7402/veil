@@ -113,7 +113,9 @@ DevTools → Network → WS).
 
 ## I forgot my password
 
-The simplest fix is to recreate the account:
+Reset it in place (keeps the user's chats) with the `crypt(...)` SQL in
+`supabase/README.md` → *Recovery recipes*. Deleting and recreating the
+account also works, but loses its chats:
 
 ```sql
 -- find the user
@@ -140,6 +142,30 @@ Free tier caps you at 60 direct Postgres connections. The Next.js
 server uses Supabase via HTTP (PostgREST), so this is rare in practice
 — but you can hit it if you also have a local Postgres GUI like TablePlus
 open. Close it.
+
+## Sign-in succeeds but every page bounces back to `/login`
+
+The `sb-…-auth-token` cookie gets set, yet `/chats` redirects to `/login`.
+Seen after the public schema was dropped and recreated: the default table
+grants were gone, so the app could not read `profiles` ("permission denied
+for table profiles"). Run the grant block in `supabase/README.md` →
+*Recovery recipes*, clear the cookie (or use a private window), sign in again.
+
+## Vercel won't save a `NEXT_PUBLIC_*` variable
+
+Vercel's "Secret" type is unreadable after saving, which conflicts with a
+browser-exposed variable. Pick type **Config** for every `NEXT_PUBLIC_*`
+variable (keep `SUPABASE_SERVICE_ROLE_KEY` as Secret), then **redeploy** —
+`NEXT_PUBLIC_*` values are baked into the build.
+
+## Voice/video call stays on "Connecting…" (timer at 0:00)
+
+The two devices can't reach each other directly — typical when they're on
+different networks (Wi-Fi vs mobile data). STUN alone can't fix that; you
+need a TURN relay. Set `NEXT_PUBLIC_TURN_URL` / `_USERNAME` / `_CREDENTIAL`
+from a TURN provider (see `.env.example`) and redeploy. Two tabs on the same
+computer should connect without TURN. Calls exist only in 1:1 chats — the
+call icons inside a room are placeholders.
 
 ---
 

@@ -18,18 +18,17 @@ The project takes ~1 minute to provision.
 
 ## 2. Apply the schema
 
-Open **SQL editor → New query**. Paste and run the contents of each
-file in order:
+Open **SQL editor → New query**. Paste and run **every** file in
+`supabase/` in the order listed in [`../supabase/README.md`](../supabase/README.md):
+`schema.sql`, `policies.sql`, `storage.sql`, then `v2.sql` … `v9.sql`.
+Skipping the `vN` files leaves rooms, invites and calling broken.
 
-1. `supabase/schema.sql` — tables, indexes, triggers, helpers, realtime
-2. `supabase/policies.sql` — Row Level Security policies
-3. `supabase/storage.sql` — `avatars` and `attachments` buckets and policies
-
-Each file is idempotent. If you change something later (say, a new
-column), just edit the SQL file and re-run.
+Each file is idempotent. Schema changes go in a new numbered `vNN.sql` —
+don't hand-edit production tables.
 
 You can confirm it worked under **Table editor**: you should see
-`profiles`, `chats`, `chat_members`, `messages`.
+`profiles`, `chats`, `chat_members`, `messages`, `invite_tokens`,
+`app_settings`, `room_invites`, `room_audit_log`, `call_sessions`.
 
 ## 3. Auth providers
 
@@ -48,9 +47,10 @@ Under **Authentication → URL configuration**, set:
 
 ## 4. Realtime
 
-`schema.sql` already adds `messages`, `chats`, `chat_members`, and
-`profiles` to the `supabase_realtime` publication. You can double-check
-under **Database → Replication → supabase_realtime**.
+The migrations manage the `supabase_realtime` publication (`messages`,
+`chats`, `chat_members`, `profiles`, `room_invites`, `room_audit_log`,
+`call_sessions`). You can double-check under
+**Database → Replication → supabase_realtime**.
 
 ## 5. Storage
 
@@ -65,7 +65,8 @@ the SQL.
 
 ## 6. Keys you'll need
 
-Under **Settings → API**:
+Under **Settings → API** (newer dashboards show these under **Legacy API keys**;
+use these `eyJ...` keys, not the newer Publishable/Secret keys):
 
 - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
 - **anon public** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -86,14 +87,10 @@ with `email_confirm: true` so the password is usable immediately.
 
 ## Common SQL recipes
 
-- **Reset everything** (development only):
-  ```sql
-  drop table if exists public.messages cascade;
-  drop table if exists public.chat_members cascade;
-  drop table if exists public.chats cascade;
-  drop table if exists public.profiles cascade;
-  ```
-  Then re-run the three SQL files.
+- **Start over:** create a fresh Supabase project and run the migrations.
+  Never `drop schema public cascade` — it wipes the default grants and the
+  app then loops back to `/login`. Fix + admin/password recipes are in
+  `supabase/README.md` → *Recovery recipes*.
 
 - **Promote a user to admin**:
   ```sql
