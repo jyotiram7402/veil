@@ -1,14 +1,30 @@
-import { MessageCircle } from "lucide-react";
+import { MOJI_COLORS } from "@/lib/moji";
 
+// What the right-hand side shows on tablets and laptops before a chat is
+// picked. Phones never see it: there the chat list fills the screen.
 export default function ChatsIndexPage() {
   return (
-    <div className="hidden md:flex h-full w-full flex-col items-center justify-center chat-bg text-center px-6">
-      <div className="grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-border/60 mb-5">
-        <MessageCircle className="h-7 w-7 text-violet-300" />
+    <div className="chat-bg hidden h-full w-full flex-col items-center justify-center px-6 text-center md:flex">
+      <div className="flex items-end gap-2 leading-none" aria-hidden="true">
+        <span
+          className="grid h-14 w-14 -rotate-6 place-items-center rounded-[30%] text-[30px]"
+          style={{ backgroundColor: MOJI_COLORS.sun }}
+        >
+          🐼
+        </span>
+        <span className="grid h-20 w-20 place-items-center rounded-[30%] bg-foreground text-[44px]">
+          🦊
+        </span>
+        <span
+          className="grid h-14 w-14 rotate-6 place-items-center rounded-[30%] text-[30px]"
+          style={{ backgroundColor: MOJI_COLORS.sky }}
+        >
+          🐱
+        </span>
       </div>
-      <h2 className="text-xl font-semibold tracking-tight">Pick up a conversation</h2>
-      <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-        Select a chat from the list, or start a new one to begin.
+      <h2 className="mt-6 text-xl font-bold tracking-tight">Pick a chat</h2>
+      <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
+        Choose someone on the left, or start a new chat.
       </p>
     </div>
   );

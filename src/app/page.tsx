@@ -1,11 +1,9 @@
-import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth/session";
-import { Splash } from "@/components/splash";
+import { FirstScreen } from "@/components/auth/first-screen";
+import { redirectIfSignedIn } from "@/lib/auth/session";
 
 export default async function RootPage() {
-  const session = await getSessionUser();
-  if (session) {
-    redirect(session.profile.is_admin ? "/chats" : "/chat");
-  }
-  return <Splash />;
+  // Signed-in visitors (for example the installed app opening at "/") go
+  // straight to their chats instead of seeing Log in / Sign up.
+  await redirectIfSignedIn();
+  return <FirstScreen />;
 }

@@ -48,10 +48,15 @@ const config: Config = {
         bubble: {
           in: "hsl(var(--bubble-in))",
           out: "hsl(var(--bubble-out))",
+          "out-foreground": "hsl(var(--bubble-out-foreground))",
           foreground: "hsl(var(--bubble-foreground))",
           meta: "hsl(var(--bubble-meta))",
         },
         tick: "hsl(var(--tick))",
+        online: {
+          DEFAULT: "hsl(var(--online))",
+          ink: "hsl(var(--online-ink))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -60,6 +65,8 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        // Chunky rounded face for the wordmark. Only the entry screens load it.
+        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
       },
       keyframes: {
         "fade-in": {

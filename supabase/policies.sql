@@ -1,5 +1,5 @@
 -- ============================================================================
---  Rooms — Row Level Security policies
+--  BlackFoxx — Row Level Security policies
 --  Run after schema.sql. Idempotent.
 -- ============================================================================
 

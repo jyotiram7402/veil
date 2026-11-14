@@ -10,7 +10,6 @@ import { useResumeSync } from "@/hooks/use-resume-sync";
 import { LiveIndicator } from "@/components/chat/live-indicator";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
-import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { ChatInfoDrawer } from "@/components/chat/chat-info-drawer";
 import { CallProvider } from "@/components/call/call-provider";
@@ -82,8 +81,8 @@ export function ChatThread({
       return `${members.length} member${members.length === 1 ? "" : "s"}`;
     }
     if (!other) return "";
-    if (onlineOther) return "online";
-    return `last seen ${lastSeen(other.last_seen_at)}`;
+    if (onlineOther) return "Online";
+    return `Last seen ${lastSeen(other.last_seen_at)}`;
   }, [chatType, members.length, other, onlineOther]);
 
   // when a new message arrives while we're viewing the chat, keep last_read fresh
@@ -102,45 +101,52 @@ export function ChatThread({
 
   const body = (
     <div className="flex h-full flex-col chat-bg">
-      <header
-        className={cn(
-          "flex h-14 items-center gap-3 px-3",
-          "bg-header text-header-foreground",
-        )}
-      >
+      <header className="flex h-16 shrink-0 items-center gap-1 border-b border-border/70 bg-header px-2 text-header-foreground sm:px-4">
         <Button
           asChild
           size="icon"
           variant="ghost"
-          className="md:hidden text-current hover:bg-white/10"
+          className="md:hidden [&_svg]:size-5"
           aria-label="Back to chats"
         >
           <Link href="/chats">
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft />
           </Link>
         </Button>
-        <UserAvatar
-          userId={subtitleUserId}
-          username={titleName}
-          displayName={titleName}
-          avatarUrl={avatarUrl}
-          size="md"
-          showPresence={chatType === "direct"}
-        />
+        {/* Avatar and name open the chat details. */}
         <button
+          type="button"
           onClick={() => setInfoOpen(true)}
-          className="flex flex-1 min-w-0 flex-col items-start text-left"
+          aria-label={`${titleName}, chat details`}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-1 pl-1 pr-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="text-sm font-medium leading-tight truncate w-full flex items-center gap-2">
-            {titleName}
-            <LiveIndicator />
+          <UserAvatar
+            userId={subtitleUserId}
+            username={titleName}
+            displayName={titleName}
+            avatarUrl={avatarUrl}
+            size="md"
+            showPresence={chatType === "direct"}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-[15px] font-bold leading-tight">
+              <span className="truncate">{titleName}</span>
+              <LiveIndicator />
+            </span>
+            <span
+              className={cn(
+                "block truncate text-xs",
+                onlineOther ? "font-medium text-online-ink" : "text-muted-foreground",
+              )}
+            >
+              {subtitle}
+            </span>
           </span>
-          <span className="text-[11px] opacity-80 truncate w-full">{subtitle}</span>
         </button>
         {chatType === "direct" && other && (
           <>
-            <CallButton mode="voice" className="text-current hover:bg-white/10" />
-            <CallButton mode="video" className="text-current hover:bg-white/10" />
+            <CallButton mode="video" className="[&_svg]:size-5" />
+            <CallButton mode="voice" className="[&_svg]:size-5" />
           </>
         )}
         <Button
@@ -148,14 +154,13 @@ export function ChatThread({
           variant="ghost"
           onClick={() => setInfoOpen(true)}
           aria-label="Chat info"
-          className="text-current hover:bg-white/10"
+          className="hidden sm:inline-flex [&_svg]:size-5"
         >
-          <Info className="h-5 w-5" />
+          <Info />
         </Button>
       </header>
 
       <MessageList chatId={chatId} me={me} memberProfiles={memberProfiles} />
-      <TypingIndicator chatId={chatId} />
       <Composer chatId={chatId} me={me} />
 
       <ChatInfoDrawer

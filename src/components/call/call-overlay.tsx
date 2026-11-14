@@ -203,7 +203,7 @@ export function CallOverlay({
           type="button"
           onClick={toggleMute}
           aria-label={muted ? "Unmute microphone" : "Mute microphone"}
-          className="grid h-9 w-9 place-items-center rounded-full bg-white/15 hover:bg-white/25"
+          className="grid h-9 w-9 place-items-center rounded-full bg-foreground/10 hover:bg-foreground/20"
         >
           {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
         </button>
@@ -211,7 +211,7 @@ export function CallOverlay({
           type="button"
           onClick={() => setMinimized(false)}
           aria-label="Expand call"
-          className="grid h-9 w-9 place-items-center rounded-full bg-white/15 hover:bg-white/25"
+          className="grid h-9 w-9 place-items-center rounded-full bg-foreground/10 hover:bg-foreground/20"
         >
           <Maximize className="h-4 w-4" />
         </button>

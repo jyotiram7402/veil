@@ -1,39 +1,40 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
+import { redirectIfSignedIn } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = { title: "Log in" };
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
+  await redirectIfSignedIn();
   const { next } = await searchParams;
 
   return (
-    <main className="min-h-[100svh] grid place-items-center px-6 chat-bg relative">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-10">
-          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            <span className="font-semibold text-xl">V</span>
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">{APP_NAME}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{APP_TAGLINE}</p>
-        </div>
+    <AuthShell>
+      <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-tight">Log in</h1>
+      <p className="mt-1.5 text-[15px] leading-relaxed text-muted-foreground">
+        Use your admin username and password.
+      </p>
 
-        <div className="glass rounded-2xl p-6">
-          <LoginForm nextPath={next} />
-        </div>
+      <LoginForm nextPath={next} />
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Admin sign-in. Regular users use their invite link instead.
-        </p>
-      </div>
-    </main>
+      <p className="mt-6 text-center text-[15px] text-muted-foreground">
+        New here?{" "}
+        <Link
+          href="/signup"
+          className="rounded-sm font-semibold text-foreground underline decoration-2 underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Sign up
+        </Link>
+      </p>
+      <p className="mt-3 text-center text-[13px] leading-relaxed text-muted-foreground">
+        Were you sent a personal invite link? Open that link instead, it logs you in.
+      </p>
+    </AuthShell>
   );
 }

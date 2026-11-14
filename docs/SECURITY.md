@@ -1,4 +1,4 @@
-# Veil / MyVoxa — Security Model
+# BlackFoxx — Security Model
 
 _This documents the security posture; it is not a guarantee. Security cannot be
 certified — see “Remaining risks”._

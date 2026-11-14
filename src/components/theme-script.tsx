@@ -3,7 +3,7 @@
 // the right class on <html>.
 const SCRIPT = `(function() {
   try {
-    var stored = localStorage.getItem('veil-theme');
+    var stored = localStorage.getItem('blackfoxx-theme');
     var theme = stored;
     if (theme !== 'light' && theme !== 'dark') {
       theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

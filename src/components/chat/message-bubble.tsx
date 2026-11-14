@@ -16,7 +16,10 @@ type Props = {
   message: MessageWithSender;
   sender: Pick<Profile, "id" | "username" | "display_name" | "avatar_url"> | null;
   fromMe: boolean;
+  /** Show the sender's name above the bubble (group chats, first of a run). */
   showSender: boolean;
+  /** Keep a column for the sender's avatar (group chats). */
+  showAvatar?: boolean;
   groupedTop: boolean;
   groupedBottom: boolean;
   readByOther?: boolean;
@@ -29,6 +32,7 @@ export function MessageBubble({
   sender,
   fromMe,
   showSender,
+  showAvatar,
   groupedTop,
   groupedBottom,
   readByOther,
@@ -79,29 +83,31 @@ export function MessageBubble({
     }
   }, [message.chat_id, message.id, removeMessage]);
 
+  // Call results and similar notes sit centred between the bubbles.
   if (message.type === "system") {
     return (
-      <div className="my-3 flex justify-center">
-        <span className="rounded-full bg-card/90 px-3 py-1 text-[11px] text-muted-foreground shadow-sm">
+      <div className="my-3 flex justify-center px-4">
+        <span className="rounded-full bg-card px-3 py-1 text-center text-xs text-muted-foreground shadow-sm">
           {message.content}
         </span>
       </div>
     );
   }
 
-  const showTopTail = !groupedTop;
+  // The last bubble of a run gets the time under it and one tighter corner.
+  const lastOfRun = !groupedBottom;
 
   return (
     <div
       className={cn(
-        "group flex w-full items-end gap-2 px-1",
+        "flex w-full items-end gap-2",
         fromMe ? "justify-end" : "justify-start",
-        groupedTop ? "mt-0.5" : "mt-2",
+        groupedTop ? "mt-0.5" : "mt-3",
       )}
     >
-      {!fromMe && (
-        <div className={cn("w-7 shrink-0", groupedBottom && "invisible")}>
-          {!groupedBottom && sender && (
+      {showAvatar && !fromMe && (
+        <div className="w-8 shrink-0">
+          {lastOfRun && sender && (
             <UserAvatar
               userId={sender.id}
               username={sender.username}
@@ -115,12 +121,12 @@ export function MessageBubble({
 
       <div
         className={cn(
-          "flex flex-col max-w-[80%] sm:max-w-[64%]",
+          "flex min-w-0 max-w-[80%] flex-col sm:max-w-[64%]",
           fromMe ? "items-end" : "items-start",
         )}
       >
         {showSender && sender && (
-          <span className="mb-0.5 ml-2 text-[11px] font-medium text-primary">
+          <span className="mb-1 ml-3 text-xs font-semibold text-muted-foreground">
             {sender.display_name ?? sender.username}
           </span>
         )}
@@ -128,22 +134,19 @@ export function MessageBubble({
         <div
           {...longPress}
           className={cn(
-            "relative px-2.5 py-1.5 text-sm shadow-sm rounded-lg cursor-default",
+            "relative cursor-default overflow-hidden rounded-[1.25rem] text-[15px] leading-relaxed shadow-sm",
             fromMe
-              ? "bg-bubble-out text-bubble-foreground rounded-tr-md"
-              : "bg-bubble-in text-bubble-foreground rounded-tl-md",
-            showTopTail && (fromMe ? "rounded-tr-none" : "rounded-tl-none"),
+              ? "bg-bubble-out text-bubble-out-foreground"
+              : "bg-bubble-in text-bubble-foreground",
+            lastOfRun && (fromMe ? "rounded-br-md" : "rounded-bl-md"),
           )}
         >
-          {showTopTail && (
-            <span aria-hidden className={fromMe ? "bubble-tail-out" : "bubble-tail-in"} />
-          )}
-
           {message.type === "image" && message.attachment_url && (
             <button
               type="button"
               onClick={() => setLightbox(true)}
-              className="block mb-1 overflow-hidden rounded-md max-w-[280px]"
+              aria-label={`Open image ${message.attachment_name ?? ""}`.trim()}
+              className="block w-full max-w-[280px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               <Image
                 src={message.attachment_url}
@@ -161,41 +164,57 @@ export function MessageBubble({
               href={message.attachment_url}
               target="_blank"
               rel="noreferrer"
-              className="mb-1 flex items-center gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-3 py-2"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 transition-colors",
+                fromMe ? "hover:bg-white/10" : "hover:bg-muted/60",
+              )}
             >
-              <FileText className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "grid h-10 w-10 shrink-0 place-items-center rounded-full",
+                  fromMe ? "bg-white/20" : "bg-muted",
+                )}
+              >
+                <FileText className="h-5 w-5" aria-hidden="true" />
+              </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-medium">
+                <div className="truncate text-sm font-semibold">
                   {message.attachment_name ?? "Attachment"}
                 </div>
                 {message.attachment_size != null && (
-                  <div className="text-[11px] text-bubble-meta">
-                    {formatBytes(message.attachment_size)}
-                  </div>
+                  <div className="text-xs opacity-80">{formatBytes(message.attachment_size)}</div>
                 )}
               </div>
-              <Download className="h-4 w-4 opacity-70" />
+              <Download className="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
             </a>
           )}
 
           {message.content && (
-            <p className="whitespace-pre-wrap break-words leading-relaxed pr-12">
+            <p
+              className={cn(
+                "whitespace-pre-wrap break-words px-3.5 pb-2",
+                // Text under a file row sits closer to it.
+                message.type === "file" ? "pt-0.5" : "pt-2",
+              )}
+            >
               {message.content}
             </p>
           )}
+        </div>
 
-          <span className="absolute bottom-1 right-2 flex items-center gap-0.5 text-[10px] tabular-nums text-bubble-meta select-none">
+        {lastOfRun && (
+          <span className="mt-1 flex select-none items-center gap-1 px-1.5 text-[11px] tabular-nums text-muted-foreground">
             {timeShort(message.created_at)}
             {fromMe &&
               (isOptimistic ? (
-                <Check className="h-3 w-3 opacity-60" />
+                <Check className="h-3.5 w-3.5 opacity-70" aria-label="Sending" />
               ) : readByOther ? (
-                <CheckCheck className="h-3 w-3 text-tick" />
+                <CheckCheck className="h-3.5 w-3.5 text-tick" aria-label="Read" />
               ) : (
-                <CheckCheck className="h-3 w-3 opacity-70" />
+                <CheckCheck className="h-3.5 w-3.5 opacity-70" aria-label="Sent" />
               ))}
           </span>
-        </div>
+        )}
       </div>
 
       {lightbox && message.attachment_url && (
@@ -208,9 +227,9 @@ export function MessageBubble({
 
       {menu && canDelete && (
         <div
-          className="fixed z-[70] min-w-[10rem] rounded-lg border border-border/60 bg-card shadow-xl py-1"
+          className="fixed z-[70] min-w-[11rem] rounded-2xl border border-border/70 bg-card p-1 shadow-xl"
           style={{
-            left: Math.min(menu.x, window.innerWidth - 180),
+            left: Math.min(menu.x, window.innerWidth - 190),
             top: Math.min(menu.y, window.innerHeight - 80),
           }}
           onMouseDown={(e) => e.stopPropagation()}
@@ -219,7 +238,7 @@ export function MessageBubble({
           <button
             type="button"
             onClick={onDelete}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent/50"
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10"
           >
             <Trash2 className="h-4 w-4" /> Delete message
           </button>

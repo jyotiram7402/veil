@@ -2,13 +2,14 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Loader2, Smile } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/chat/user-avatar";
+import { MojiPicker } from "@/components/moji-picker";
 import { useSessionStore } from "@/store/session-store";
 import { AVATAR_MAX_BYTES, IMAGE_MIME_TYPES } from "@/lib/constants";
 import { formatBytes } from "@/lib/utils";
@@ -23,6 +24,7 @@ export function SettingsForm({ me }: { me: Profile }) {
   const [bio, setBio] = useState(profile.bio ?? "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function onAvatarPick(file: File) {
@@ -70,10 +72,8 @@ export function SettingsForm({ me }: { me: Profile }) {
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          displayName: displayName.trim() || undefined,
-          bio: bio.trim() || undefined,
-        }),
+        // Empty strings are sent on purpose: they clear the field.
+        body: JSON.stringify({ displayName: displayName.trim(), bio: bio.trim() }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -100,32 +100,38 @@ export function SettingsForm({ me }: { me: Profile }) {
             avatarUrl={profile.avatar_url}
             size="xl"
           />
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full bg-card border border-border/60 hover:bg-accent transition-colors"
-            aria-label="Change avatar"
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          </button>
           <input
             ref={fileRef}
             type="file"
             accept="image/*"
             className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) void onAvatarPick(f);
             }}
           />
         </div>
-        <div>
-          <div className="text-lg font-medium">@{profile.username}</div>
-          <p className="text-sm text-muted-foreground">
-            Your username can&apos;t be changed. Ask an admin if you need a new one.
-          </p>
+        <div className="min-w-0">
+          <div className="truncate text-lg font-bold">@{profile.username}</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setPickerOpen(true)}>
+              <Smile /> Choose an emoji avatar
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? <Loader2 className="animate-spin" /> : <Camera />} Upload a photo
+            </Button>
+          </div>
         </div>
       </section>
+
+      <MojiPicker open={pickerOpen} onOpenChange={setPickerOpen} profile={profile} />
 
       <section className="space-y-4 max-w-md">
         <div className="space-y-2">

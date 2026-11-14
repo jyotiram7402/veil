@@ -19,7 +19,7 @@ Almost always one of:
   region)
 - Vercel project doesn't have `SUPABASE_SERVICE_ROLE_KEY` (login itself
   doesn't need it, but creating users does)
-- Auth providers: "Confirm email" is **on**. Turn it off — Rooms
+- Auth providers: "Confirm email" is **on**. Turn it off — BlackFoxx
   doesn't use email confirmation.
 
 ## Bootstrap returns "Bootstrap token required and must match"
@@ -127,7 +127,7 @@ delete from auth.users where email = 'jay@rooms.local';
 Then create the account again from `/admin` (or via bootstrap if you
 also deleted yourself).
 
-A real password-reset flow would need a recovery email; Rooms is
+A real password-reset flow would need a recovery email; BlackFoxx is
 deliberately email-less.
 
 ## Build fails on Vercel: "Module not found: @/..."

@@ -1,5 +1,5 @@
 -- ============================================================================
---  Veil — v3 migration
+--  BlackFoxx — v3 migration
 --  Adds: per-user invite password gate + per-user runtime settings overrides
 --  Idempotent. Run after v2.sql.
 -- ============================================================================

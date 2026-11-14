@@ -16,7 +16,7 @@ git init
 git add .
 git commit -m "Initial commit"
 git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/rooms.git
+git remote add origin https://github.com/YOUR-USERNAME/blackfoxx.git
 git push -u origin main
 ```
 
@@ -27,7 +27,7 @@ files.
 ## 2. Import the repo in Vercel
 
 1. Sign in to [vercel.com](https://vercel.com).
-2. **Add New → Project** → pick the `rooms` repo.
+2. **Add New → Project** → pick the `blackfoxx` repo.
 3. Framework preset: **Next.js** (auto-detected).
 4. Build command and output directory: leave the defaults.
 
@@ -53,7 +53,7 @@ the name doesn't start with `NEXT_PUBLIC_`.
 ## 4. Deploy
 
 Click **Deploy**. The first build takes 1–2 minutes. You'll get a URL
-like `https://rooms-yourname.vercel.app`.
+like `https://blackfoxx-yourname.vercel.app`.
 
 ## 5. Tell Supabase about the new URL
 

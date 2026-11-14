@@ -1,5 +1,5 @@
 -- ============================================================================
---  Veil / MyVoxa — v5 migration
+--  BlackFoxx — v5 migration
 --  Run AFTER schema.sql + policies.sql + storage.sql + v2.sql + v3.sql + v4.sql.
 --  Idempotent: safe to re-run.
 --

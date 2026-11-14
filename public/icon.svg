@@ -1,12 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0D8276"/>
-      <stop offset="100%" stop-color="#075E54"/>
-    </linearGradient>
-  </defs>
-  <rect width="192" height="192" rx="36" ry="36" fill="url(#g)"/>
-  <text x="96" y="124" text-anchor="middle"
-        font-family="-apple-system, system-ui, sans-serif"
-        font-weight="700" font-size="108" fill="#ffffff">V</text>
+  <rect width="192" height="192" rx="44" fill="#16181D"/>
+  <!-- ears and head -->
+  <path d="M36 40 82 70h28l46-30-5 62-55 58-55-58z" fill="#FF7A1A"/>
+  <!-- inner ears -->
+  <path d="M48 58 70 72 50 88z" fill="#16181D" opacity=".28"/>
+  <path d="M144 58 122 72l20 16z" fill="#16181D" opacity=".28"/>
+  <!-- cheeks -->
+  <path d="M41 102 80 116l16 44z" fill="#fff"/>
+  <path d="M151 102 112 116l-16 44z" fill="#fff"/>
+  <!-- eyes -->
+  <ellipse cx="74" cy="102" rx="6" ry="7" fill="#16181D"/>
+  <ellipse cx="118" cy="102" rx="6" ry="7" fill="#16181D"/>
+  <!-- nose -->
+  <path d="M87 146h18l-9 14z" fill="#16181D"/>
 </svg>

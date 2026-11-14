@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Paperclip, SendHorizonal, Loader2, X, ImageIcon, FileText } from "lucide-react";
+import { ArrowUp, FileText, Loader2, Paperclip, X } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -203,91 +203,104 @@ export function Composer({
     }
   }
 
+  const empty = !text.trim() && !staged;
+
   return (
     <div
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
-      className="border-t border-border/60 bg-card/40 backdrop-blur px-3 py-3 sm:px-6"
+      className="px-3 pt-1 sm:px-6"
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
-      {staged && (
-        <div className="mb-2 flex items-center gap-3 rounded-xl border border-border/60 bg-background/60 p-2">
-          {staged.isImage && staged.previewUrl ? (
-            // next/image can't optimize a blob: URL — this is a tiny local
-            // preview only, so a plain img is the right call.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={staged.previewUrl}
-              alt="preview"
-              className="h-12 w-12 rounded-md object-cover"
-            />
-          ) : (
-            <div className="grid h-12 w-12 place-items-center rounded-md bg-muted">
-              <FileText className="h-5 w-5 text-muted-foreground" />
+      {/* One floating pill: attach, type, send. Files can also be dropped on it. */}
+      <div className="rounded-[1.75rem] border border-border/70 bg-card p-1.5 shadow-[0_10px_30px_-18px_rgb(15_18_30/0.45)] transition-shadow focus-within:ring-2 focus-within:ring-ring/40">
+        {staged && (
+          <div className="mb-1.5 flex items-center gap-3 rounded-[1.25rem] bg-muted p-2">
+            {staged.isImage && staged.previewUrl ? (
+              // next/image can't optimize a blob: URL — this is a tiny local
+              // preview only, so a plain img is the right call.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={staged.previewUrl}
+                alt="Preview of the image you are about to send"
+                className="h-12 w-12 rounded-xl object-cover"
+              />
+            ) : (
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-card">
+                <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{staged.file.name}</div>
+              <div className="text-xs text-muted-foreground">{formatBytes(staged.file.size)}</div>
             </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="truncate text-sm">{staged.file.name}</div>
-            <div className="text-xs text-muted-foreground">{formatBytes(staged.file.size)}</div>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setStaged(null)}
+              aria-label="Remove attachment"
+            >
+              <X />
+            </Button>
           </div>
-          <Button size="icon" variant="ghost" onClick={() => setStaged(null)} aria-label="Remove">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+        )}
 
-      <div className="flex items-end gap-2">
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="sr-only"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void onPickFile(f);
-          }}
-        />
-        {uploadsEnabled && (
+        <div className="flex items-end gap-1">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void onPickFile(f);
+            }}
+          />
+          {uploadsEnabled && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending}
+              aria-label="Attach a file"
+              className="shrink-0 text-muted-foreground [&_svg]:size-5"
+            >
+              <Paperclip />
+            </Button>
+          )}
+          <Textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => {
+              const v = e.target.value;
+              setText(v.length > maxLength ? v.slice(0, maxLength) : v);
+              notifyTyping();
+            }}
+            onKeyDown={onKeyDown}
+            rows={1}
+            maxLength={maxLength}
+            placeholder="Type a message"
+            aria-label="Message"
+            enterKeyHint="send"
+            className={cn(
+              "max-h-40 flex-1 rounded-none border-0 bg-transparent py-2 shadow-none placeholder:text-muted-foreground focus-visible:ring-0 sm:text-[15px]",
+              uploadsEnabled ? "px-1" : "pl-3 pr-1",
+            )}
+          />
           <Button
             type="button"
             size="icon"
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={sending}
-            aria-label="Attach"
+            onClick={onSend}
+            disabled={sending || empty}
+            aria-label="Send"
+            className="shrink-0 shadow-none [&_svg]:size-5"
           >
-            <Paperclip className="h-5 w-5" />
+            {sending ? <Loader2 className="animate-spin" /> : <ArrowUp />}
           </Button>
-        )}
-        <Textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => {
-            const v = e.target.value;
-            setText(v.length > maxLength ? v.slice(0, maxLength) : v);
-            notifyTyping();
-          }}
-          onKeyDown={onKeyDown}
-          rows={1}
-          maxLength={maxLength}
-          placeholder="Type a message"
-          className="flex-1 max-h-40"
-        />
-        <Button
-          type="button"
-          size="icon"
-          onClick={onSend}
-          disabled={sending || (!text.trim() && !staged)}
-          className={cn(!text.trim() && !staged && "opacity-60")}
-          aria-label="Send"
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
-        </Button>
+        </div>
       </div>
-
-      <p className="mt-1 hidden sm:block text-[11px] text-muted-foreground">
-        <ImageIcon className="inline h-3 w-3 mr-1" />
-        Drag a file here, or press <kbd className="rounded bg-muted px-1">Enter</kbd> to send.
-      </p>
     </div>
   );
 }

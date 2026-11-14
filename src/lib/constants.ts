@@ -1,5 +1,5 @@
-export const APP_NAME = "Rooms";
-export const APP_TAGLINE = "A quiet place to talk.";
+export const APP_NAME = "BlackFoxx";
+export const APP_TAGLINE = "Private chat, voice and video calls.";
 
 export const MESSAGE_PAGE_SIZE = 40;
 
