@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { USERNAME_REGEX } from "@/lib/auth/username";
+import { isMojiValue } from "@/lib/moji";
 
 export const usernameSchema = z
   .string()
@@ -38,7 +39,12 @@ export type CreateUserInput = z.infer<typeof createUserSchema>;
 export const profileUpdateSchema = z.object({
   displayName: z.string().trim().max(60).optional(),
   bio: z.string().trim().max(280).optional(),
-  avatarUrl: z.string().url().optional().or(z.literal("")),
+  // "" clears it. Otherwise an https photo URL or a chosen moji ("moji:fox:sky").
+  avatarUrl: z
+    .string()
+    .max(500)
+    .refine((v) => v === "" || isMojiValue(v) || /^https:\/\/\S+$/.test(v), "Not a valid avatar")
+    .optional(),
 });
 
 export const messageInputSchema = z

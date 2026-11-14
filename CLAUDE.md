@@ -16,8 +16,7 @@ Product facts: `PRODUCT.md`. Look and feel: `DESIGN.md` (read it before touching
 - Hosting: Vercel (prod: https://veil-cqsf.vercel.app), repo github.com/jyotiram7402/veil, branch `main`.
 
 ## Setup on a fresh machine
-1. Node 18.18+ (`engines`); use a current LTS such as Node 22 (18/20 are end-of-life; 22 is
-   untested on this repo). Git.
+1. Node 24 (`engines` is pinned to `24.x`, the version set in the Vercel projects). Git.
 2. `npm install` — **no lockfile is committed yet**; commit the generated `package-lock.json`.
 3. `cp .env.example .env.local` and fill it (real values: Vercel → Settings → Environment
    Variables, or Supabase → Settings → API). The old laptop's `.env.local` was only the template.
@@ -134,6 +133,10 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   `/api/admin/users` is deliberately middleware-public for that and self-checks.
 - Login form needs passwords ≥ 8 chars; sign in with the username, not the email.
 - Builds ignore TypeScript/ESLint errors, and there's no lockfile → deps float on every Vercel build.
+- `src/lib/env.ts` throws at build time ("Collecting page data") when a required variable is
+  missing in that Vercel environment. Preview builds need the variables ticked for **Preview** too.
+- `profiles.avatar_url` is either an https photo URL or a moji choice (`moji:fox:sky`). Never
+  use it as an image source directly: render people with `UserAvatar`.
 - `src/types/database.ts` is hand-written: it doesn't auto-update (a missing column won't fail
   the build) and makes supabase-js infer `never` for some `.update()` args — the reason builds
   skip tsc (comment in `next.config.ts`). Whether `npm run typecheck` passes today is unverified.
@@ -156,38 +159,37 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 
 ## Current status
 - Live on Vercel; Supabase migrated through v9 with grants restored. Confirmed working by the
-  owner: admin login, chat.
-- UI redesign in progress (started 2026-11-14), one branch per feature, in this order:
-  1. `feature/first-screen` — BlackFoxx rename, new tokens/fonts, moji avatars, animated first
-     screen, new log-in and invite-link screens. Pushed (PR #1), not merged yet.
-  2. `feature/chat-list` (stacked on 1) — new chat home: greeting, people row, search, rows;
-     rooms entry points removed (rooms are on hold; their routes still exist). Built.
-  3. `feature/chat-thread` (stacked on 2) — chat screen for admin, member and rooms: new
-     header, blue/white bubbles with the time under each run, pill composer, typing bubble in a
-     fixed slot inside the message list. Built.
-  4. Avatar picker (choose your moji). 5. Sign-up with an invite code (needs a `v10.sql`
-     migration). 6. Calls: TURN + call screen. Then the admin/settings pages.
-  None of the new screens has been seen on a real build by the assistant (previews need a Vercel
-  login): the owner checks previews; designs are checked beforehand on a static mock-up.
-- Proposed, not started: switch the route guard on (see the first Gotcha) with a lighter matcher.
-- Five Vercel projects build every push of this repo: `veil`, `veil-32wk`, `veil-ah7i`,
-  `veil-cqsf`, `veil-vo9a`. `veil-cqsf` (the address used so far) builds `main` fine but its
-  preview builds of PR #1 failed while the other four succeeded; the cause is unknown (its build
-  log was not available). Which project is the real one, and deleting the rest, is the owner's call.
-- Decided by the owner: sign-up is invite-code only; members chat only with the admin; tests run
-  on Vercel previews only. Open: whether to add a yellow "Snapchat-style" theme next to the blue.
-- Deployed but not yet confirmed: rooms-page crash hardening (c2de8e6), clearer form errors
-  (36383cb), speed changes (session cache, 5 s resync poll, no splash).
-- Calls: cross-network calls fail — TURN not configured (public "openrelay" test TURN is dead;
-  whether `NEXT_PUBLIC_TURN_*` are set in Vercel is unverified). Next: Metered (static creds, no
-  code) or Cloudflare TURN (short-lived creds → needs a server route). Same-network call untested.
-- Performance: Vercel's default function region (iad1) is probably far from the Supabase region
-  (unknown) — set Vercel → Settings → Functions → Region to match Supabase.
+  owner: admin login, chat. Deployed but never confirmed: rooms crash hardening (c2de8e6),
+  clearer form errors (36383cb), speed changes (session cache, 5 s resync poll).
+- UI redesign (started 2026-11-14), one stacked branch per feature; none is merged yet:
+  1. `feature/first-screen` (PR #1) — rename to BlackFoxx, tokens/fonts, moji avatars, animated
+     first screen, new log-in and invite-link screens.
+  2. `feature/chat-list` (PR #2) — chat home: greeting, people row, search, rows; rooms entry
+     points removed (rooms are on hold; their routes still exist).
+  3. `feature/chat-thread` — chat screen for admin, member and rooms: header, bubbles with the
+     time under each run, pill composer, typing bubble in a fixed slot in the message list.
+  4. `feature/avatar-picker` — choose your moji (Settings, or the member's More menu); stored in
+     `profiles.avatar_url` as `moji:<id>:<colour>`; `PATCH /api/profile` now only changes the
+     fields it is sent; Node pinned to 24.x.
+  Next: 5. sign-up with an invite code (needs `v10.sql`). 6. calls: TURN + call screen. Then
+  the admin/settings pages. Proposed: switch the route guard on (first Gotcha).
+- The assistant has not seen any of this on a real build (previews need a Vercel login): the
+  owner checks previews; designs are checked beforehand on a static mock-up.
+- Five Vercel projects build every push: `veil`, `veil-32wk`, `veil-ah7i`, `veil-cqsf`,
+  `veil-vo9a`. `veil-cqsf` (the address used so far) builds `main`, but its preview builds fail:
+  its variables are set for Production only. Which project is the real one, and deleting the
+  rest, is the owner's call.
+- Decided by the owner: sign-up is invite-code only; members chat only with the admin. Open:
+  a yellow "Snapchat-style" theme next to the blue.
+- Calls: cross-network calls fail — TURN not configured (whether `NEXT_PUBLIC_TURN_*` are set in
+  Vercel is unverified). Options: Metered (static creds, no code) or Cloudflare TURN
+  (short-lived creds → needs a server route). Same-network call untested.
+- Performance: Vercel builds (and by default functions) run in iad1; the Supabase region is
+  unknown — set Vercel → Settings → Functions → Region to match it.
 - To do: commit `package-lock.json`; add a test runner + CI.
-- Known gaps: setting `user_session_ephemeral` has no effect (hook `use-ephemeral-session` is not
-  mounted); admin-only routes still echo raw DB errors; small blue text is under 4.5:1 contrast
-  in dark mode on the old screens (see `DESIGN.md`);
-  remaining risks listed in `docs/SECURITY.md` (in-memory rate limit, plaintext `invite_tokens`,
-  CSP `'unsafe-inline'`, public chat/presence channels). No TODO/FIXME markers in the code.
+- Known gaps: `user_session_ephemeral` has no effect (its hook is not mounted); admin-only routes
+  echo raw DB errors; small blue text is under 4.5:1 in dark mode on the old screens; more in
+  `docs/SECURITY.md` (in-memory rate limit, plaintext `invite_tokens`, CSP `'unsafe-inline'`,
+  public chat/presence channels). No TODO/FIXME markers in the code.
 
 When you change commands, structure, env vars or conventions, update this file in the same commit.

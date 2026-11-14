@@ -68,6 +68,11 @@ Always seed with the user id when you have it. Native emoji are used on purpose:
 they cost zero bytes and match the phone's own style. Each emoji is paired with a
 ground it stands out on; keep that pairing when adding more.
 
+People can choose their own in the avatar picker (`moji-picker.tsx`): an emoji from three
+groups (animals, faces, things) and one of the nine grounds. The choice is saved in
+`profiles.avatar_url` as `moji:<id>:<colour>`; `UserAvatar` draws it. The first 24 catalogue
+entries are the pool for automatic avatars, so new ones are only ever added after them.
+
 Emoji are for avatars and tiles only. Interface icons come from `lucide-react`.
 
 ## Chat home

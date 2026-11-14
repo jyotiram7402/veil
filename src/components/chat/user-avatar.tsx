@@ -1,7 +1,7 @@
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { mojiFor } from "@/lib/moji";
+import { mojiFor, parseMojiValue } from "@/lib/moji";
 import { cn } from "@/lib/utils";
 import { usePresenceStore } from "@/store/presence-store";
 
@@ -36,14 +36,17 @@ export function UserAvatar({
   className,
 }: Props) {
   const online = usePresenceStore((s) => (userId ? s.online.has(userId) : false));
-  // Seed with the id when we have one, so a person keeps the same moji
+  // avatar_url holds either a photo URL or a chosen moji ("moji:fox:sky").
+  // Without either, pick one from the id, so a person keeps the same moji
   // wherever they show up (the name can differ from screen to screen).
-  const moji = mojiFor(userId ?? username);
+  const chosen = parseMojiValue(avatarUrl);
+  const moji = chosen ?? mojiFor(userId ?? username);
+  const photoUrl = chosen ? null : avatarUrl;
 
   return (
     <div className={cn("relative inline-block", className)}>
       <Avatar className={SIZE[size]}>
-        {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName ?? username} />}
+        {photoUrl && <AvatarImage src={photoUrl} alt={displayName ?? username} />}
         <AvatarFallback style={{ backgroundColor: moji.bg }}>
           <span aria-hidden="true">{moji.emoji}</span>
         </AvatarFallback>

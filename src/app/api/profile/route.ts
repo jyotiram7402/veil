@@ -11,16 +11,20 @@ export async function PATCH(req: Request) {
   const parsed = await parseBody(req, profileUpdateSchema);
   if (!parsed.ok) return parsed.response;
 
+  // Only the fields that were sent are changed; an empty string clears one.
+  // (Before, saving the name wiped the avatar and the other way round.)
   const { displayName, bio, avatarUrl } = parsed.data;
-  const supabase = await supabaseServer();
+  const update: { display_name?: string | null; bio?: string | null; avatar_url?: string | null } =
+    {};
+  if (displayName !== undefined) update.display_name = displayName || null;
+  if (bio !== undefined) update.bio = bio || null;
+  if (avatarUrl !== undefined) update.avatar_url = avatarUrl || null;
+  if (Object.keys(update).length === 0) return jsonError(400, "Nothing to update");
 
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("profiles")
-    .update({
-      display_name: displayName ?? null,
-      bio: bio ?? null,
-      avatar_url: avatarUrl && avatarUrl.length > 0 ? avatarUrl : null,
-    })
+    .update(update)
     .eq("id", session.id)
     .select()
     .single();

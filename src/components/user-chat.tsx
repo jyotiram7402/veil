@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Moon, MoreHorizontal, Sun } from "lucide-react";
+import { LogOut, Moon, MoreHorizontal, Smile, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import { UserAvatar } from "@/components/chat/user-avatar";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
 import { SessionLock } from "@/components/session-lock";
+import { MojiPicker } from "@/components/moji-picker";
 import { useTheme } from "@/components/theme-toggle";
 import { CallProvider } from "@/components/call/call-provider";
 import { CallButton } from "@/components/call/call-button";
@@ -76,6 +77,9 @@ export function UserChat({
   const adminOnline = usePresenceStore((s) => s.online.has(adminProfile.id));
   const subtitle = adminOnline ? "Online" : `Last seen ${lastSeen(adminProfile.last_seen_at)}`;
   const { theme, toggle: toggleTheme } = useTheme();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // The store has the freshest copy of my own profile (it changes when I pick an avatar).
+  const myProfile = useSessionStore((s) => s.profile) ?? me;
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -117,6 +121,9 @@ export function UserChat({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem className="px-3 py-2.5" onClick={() => setPickerOpen(true)}>
+              <Smile className="h-4 w-4" /> Change avatar
+            </DropdownMenuItem>
             <DropdownMenuItem className="px-3 py-2.5" onClick={toggleTheme}>
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {theme === "dark" ? "Light mode" : "Dark mode"}
@@ -140,6 +147,8 @@ export function UserChat({
         uploadsEnabled={settings.uploads_enabled}
         maxLength={settings.max_message_length}
       />
+
+      <MojiPicker open={pickerOpen} onOpenChange={setPickerOpen} profile={myProfile} />
     </div>
   );
 
