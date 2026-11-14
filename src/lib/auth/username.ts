@@ -1,7 +1,7 @@
 import { env } from "@/lib/env";
 
 /**
- * Supabase Auth requires a unique email per user. Rooms is a username-only
+ * Supabase Auth requires a unique email per user. BlackFoxx is a username-only
  * product, so we synthesize an email behind the scenes. The user never sees
  * it; it's a stable identifier for auth.users only.
  */

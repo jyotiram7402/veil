@@ -1,5 +1,5 @@
 -- ============================================================================
---  Veil / MyVoxa — RLS negative-test harness
+--  BlackFoxx — RLS negative-test harness
 --
 --  Framework-free regression tests for the security-sensitive RLS policies.
 --  Run with psql (it uses psql `\set` variables, which the Supabase dashboard

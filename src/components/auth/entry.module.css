@@ -1,0 +1,416 @@
+/*
+ * Entry screens: the first screen (a wall of floating moji tiles around the
+ * wordmark) and the auth shell (blue stage over a white sheet).
+ * Plain CSS on purpose: the animation runs without any JavaScript, and
+ * reduced motion gets a still composition.
+ */
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: rotate(var(--r, 0deg)) scale(0.35);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(var(--r, 0deg)) scale(1);
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(calc(var(--dx, 3px) * -1), calc(var(--dy, 7px) * -1), 0)
+      rotate(calc(var(--dr, 2deg) * -1));
+  }
+  to {
+    transform: translate3d(var(--dx, 3px), var(--dy, 7px), 0) rotate(var(--dr, 2deg));
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  First screen                                                       */
+/* ------------------------------------------------------------------ */
+
+.screen {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow: hidden;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  /* One design pixel of the phone layout (390 wide, 668 tall stage), scaled to
+     whichever of width or height is tighter, so tiles never crowd the name. */
+  --u: clamp(0.56px, min(100vw / 390, (100vh - 11rem) / 668), 1.3px);
+}
+
+@supports (height: 100svh) {
+  .screen {
+    --u: clamp(0.56px, min(100vw / 390, (100svh - 11rem) / 668), 1.3px);
+  }
+}
+
+/* Wide layout is designed at 1280 wide with a 700 tall stage. */
+@media (min-width: 768px) {
+  .screen {
+    --u: clamp(0.6px, min(100vw / 1280, (100vh - 10rem) / 700), 1.25px);
+  }
+
+  @supports (height: 100svh) {
+    .screen {
+      --u: clamp(0.6px, min(100vw / 1280, (100svh - 10rem) / 700), 1.25px);
+    }
+  }
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 25rem;
+}
+
+.wall {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* One tile = a positioned, rotated box (entrance) holding a squircle that
+   drifts forever. Two elements so the two transforms never fight. */
+.tile {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--s);
+  height: var(--s);
+  transform: rotate(var(--r, 0deg));
+  animation: popIn 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.tileBody {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 30%;
+  background: var(--tile);
+  box-shadow: 0 22px 34px -22px rgb(15 18 30 / 0.5);
+  font-size: calc(var(--s) * 0.56);
+  line-height: 1;
+  animation: drift var(--t, 7s) ease-in-out var(--fd, 0s) infinite alternate;
+  will-change: transform;
+}
+
+/* Phone layout (portrait). x / y are relative to the stage (the area above
+   the buttons) and sizes are in design pixels times --u, so the composition
+   holds on short and tall phones alike. */
+.t1  { --x: -9%;  --y: 2%;  --s: calc(var(--u) * 133); --r: -12deg; --d: 200ms; --t: 7.6s; --fd: -1.2s; }
+.t2  { --x: 45%;  --y: 4%;  --s: calc(var(--u) * 86);  --r: 9deg;   --d: 150ms; --t: 6.4s; --fd: -3.1s; --dx: -3px; }
+.t3  { --x: 76%;  --y: 12%; --s: calc(var(--u) * 117); --r: 13deg;  --d: 220ms; --t: 8.2s; --fd: -0.4s; }
+.t4  { --x: 11%;  --y: 27%; --s: calc(var(--u) * 66);  --r: -7deg;  --d: 110ms; --t: 5.8s; --fd: -2.2s; --dy: 5px; }
+.t5  { --x: 38%;  --y: 24%; --s: calc(var(--u) * 94);  --r: -6deg;  --d: 40ms;  --t: 6.9s; --fd: -4s; }
+.t6  { --x: 75%;  --y: 29%; --s: calc(var(--u) * 70);  --r: 8deg;   --d: 120ms; --t: 6.1s; --fd: -1.7s; --dx: -2px; }
+.t7  { --x: -8%;  --y: 66%; --s: calc(var(--u) * 117); --r: 10deg;  --d: 210ms; --t: 7.9s; --fd: -2.6s; }
+.t8  { --x: 38%;  --y: 70%; --s: calc(var(--u) * 74);  --r: -9deg;  --d: 130ms; --t: 6.6s; --fd: -0.9s; --dy: 5px; }
+.t9  { --x: 73%;  --y: 63%; --s: calc(var(--u) * 125); --r: -10deg; --d: 190ms; --t: 8.4s; --fd: -3.6s; }
+.t10 { --x: 22%;  --y: 85%; --s: calc(var(--u) * 58);  --r: 7deg;   --d: 250ms; --t: 5.6s; --fd: -1.4s; --dy: 4px; }
+.t11 { --x: 58%;  --y: 84%; --s: calc(var(--u) * 62);  --r: -5deg;  --d: 260ms; --t: 6.2s; --fd: -2.9s; --dy: 4px; }
+.t12 { display: none; }
+
+/* Wide layout (tablet, laptop): the same tiles spread out around the name. */
+@media (min-width: 768px) {
+  .t1  { --x: -2%;  --y: -9%; --s: calc(var(--u) * 200); }
+  .t2  { --x: 41%;  --y: -7%; --s: calc(var(--u) * 138); }
+  .t3  { --x: 86%;  --y: -5%; --s: calc(var(--u) * 178); }
+  .t4  { --x: 19%;  --y: 16%; --s: calc(var(--u) * 94); }
+  .t5  { --x: 31%;  --y: 22%; --s: calc(var(--u) * 108); }
+  .t6  { --x: 57%;  --y: 13%; --s: calc(var(--u) * 100); }
+  .t7  { --x: -3%;  --y: 43%; --s: calc(var(--u) * 174); }
+  .t8  { --x: 29%;  --y: 68%; --s: calc(var(--u) * 120); }
+  .t9  { --x: 87%;  --y: 36%; --s: calc(var(--u) * 212); }
+  .t10 { --x: 66%;  --y: 66%; --s: calc(var(--u) * 116); }
+  .t11 { --x: 74%;  --y: 20%; --s: calc(var(--u) * 92); }
+  .t12 { display: block; --x: 8%; --y: 70%; --s: calc(var(--u) * 150); --r: -11deg; --d: 240ms; --t: 7.2s; --fd: -2s; }
+}
+
+.brand {
+  position: relative;
+  z-index: 2;
+  padding: 0 1.25rem;
+  text-align: center;
+  animation: riseIn 640ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.6rem, min(14.5vw, 13vh), 6rem);
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.promise {
+  margin: 0.9rem auto 0;
+  max-width: 21rem;
+  font-size: 1.0625rem;
+  line-height: 1.4;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  text-wrap: balance;
+}
+
+@media (min-width: 768px) {
+  .promise {
+    max-width: 28rem;
+    font-size: 1.25rem;
+  }
+}
+
+.actions {
+  position: relative;
+  z-index: 3;
+  padding: 0.25rem 1.25rem 1.25rem;
+  background: hsl(var(--background));
+}
+
+/* Tiles that reach the bottom of the stage dissolve before the buttons. */
+.actions::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 3rem;
+  background: linear-gradient(to bottom, hsl(var(--background) / 0), hsl(var(--background)));
+  pointer-events: none;
+}
+
+.buttons {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 24rem;
+  margin: 0 auto;
+}
+
+@media (min-width: 640px) {
+  .buttons {
+    grid-template-columns: 1fr 1fr;
+    max-width: 30rem;
+  }
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 3.5rem;
+  border-radius: 999px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  text-decoration: none;
+  user-select: none;
+  transition:
+    transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 140ms ease-out,
+    opacity 140ms ease-out;
+}
+
+.cta:active {
+  transform: scale(0.97);
+}
+
+.cta:focus-visible {
+  outline: 3px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+
+.ctaPrimary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 14px 26px -14px hsl(var(--primary) / 0.8);
+}
+
+.ctaPrimary:hover {
+  filter: brightness(1.07);
+}
+
+.ctaInk {
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+.ctaInk:hover {
+  opacity: 0.88;
+}
+
+.note {
+  margin: 0.9rem 0 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ------------------------------------------------------------------ */
+/*  Auth shell: blue stage over a white sheet                          */
+/* ------------------------------------------------------------------ */
+
+.auth {
+  display: grid;
+  min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  background: hsl(var(--primary));
+}
+
+.authCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  overflow: hidden;
+  background: hsl(var(--primary));
+}
+
+.authStage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 11rem;
+  color: #fff;
+}
+
+.rings {
+  position: absolute;
+  inset: 0;
+  background: repeating-radial-gradient(
+    circle at 50% 82%,
+    transparent 0 43px,
+    rgb(255 255 255 / 0.13) 43px 44.5px
+  );
+  -webkit-mask-image: radial-gradient(circle at 50% 82%, #000 10%, transparent 78%);
+  mask-image: radial-gradient(circle at 50% 82%, #000 10%, transparent 78%);
+  pointer-events: none;
+}
+
+.authTop {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.75rem 0;
+}
+
+.authBrand {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1.3125rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(255 255 255 / 0.16);
+  transition: background-color 140ms ease-out;
+}
+
+.iconBtn:hover {
+  background: rgb(255 255 255 / 0.26);
+}
+
+.iconBtn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.stageMoji {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  transform: rotate(var(--r, 0deg));
+  animation: popIn 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0ms);
+  pointer-events: none;
+}
+
+.stageMojiBody {
+  display: block;
+  font-size: var(--s);
+  line-height: 1;
+  filter: drop-shadow(0 12px 10px rgb(0 20 80 / 0.28));
+  animation: drift var(--t, 7s) ease-in-out var(--fd, 0s) infinite alternate;
+  will-change: transform;
+}
+
+.m1 { --x: 7%;  --y: 34%; --s: clamp(3.4rem, 17vw, 4.6rem); --r: -10deg; --d: 60ms;  --t: 7.4s; --fd: -1s; }
+.m2 { --x: 66%; --y: 28%; --s: clamp(3rem, 15vw, 4rem);     --r: 9deg;   --d: 120ms; --t: 6.3s; --fd: -2.4s; }
+.m3 { --x: 43%; --y: 52%; --s: clamp(2rem, 10vw, 2.6rem);   --r: -4deg;  --d: 180ms; --t: 5.7s; --fd: -3.2s; --dy: 5px; }
+.m4 { --x: 15%; --y: 68%; --s: clamp(2.8rem, 14vw, 3.6rem); --r: 7deg;   --d: 150ms; --t: 6.8s; --fd: -0.6s; }
+.m5 { --x: 70%; --y: 60%; --s: clamp(3.8rem, 20vw, 5.2rem); --r: -8deg;  --d: 210ms; --t: 8s;   --fd: -4.1s; }
+
+.sheet {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  padding: 1.75rem 1.5rem 1.75rem;
+  border-radius: 2rem 2rem 0 0;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
+
+/* From tablet up the shell becomes a centred card on the porcelain ground. */
+@media (min-width: 640px) {
+  .auth {
+    place-items: center;
+    padding: 2rem 1rem;
+    background: hsl(var(--background));
+  }
+
+  .authCard {
+    width: 100%;
+    max-width: 27rem;
+    min-height: 0;
+    border-radius: 2.25rem;
+    box-shadow: 0 44px 80px -44px rgb(15 18 30 / 0.5);
+  }
+
+  .authStage {
+    flex: none;
+    height: 13.5rem;
+  }
+
+  .sheet {
+    padding: 2rem 2rem 2.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .tileBody,
+  .brand,
+  .stageMoji,
+  .stageMojiBody {
+    animation: none;
+  }
+}

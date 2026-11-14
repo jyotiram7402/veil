@@ -1,4 +1,4 @@
-# Veil / MyVoxa — Production Deployment
+# BlackFoxx — Production Deployment
 
 This is the canonical production deployment guide. It contains **no secret
 values** — only variable names and steps. Pair it with `PRODUCTION_RUNBOOK.md`
@@ -33,7 +33,7 @@ values; `.env.example` holds placeholders only.
 **Public (safe in the browser, `NEXT_PUBLIC_`):**
 - `NEXT_PUBLIC_SUPABASE_URL` — production Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — production anon key
-- `NEXT_PUBLIC_APP_URL` — canonical production origin, e.g. `https://veil.example.com`
+- `NEXT_PUBLIC_APP_URL` — canonical production origin, e.g. `https://blackfoxx.example.com`
 - `NEXT_PUBLIC_TURN_URL` / `NEXT_PUBLIC_TURN_USERNAME` / `NEXT_PUBLIC_TURN_CREDENTIAL` — optional TURN (see §6)
 
 **Secret (server-only — must NOT be `NEXT_PUBLIC_`):**

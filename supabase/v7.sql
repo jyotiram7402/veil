@@ -1,5 +1,5 @@
 -- ============================================================================
---  Veil / MyVoxa — v7 migration
+--  BlackFoxx — v7 migration
 --  Run AFTER v2..v6.sql. Idempotent.
 --
 --  Voice audio itself is peer-to-peer WebRTC and never touches the database.

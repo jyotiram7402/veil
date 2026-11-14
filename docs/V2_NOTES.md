@@ -1,6 +1,6 @@
 # v2 changes
 
-This release rewrites Rooms / Veil into a strict **admin ↔ user** model.
+This release rewrites BlackFoxx into a strict **admin ↔ user** model.
 Read this before deploying so the new flow makes sense.
 
 ## Apply the v2 migration

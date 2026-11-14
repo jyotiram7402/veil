@@ -10,7 +10,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   const [theme, setTheme] = useState<Theme | null>(null);
 
   useEffect(() => {
-    const stored = (localStorage.getItem("veil-theme") as Theme | null) ?? null;
+    const stored = (localStorage.getItem("blackfoxx-theme") as Theme | null) ?? null;
     const initial: Theme =
       stored ??
       (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -28,13 +28,13 @@ export function ThemeToggle({ className }: { className?: string }) {
   function toggle() {
     const next: Theme = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    localStorage.setItem("veil-theme", next);
+    localStorage.setItem("blackfoxx-theme", next);
     apply(next);
   }
 
   if (!theme) {
     // Avoid hydration mismatch; render an empty placeholder.
-    return <span className="h-9 w-9 inline-block" aria-hidden />;
+    return <span className="h-10 w-10 inline-block" aria-hidden />;
   }
 
   return (

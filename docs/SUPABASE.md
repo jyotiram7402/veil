@@ -7,7 +7,7 @@ dashboard. You only need to do it once.
 
 Go to [supabase.com](https://supabase.com) → **New project**.
 
-- Name: anything (e.g. `rooms`)
+- Name: anything (e.g. `blackfoxx`)
 - Database password: anything — you won't type it again, just keep it
   in a password manager in case you need to use the SQL editor as
   `postgres`.
@@ -34,7 +34,7 @@ You can confirm it worked under **Table editor**: you should see
 
 Under **Authentication → Providers**:
 
-- **Email**: enable. Open it and **disable** "Confirm email" — Rooms
+- **Email**: enable. Open it and **disable** "Confirm email" — BlackFoxx
   creates users via the service role and they should be able to sign
   in immediately. We never collect a real email.
 - Disable every other provider (Phone, OAuth, etc.).
@@ -74,7 +74,7 @@ use these `eyJ...` keys, not the newer Publishable/Secret keys):
 
 ## How the username / email mapping works
 
-Supabase Auth requires a unique email per `auth.users` row. Rooms is a
+Supabase Auth requires a unique email per `auth.users` row. BlackFoxx is a
 username-only product, so we synthesize an email behind the scenes:
 `<username>@<INTERNAL_EMAIL_DOMAIN>`. Users never see this email — they
 sign in with the username they were given. The domain you choose

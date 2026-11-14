@@ -1,5 +1,5 @@
 -- ============================================================================
---  Rooms / Veil — v2 migration
+--  BlackFoxx — v2 migration
 --  Run AFTER schema.sql + policies.sql + storage.sql.
 --  Idempotent: safe to re-run.
 --

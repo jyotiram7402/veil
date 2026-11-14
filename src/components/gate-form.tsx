@@ -1,19 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
+import { ENTRY_SUBMIT } from "@/components/auth/field";
+import { PasswordInput } from "@/components/auth/password-input";
 import { UserAvatar } from "@/components/chat/user-avatar";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+
+const ERROR_TEXT: Record<string, string> = {
+  invalid: "That password doesn't match. Try again.",
+  locked: "Too many attempts. Wait a minute and try again.",
+};
 
 export function GateForm({
   token,
+  userId,
   displayName,
   username,
   avatarUrl,
   error,
 }: {
   token: string;
+  userId: string;
   displayName: string;
   username: string;
   avatarUrl: string | null;
@@ -21,59 +30,52 @@ export function GateForm({
 }) {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const errorText = error ? ERROR_TEXT[error] : undefined;
 
   return (
-    <form
-      action={`/api/i/${token}`}
-      method="POST"
-      onSubmit={() => setSubmitting(true)}
-      className="w-full max-w-sm"
-    >
-      <div className="flex flex-col items-center text-center mb-8">
+    <form action={`/api/i/${token}`} method="POST" onSubmit={() => setSubmitting(true)}>
+      <div className="flex items-center gap-4">
         <UserAvatar
+          userId={userId}
           username={username}
           displayName={displayName}
           avatarUrl={avatarUrl}
           size="xl"
         />
-        <h1 className="mt-4 text-xl font-semibold">{displayName}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">@{username}</p>
-      </div>
-
-      <div className="glass rounded-2xl p-6 space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium text-foreground/90">
-            Enter your password
-          </label>
-          <div className="relative">
-            <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              autoFocus
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pl-9"
-              placeholder="••••••••"
-            />
-          </div>
-          {error === "invalid" && (
-            <p className="text-xs text-destructive">That password doesn&apos;t match. Try again.</p>
-          )}
-          {error === "locked" && (
-            <p className="text-xs text-destructive">Too many attempts. Wait a minute and try again.</p>
-          )}
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">
+            Hi, {displayName}
+          </h1>
+          <p className="truncate text-[15px] text-muted-foreground">@{username}</p>
         </div>
-
-        <Button type="submit" className="w-full" disabled={submitting || !password}>
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"}
-        </Button>
       </div>
 
-      <p className="mt-6 text-center text-xs text-muted-foreground">
+      <div className="mt-6 space-y-2">
+        <Label htmlFor="password">Your password</Label>
+        <PasswordInput
+          id="password"
+          name="password"
+          autoComplete="current-password"
+          autoFocus
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          enterKeyHint="go"
+          aria-invalid={!!errorText}
+          aria-describedby={errorText ? "password-error" : undefined}
+        />
+        {errorText && (
+          <p id="password-error" role="alert" className="text-[13px] font-medium text-destructive">
+            {errorText}
+          </p>
+        )}
+      </div>
+
+      <Button type="submit" className={`mt-5 ${ENTRY_SUBMIT}`} disabled={submitting || !password}>
+        {submitting ? <Loader2 className="animate-spin" aria-label="Opening your chat" /> : "Continue"}
+      </Button>
+
+      <p className="mt-5 text-center text-[13px] leading-relaxed text-muted-foreground">
         This link is yours alone. Don&apos;t share it or your password.
       </p>
     </form>

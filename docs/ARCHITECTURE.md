@@ -8,7 +8,8 @@ setup and day-to-day rules see `CLAUDE.md`. Security model: `docs/SECURITY.md`.
 ```
 Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSession)
               │  refresh auth cookie, getUser(), load profiles(is_admin, suspended, archived)
-              │  logged-out "/" → /login; non-public path → /login?next=…
+              │  logged-out: public paths pass ("/" is the first screen); the rest → /login?next=…
+              │  signed-in on an entry screen (/ /login /signup) → /chats or /chat
               │  suspended/archived → sign out → /expired
               │  admin-only prefixes (/chats /settings /admin /archive /rooms) ← non-admins → /chat
               │  /chat ← admins → /chats
@@ -26,7 +27,9 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 
 | Path | Who | What |
 |---|---|---|
-| `(auth)/login` | admin | username + password sign-in (`/api/auth/login`) |
+| `page.tsx` | signed-out | first screen: animated moji wall, Log in / Sign up (`components/auth/first-screen.tsx`); static |
+| `(auth)/login` | admin | username + password sign-in (`/api/auth/login`), inside `components/auth/auth-shell.tsx` |
+| `(auth)/signup` | signed-out | placeholder: says sign-up needs an invite code (the real flow is not built yet) |
 | `(app)/layout.tsx` | admin | requires `is_admin`; loads chat list (`loadChatsForUser`) into `AppShell` |
 | `(app)/chats`, `chats/[id]` | admin | chat list + thread (`components/chat/chat-thread.tsx`) |
 | `(app)/admin` | admin | Members / Archive / Defaults / Account tabs (`components/admin-panel.tsx`) |
@@ -37,7 +40,6 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 | `i/[token]` | member | per-member invite link + gate password → session |
 | `join`, `join/[code]` | guest | room access-code form (`components/rooms/join-form.tsx`) |
 | `room/[id]` | guest | room chat view (`components/rooms/room-chat.tsx`) |
-| `page.tsx` | — | splash; effectively unused (middleware sends logged-out `/` to `/login`) |
 | `error.tsx` | — | error boundary; shows `Ref: <digest>` to match against Vercel logs |
 
 ## API routes (`src/app/api`)
@@ -74,7 +76,8 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
   `assertRoomAdmin`, `recordAudit`. `permissions.ts` — effective chat/voice/video model.
 - `settings.ts` — `app_settings` defaults merged with `profiles.settings` overrides.
 - `password.ts` (PBKDF2), `invite-token.ts`, `url.ts` (app origin for links), `share.ts`
-  (`navigator.share` → clipboard), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`).
+  (`navigator.share` → clipboard), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
+  `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
 - `webrtc/` — `ice.ts` (STUN + env TURN), `signaling.ts` (private broadcast channel),
   `codec.ts` (audio/video constraints, Opus preference), `stats.ts` (quality from getStats),
   `audio-level.ts`, `errors.ts` (error codes → friendly text), `ringtone.ts`, `types.ts`.
@@ -86,7 +89,7 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
   `sync-store`, `call-store` (call + media state).
 - `use-chat-realtime` — channel `chat:<chatId>`: message INSERT/DELETE + typing broadcast.
 - `use-chat-list-realtime` — channel `chats:<userId>`: previews, unread, new memberships.
-- `use-presence` — channel `rooms-presence` (online dots only; never used for auth).
+- `use-presence` — channel `blackfoxx-presence` (online dots only; never used for auth).
 - `use-resume-sync` — 5 s poll while visible + immediate resync on focus/visibility/online.
 - `use-heartbeat` — `last_seen_at` every 30 s. `use-ephemeral-session` — exists but is not
   mounted anywhere (V2_NOTES describes it as active; that's outdated).

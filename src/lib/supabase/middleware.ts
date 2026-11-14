@@ -3,7 +3,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 import { env } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/", "/login", "/expired", "/api/auth/login", "/api/admin/users"];
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/signup",
+  "/expired",
+  "/api/auth/login",
+  "/api/admin/users",
+];
+// Entry screens: a signed-in visitor is sent on to the app instead.
+const ENTRY_PATHS = ["/", "/login", "/signup"];
 const ADMIN_ONLY_PREFIXES = ["/chats", "/settings", "/admin", "/archive", "/rooms"];
 const USER_ONLY_PREFIXES = ["/chat"];
 
@@ -57,14 +66,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!user) {
-    // Go straight to sign-in instead of making visitors sit through the
-    // animated splash screen first.
-    if (pathname === "/") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
+    // "/" is the first screen (Log in / Sign up); it is public like the rest.
     if (isPublic(pathname)) return response;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -88,7 +90,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (pathname === "/login" || pathname === "/") {
+  if (ENTRY_PATHS.includes(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = profile.is_admin ? "/chats" : "/chat";
     url.search = "";

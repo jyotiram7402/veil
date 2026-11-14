@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DoorOpen, LogOut, MessageSquarePlus, Settings, Shield, Users } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,8 +17,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ChatList } from "@/components/chat/chat-list";
 import { NewChatDialog } from "@/components/chat/new-chat-dialog";
+import { UserAvatar } from "@/components/chat/user-avatar";
 import { useSessionStore } from "@/store/session-store";
-import { avatarGradient, cn, initialsFor } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
 import type { Profile } from "@/types/chat";
 
@@ -41,14 +40,13 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 min-w-0 group">
-                <Avatar className="h-8 w-8 ring-1 ring-border/60">
-                  {profile.avatar_url && (
-                    <AvatarImage src={profile.avatar_url} alt={profile.username} />
-                  )}
-                  <AvatarFallback className={cn(avatarGradient(profile.username))}>
-                    {initialsFor(profile.display_name ?? profile.username)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  userId={profile.id}
+                  username={profile.username}
+                  displayName={profile.display_name}
+                  avatarUrl={profile.avatar_url}
+                  size="sm"
+                />
                 <div className="hidden sm:block text-left truncate">
                   <div className="text-sm font-medium leading-tight truncate">
                     {profile.display_name ?? profile.username}

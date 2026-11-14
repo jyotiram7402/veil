@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { GateForm } from "@/components/gate-form";
 
 export const dynamic = "force-dynamic";
@@ -40,14 +41,15 @@ export default async function InviteGatePage({
   if (profile.is_admin) redirect("/login");
 
   return (
-    <main className="min-h-[100svh] grid place-items-center px-6 chat-bg">
+    <AuthShell backHref={null}>
       <GateForm
         token={token}
+        userId={row.user_id}
         displayName={profile.display_name ?? profile.username}
         username={profile.username}
         avatarUrl={profile.avatar_url}
         error={error}
       />
-    </main>
+    </AuthShell>
   );
 }

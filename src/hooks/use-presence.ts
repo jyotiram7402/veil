@@ -6,7 +6,7 @@ import { usePresenceStore } from "@/store/presence-store";
 import type { Profile } from "@/types/chat";
 
 /**
- * Joins the global "rooms-presence" channel so every signed-in client tracks
+ * Joins the global "blackfoxx-presence" channel so every signed-in client tracks
  * who's online. We use Supabase Realtime presence — a built-in primitive
  * that we don't have to host ourselves.
  */
@@ -17,7 +17,7 @@ export function usePresence(me: Profile | null) {
     if (!me) return;
     const supabase = supabaseBrowser();
 
-    const channel = supabase.channel("rooms-presence", {
+    const channel = supabase.channel("blackfoxx-presence", {
       config: { presence: { key: me.id } },
     });
 

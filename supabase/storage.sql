@@ -1,5 +1,5 @@
 -- ============================================================================
---  Rooms — Storage buckets & policies
+--  BlackFoxx — Storage buckets & policies
 --  Buckets:
 --    avatars      (public)  -> profile/group images
 --    attachments  (private) -> chat attachments; served via signed URLs

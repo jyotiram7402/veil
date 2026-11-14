@@ -1,11 +1,8 @@
-import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth/session";
-import { Splash } from "@/components/splash";
+import { FirstScreen } from "@/components/auth/first-screen";
 
-export default async function RootPage() {
-  const session = await getSessionUser();
-  if (session) {
-    redirect(session.profile.is_admin ? "/chats" : "/chat");
-  }
-  return <Splash />;
+// Static on purpose: signed-in visitors never reach this page (the middleware
+// sends them straight to their chats), so it needs no session lookup and can
+// be served from the edge cache.
+export default function RootPage() {
+  return <FirstScreen />;
 }

@@ -1,5 +1,5 @@
 -- ============================================================================
---  Rooms — schema
+--  BlackFoxx — schema
 --  Run this file once in the Supabase SQL editor (project > SQL > New query).
 --  It is idempotent: safe to re-run after edits.
 -- ============================================================================

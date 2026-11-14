@@ -1,5 +1,5 @@
 -- ============================================================================
---  Veil / MyVoxa — v6 migration
+--  BlackFoxx — v6 migration
 --  Run AFTER v2..v5.sql. Idempotent.
 --
 --  1. Corrects LOCKED-room semantics: a locked room must keep its EXISTING

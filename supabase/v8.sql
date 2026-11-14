@@ -1,5 +1,5 @@
 -- ============================================================================
---  Veil / MyVoxa — v8 migration
+--  BlackFoxx — v8 migration
 --  Run AFTER v2..v7.sql. Idempotent.
 --
 --  No new tables. Extends the call_sessions table so a completed/

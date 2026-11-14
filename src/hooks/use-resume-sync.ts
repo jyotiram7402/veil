@@ -107,7 +107,7 @@ export function useResumeSync(chatId: string | null, me: Profile | null) {
 
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onFocus);
-    window.addEventListener("veil:resume", onResume);
+    window.addEventListener("blackfoxx:resume", onResume);
     window.addEventListener("online", onOnline);
 
     // First sync immediately on mount, then begin the regular poll cadence.
@@ -119,7 +119,7 @@ export function useResumeSync(chatId: string | null, me: Profile | null) {
       if (pollTimer !== null) window.clearTimeout(pollTimer);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", onFocus);
-      window.removeEventListener("veil:resume", onResume);
+      window.removeEventListener("blackfoxx:resume", onResume);
       window.removeEventListener("online", onOnline);
     };
   }, [chatId, me]);

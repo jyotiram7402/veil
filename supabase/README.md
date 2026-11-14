@@ -35,7 +35,7 @@ After that, in **Authentication → Providers**:
 
 - Disable everything except **Email**.
 - Under **Email**, turn **off** the "Confirm email" toggle. Users created via
-  the service role can sign in immediately, which is the flow Rooms uses.
+  the service role can sign in immediately, which is the flow BlackFoxx uses.
 
 Then create your first user from the running app:
 

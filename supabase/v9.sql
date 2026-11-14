@@ -1,5 +1,5 @@
 -- ============================================================================
---  Veil / MyVoxa — v9 migration
+--  BlackFoxx — v9 migration
 --  Run AFTER v2..v8.sql. Idempotent.
 --
 --  Fixes found during the audit:

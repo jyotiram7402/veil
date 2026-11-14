@@ -1,14 +1,17 @@
 # CLAUDE.md
 
 ## Overview
-Veil (shown in the UI as "Rooms"; package name `rooms`) is a private, invite-only, mobile-first
-chat app with 1:1 WebRTC voice/video calls. An admin creates every account; members sign in
-through a personal invite link, guests join rooms with temporary access codes — no email/phone.
+BlackFoxx (package name `blackfoxx`; the GitHub repo and Vercel project are still named `veil`)
+is a private, invite-only, mobile-first chat app with 1:1 WebRTC voice/video calls. An admin
+creates every account; members sign in through a personal invite link — no email/phone. Members
+chat only with the admin. Rooms (guest access codes) exist in the code but are on hold.
+Product facts: `PRODUCT.md`. Look and feel: `DESIGN.md` (read it before touching any screen).
 
 ## Tech stack
 - Next.js 15.5 App Router + React 19 + TypeScript 5 (strict), path alias `@/` → `src/`.
 - Supabase: Postgres + RLS, Auth, Realtime, Storage — `@supabase/ssr` ^0.5, `@supabase/supabase-js` ^2.47.
-- Tailwind 3 + shadcn/ui (new-york, Radix), Zustand 5, zod 3 + react-hook-form, sonner, lucide-react.
+- Tailwind 3 + shadcn/ui (new-york, Radix), Zustand 5, zod 3, sonner, lucide-react. Fonts via
+  `next/font`: Figtree (UI) and Baloo 2 (wordmark, entry screens only).
 - WebRTC (native browser APIs) for calls; Supabase Realtime only carries signaling.
 - Hosting: Vercel (prod: https://veil-cqsf.vercel.app), repo github.com/jyotiram7402/veil, branch `main`.
 
@@ -38,12 +41,19 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
   `psql "<connection string>" -f supabase/security-tests.sql` (unverified end-to-end).
 - Migrations: paste `supabase/vNN.sql` into Supabase → SQL Editor (no CLI / config.toml).
 - Rollback: Vercel → Deployments → previous → Promote to Production.
+- Workflow (owner's rule): one feature per branch (`feature/<name>`). Commit locally, tell the
+  owner; the owner pushes, Vercel builds a preview, the preview gets tested with the Playwright
+  MCP, and only then does the next feature start. Never push or merge yourself.
+- Nothing is installed or built on the owner's machine (no `npm install`): Vercel is the build.
 
 ## Project map (full module map: read docs/ARCHITECTURE.md before cross-cutting changes)
 - `middleware.ts` → `src/lib/supabase/middleware.ts`: session refresh + route gating (public
   paths, admin-only prefixes, member vs admin redirects).
 - `src/app/(app)` admin shell (layout requires `is_admin`): `chats`, `rooms`, `admin`, `settings`.
-- `src/app/(auth)/login`; `src/app/(user)/chat` (member's 1:1 chat with admin), `(user)/expired`.
+- `src/app/page.tsx` first screen (static; Log in / Sign up); `src/app/(auth)/login`, `(auth)/signup`
+  (placeholder until invite-code sign-up is built). Their UI is `src/components/auth/*`:
+  `first-screen.tsx`, `auth-shell.tsx`, styles in `entry.module.css`.
+- `src/app/(user)/chat` (member's 1:1 chat with admin), `(user)/expired`.
 - `src/app/i/[token]` member invite gate; `src/app/join[/code]` + `src/app/room/[id]` room guests.
 - `src/app/api/**/route.ts` all mutations. `src/lib/` server logic (`supabase/`, `auth/`,
   `rooms.ts`, `permissions.ts`, `validations.ts`, `api.ts`, `webrtc/`).
@@ -66,7 +76,8 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - Calls: `src/hooks/use-call.ts`, `src/lib/webrtc/*`, `src/components/call/*`,
   auth in `src/app/api/calls/authorize/route.ts`.
 - Runtime toggles: `src/lib/settings.ts` + `app_settings` table + admin "Defaults" tab.
-- Styling: tokens in `src/app/globals.css`, primitives in `src/components/ui`, `cn()` from `src/lib/utils.ts`.
+- Styling: rules in `DESIGN.md`, tokens in `src/app/globals.css`, primitives in `src/components/ui`,
+  `cn()` from `src/lib/utils.ts`. Avatars without a photo are "moji" (`src/lib/moji.ts`).
 
 ## Conventions
 - Never trust client-sent role/ids: every handler re-checks the session; admin = `profiles.is_admin`;
@@ -81,6 +92,9 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - Optimistic chat messages use `local-` ids (`clientMessageId`), replaced by the server row.
 - Mobile-first: `h-screen-mobile` (svh/dvh), `env(safe-area-inset-*)`, inputs 16px on mobile
   (`text-base sm:text-sm`) to stop iOS zoom, icon buttons 40px.
+- Design: one blue (`--primary`), pill buttons, moji avatars seeded with the user id
+  (`mojiFor(userId ?? username)`). Emoji are for avatars and tiles only; UI icons are lucide.
+  Entry forms use `ENTRY_FIELD` / `ENTRY_SUBMIT` (`src/components/auth/field.ts`).
 - Migrations are idempotent (`if not exists`, `drop policy if exists`) and never edited after
   they've run in prod — add a new file instead.
 
@@ -117,7 +131,14 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - `src/types/database.ts` is hand-written: it doesn't auto-update (a missing column won't fail
   the build) and makes supabase-js infer `never` for some `.update()` args — the reason builds
   skip tsc (comment in `next.config.ts`). Whether `npm run typecheck` passes today is unverified.
-- Broadcast channels `chat:<chatId>` and `call:<chatId>` must keep identical names on both peers.
+- The app was renamed to BlackFoxx. Old names survive only where renaming would break things:
+  `INTERNAL_EMAIL_DOMAIN=rooms.local` (part of every login, never change), the GitHub repo /
+  Vercel URL (`veil`), and "rooms" as the name of the rooms feature.
+- The Playwright MCP browser cannot open `localhost` or `file://` on the owner's machine; it
+  can only test deployed URLs (Vercel previews). It must not type real passwords there: previews
+  use the production database, so the owner signs in by hand for screens behind login.
+- Broadcast channels `chat:<chatId>` and `call:<chatId>` must keep identical names on both peers
+  (same for the presence channel `blackfoxx-presence`).
   Dashboard channels (`admin-rooms:`, `admin-room:`) add a random suffix on purpose: newer
   supabase-js reuses a same-named channel and a second `subscribe()` throws.
 - Calls only exist in 1:1 direct chats (room call icons are placeholders); both people must have
@@ -129,6 +150,16 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 ## Current status
 - Live on Vercel; Supabase migrated through v9 with grants restored. Confirmed working by the
   owner: admin login, chat.
+- UI redesign in progress (started 2026-11-14), one branch per feature, in this order:
+  1. `feature/first-screen` — BlackFoxx rename, new tokens/fonts, moji avatars, animated first
+     screen, new log-in and invite-link screens. Built; waiting for the owner's push and a
+     preview test. Old screens only got the new colours.
+  2. Sign-up with an invite code (admin creates codes; needs a `v10.sql` migration).
+  3. Chat list redesign; hide the rooms entry points (rooms are on hold).
+  4. Chat thread redesign (header, bubbles, composer) for the admin and member views.
+  5. Avatar picker (choose your moji). 6. Calls: TURN + call screen. Then admin/settings pages.
+- Decided by the owner: sign-up is invite-code only; members chat only with the admin; tests run
+  on Vercel previews only. Open: whether to add a yellow "Snapchat-style" theme next to the blue.
 - Deployed but not yet confirmed: rooms-page crash hardening (c2de8e6), clearer form errors
   (36383cb), speed changes (session cache, 5 s resync poll, no splash).
 - Calls: cross-network calls fail — TURN not configured (public "openrelay" test TURN is dead;
@@ -136,10 +167,10 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   code) or Cloudflare TURN (short-lived creds → needs a server route). Same-network call untested.
 - Performance: Vercel's default function region (iad1) is probably far from the Supabase region
   (unknown) — set Vercel → Settings → Functions → Region to match Supabase.
-- To do: commit `package-lock.json`; add a test runner + CI; pick one name (UI "Rooms",
-  `apple-mobile-web-app-title` "Veil", SQL headers "Veil / MyVoxa").
+- To do: commit `package-lock.json`; add a test runner + CI.
 - Known gaps: setting `user_session_ephemeral` has no effect (hook `use-ephemeral-session` is not
-  mounted); `src/app/page.tsx` splash is unreachable; admin-only routes still echo raw DB errors;
+  mounted); admin-only routes still echo raw DB errors; small blue text is under 4.5:1 contrast
+  in dark mode on the old screens (see `DESIGN.md`);
   remaining risks listed in `docs/SECURITY.md` (in-memory rate limit, plaintext `invite_tokens`,
   CSP `'unsafe-inline'`, public chat/presence channels). No TODO/FIXME markers in the code.
 
