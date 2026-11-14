@@ -12,6 +12,7 @@ import {
 } from "@/lib/webrtc/codec";
 import { createQualitySampler, STATS_INTERVAL_MS } from "@/lib/webrtc/stats";
 import { monitorAudioLevel, type AudioLevelMonitor } from "@/lib/webrtc/audio-level";
+import { realAudioOutputs } from "@/lib/webrtc/devices";
 import {
   callErrorMessage,
   classifyCameraError,
@@ -19,7 +20,13 @@ import {
   type CallErrorCode,
 } from "@/lib/webrtc/errors";
 import { SignalingChannel } from "@/lib/webrtc/signaling";
-import { CALL_RING_TIMEOUT_MS, type PeerInfo, type SignalPayload, type SignalType } from "@/lib/webrtc/types";
+import {
+  CALL_RING_TIMEOUT_MS,
+  isCallOver,
+  type PeerInfo,
+  type SignalPayload,
+  type SignalType,
+} from "@/lib/webrtc/types";
 import type { Profile } from "@/types/chat";
 
 type UseCallArgs = {
@@ -32,6 +39,10 @@ type UseCallArgs = {
 const RECONNECT_DELAYS = [1500, 3000, 6000];
 const MAX_RECONNECT = RECONNECT_DELAYS.length;
 const DISCONNECT_GRACE_MS = 2000;
+// How long a closing screen ("Call ended", "No answer") stays up before the
+// call UI goes away by itself. An error does not go by itself: it says what to
+// do, so it stays until it is closed.
+const ENDED_LINGER_MS = 2500;
 
 function peerInfo(p: Pick<Profile, "id" | "username" | "display_name" | "avatar_url">): PeerInfo {
   return { id: p.id, name: p.display_name ?? p.username, avatarUrl: p.avatar_url };
@@ -58,6 +69,10 @@ function reasonToCode(reason?: string): CallErrorCode {
  */
 export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
   const store = useCallStore;
+  // The signaling handlers below are created once per chat; this keeps them
+  // reading the current profile of the other person.
+  const otherRef = useRef(other);
+  otherRef.current = other;
 
   const signalingRef = useRef<SignalingChannel | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -82,7 +97,9 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
   const statsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const authTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stopCameraRef = useRef<((reason?: CallErrorCode) => void) | null>(null);
-  const startCameraRef = useRef<((deviceId?: string) => Promise<void>) | null>(null);
+  const startCameraRef = useRef<
+    ((deviceId?: string, preAuthorized?: boolean) => Promise<void>) | null
+  >(null);
   const samplerRef = useRef<ReturnType<typeof createQualitySampler> | null>(null);
   const audioMonitorRef = useRef<AudioLevelMonitor | null>(null);
 
@@ -223,12 +240,22 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
     callIdRef.current = null;
   }, [clearReconnect, stopMonitors, remoteAudioRef]);
 
+  /**
+   * End the call and show its closing screen: `message` is the error for
+   * "failed", or a short note such as "No answer". The screen goes away by
+   * itself after a moment (an error only through dismiss()).
+   */
   const finish = useCallback(
     (final: "rejected" | "busy" | "failed" | "ended", message?: string) => {
       teardown();
-      if (final === "failed" && message) store.getState().fail(message);
-      else store.getState().setState(final);
-      resetTimeoutRef.current = setTimeout(() => store.getState().reset(), 2500);
+      store.getState().close(final, message ?? null);
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+      resetTimeoutRef.current = null;
+      if (final === "failed") return;
+      resetTimeoutRef.current = setTimeout(() => {
+        resetTimeoutRef.current = null;
+        store.getState().reset();
+      }, ENDED_LINGER_MS);
     },
     [store, teardown],
   );
@@ -345,17 +372,16 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
       const remote = remoteStreamRef.current;
       if (!remote.getTracks().some((t) => t.id === e.track.id)) remote.addTrack(e.track);
       // Audio plays through the hidden audio element (setSinkId target); the
-      // overlay's <video> element binds the same stream (muted) for video.
+      // call screen's <video> element binds the same stream (muted) for video.
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = remote;
         applySinkId();
         void remoteAudioRef.current.play().catch(() => undefined);
       }
       store.getState().setRemoteStream(remote);
-      if (e.track.kind === "video") store.getState().setRemoteMedia({
-        audio: store.getState().remoteAudioOn,
-        video: true,
-      });
+      // A video track arrives on every call (the line is negotiated up front),
+      // so it says nothing about the other camera. Whether that camera is on
+      // comes from call_started and media_state.
     };
     pc.onconnectionstatechange = () => {
       switch (pc.connectionState) {
@@ -392,22 +418,57 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
     return pc;
   }, [send, remoteAudioRef, applySinkId, handleConnUp, enterReconnecting, store]);
 
-  const attachLocalMedia = useCallback(async (pc: RTCPeerConnection) => {
-    const stream = await navigator.mediaDevices.getUserMedia(audioConstraints());
-    localStreamRef.current = stream;
-    const [track] = stream.getAudioTracks();
-    if (track) {
-      senderRef.current = pc.addTrack(track, stream);
-      // Prefer Opus on the audio transceiver (feature-detected, safe no-op else).
-      const audioTx = pc.getTransceivers().find((t) => t.sender === senderRef.current);
-      preferOpus(audioTx);
-    }
-    // Pre-negotiate a video transceiver up front so camera on/off later is a
-    // pure replaceTrack() — no renegotiation, no second architecture. Both
-    // peers do this, so the SDP always carries matching audio+video m-lines.
-    const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
-    videoSenderRef.current = videoTx.sender;
-  }, []);
+  /**
+   * Opens the microphone and adds it to the connection. Resolves false when the
+   * call was closed while the browser was still asking for permission; the
+   * microphone is released again in that case.
+   */
+  const attachLocalMedia = useCallback(
+    async (pc: RTCPeerConnection, role: "caller" | "callee"): Promise<boolean> => {
+      const stream = await navigator.mediaDevices.getUserMedia(audioConstraints());
+      if (pcRef.current !== pc) {
+        for (const track of stream.getTracks()) track.stop();
+        return false;
+      }
+      localStreamRef.current = stream;
+      const [track] = stream.getAudioTracks();
+      if (track) {
+        // Mute may have been tapped before the microphone was ready.
+        track.enabled = !store.getState().muted;
+        senderRef.current = pc.addTrack(track, stream);
+        // Prefer Opus on the audio transceiver (feature-detected, safe no-op else).
+        const audioTx = pc.getTransceivers().find((t) => t.sender === senderRef.current);
+        preferOpus(audioTx);
+      }
+      // The caller offers a video line up front, so turning a camera on or off
+      // later is a plain replaceTrack(): no renegotiation. The callee must not
+      // add a line of its own; it takes over the offered one (adoptOfferedVideo).
+      if (role === "caller") {
+        videoSenderRef.current = pc.addTransceiver("video", { direction: "sendrecv" }).sender;
+        store.getState().setMediaReady(true);
+      }
+      return true;
+    },
+    [store],
+  );
+
+  /**
+   * Callee, right after reading the offer: send our camera on the video line the
+   * caller offered. A transceiver the callee creates itself is never paired with
+   * that line (only ones made by addTrack are), so its picture would not reach
+   * the caller.
+   */
+  const adoptOfferedVideo = useCallback(
+    (pc: RTCPeerConnection) => {
+      const offered = pc
+        .getTransceivers()
+        .find((t) => t.mid !== null && t.receiver.track.kind === "video");
+      if (offered) offered.direction = "sendrecv";
+      videoSenderRef.current = offered?.sender ?? null;
+      store.getState().setMediaReady(!!offered);
+    },
+    [store],
+  );
 
   const drainCandidates = useCallback(async () => {
     const pc = pcRef.current;
@@ -427,29 +488,35 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
 
   const startCall = useCallback(
     async (withVideo = false) => {
+      if (store.getState().state !== "idle") return; // double-call protection
+
+      const callId = crypto.randomUUID();
+      callIdRef.current = callId;
+      usedVideoRef.current = false;
+      // Open the call screen at once: the steps below can each take a moment,
+      // and any of them failing needs a screen to say so.
+      store.getState().startOutgoing(callId, peerInfo(other));
+      // False once this call has been cancelled or replaced (teardown clears the id).
+      const stillOurs = () => callIdRef.current === callId;
+
       if (!isWebRtcSupported()) {
         finishWithError("UNSUPPORTED");
         return;
       }
-      if (store.getState().state !== "idle") return; // double-call protection
-
       const auth = await authorize(withVideo ? "video" : "voice");
+      if (!stillOurs()) return;
       if (!auth.ok) {
         finishWithError(reasonToCode(auth.reason));
         return;
       }
 
-      const callId = crypto.randomUUID();
-      callIdRef.current = callId;
-      usedVideoRef.current = false;
-      store.getState().startOutgoing(callId, peerInfo(other));
-
       try {
         const pc = createPeer();
-        await attachLocalMedia(pc);
+        if (!(await attachLocalMedia(pc, "caller"))) return;
         // Video call: capture the camera up front so the initial offer carries
         // the video track (voice→video upgrade later is the same replaceTrack).
-        if (withVideo) await startCameraRef.current?.();
+        if (withVideo) await startCameraRef.current?.(undefined, true);
+        if (!stillOurs()) return;
 
         void supabaseBrowser()
           .from("call_sessions")
@@ -465,17 +532,24 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        send("call_started", { from: peerInfo(me), sdp: offer });
+        if (!stillOurs()) return;
+        // `media` tells the other side whether this is a voice or a video call.
+        send("call_started", {
+          from: peerInfo(me),
+          sdp: offer,
+          media: { audio: !store.getState().muted, video: store.getState().videoEnabled },
+        });
 
         ringTimeoutRef.current = setTimeout(() => {
           if (store.getState().state === "calling") {
             send("call_cancelled", { reason: "no answer" });
             updateSession({ status: "missed", ended_at: new Date().toISOString(), end_reason: "no answer" });
             postOutcome("missed");
-            finish("ended", "No answer.");
+            finish("ended", "No answer");
           }
         }, CALL_RING_TIMEOUT_MS);
       } catch (err) {
+        if (!stillOurs()) return; // cancelled meanwhile: nothing to report
         send("call_cancelled", { reason: "error" });
         postOutcome("failed");
         finishWithError(classifyMediaError(err));
@@ -484,32 +558,45 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
     [store, other, me, chatId, authorize, createPeer, attachLocalMedia, send, updateSession, finish, finishWithError, postOutcome],
   );
 
-  const accept = useCallback(async () => {
-    const offer = incomingOfferRef.current;
-    if (!offer || store.getState().state !== "ringing") return;
+  /** Answer the ringing call. `withVideo` also turns our camera on. */
+  const accept = useCallback(
+    async (withVideo = false) => {
+      const offer = incomingOfferRef.current;
+      const callId = callIdRef.current;
+      if (!offer || !callId || store.getState().state !== "ringing") return;
+      const stillOurs = () => callIdRef.current === callId;
 
-    const auth = await authorize();
-    if (!auth.ok) {
-      send("call_rejected", { reason: "unauthorized" });
-      finishWithError(reasonToCode(auth.reason));
-      return;
-    }
+      // Leave "ringing" at once: the tap shows straight away and cannot answer twice.
+      store.getState().setState("connecting");
+      const auth = await authorize(withVideo ? "video" : "voice");
+      if (!stillOurs()) return;
+      if (!auth.ok) {
+        send("call_rejected", { reason: "unauthorized" });
+        finishWithError(reasonToCode(auth.reason));
+        return;
+      }
 
-    store.getState().setState("connecting");
-    try {
-      const pc = createPeer();
-      await attachLocalMedia(pc);
-      await pc.setRemoteDescription(offer);
-      await drainCandidates();
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      send("call_accepted", {});
-      send("answer", { sdp: answer });
-    } catch (err) {
-      send("call_rejected", { reason: "error" });
-      finishWithError(classifyMediaError(err));
-    }
-  }, [store, authorize, createPeer, attachLocalMedia, drainCandidates, send, finishWithError]);
+      try {
+        const pc = createPeer();
+        if (!(await attachLocalMedia(pc, "callee"))) return;
+        await pc.setRemoteDescription(offer);
+        adoptOfferedVideo(pc);
+        await drainCandidates();
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        if (!stillOurs()) return;
+        send("call_accepted", {});
+        send("answer", { sdp: answer });
+        // The answer does not wait for the camera: it joins as soon as it is ready.
+        if (withVideo) void startCameraRef.current?.(undefined, true);
+      } catch (err) {
+        if (!stillOurs()) return;
+        send("call_rejected", { reason: "error" });
+        finishWithError(classifyMediaError(err));
+      }
+    },
+    [store, authorize, createPeer, attachLocalMedia, adoptOfferedVideo, drainCandidates, send, finishWithError],
+  );
 
   const reject = useCallback(() => {
     send("call_rejected", { reason: "declined" });
@@ -532,27 +619,40 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
   }, [store, send, updateSession, finish, postOutcome]);
 
   const toggleMute = useCallback(() => {
-    const stream = localStreamRef.current;
-    if (!stream) return;
     const next = !store.getState().muted;
-    // enabled=false keeps the track/connection alive — no renegotiation.
-    for (const track of stream.getAudioTracks()) track.enabled = !next;
+    // enabled=false keeps the track/connection alive — no renegotiation. Before
+    // the microphone is open this only records the choice; attachLocalMedia
+    // applies it to the track when it arrives.
+    for (const track of localStreamRef.current?.getAudioTracks() ?? []) track.enabled = !next;
     store.getState().setMuted(next);
     broadcastMediaState();
   }, [store, broadcastMediaState]);
 
+  /** Close the closing screen now instead of waiting for it to go by itself. */
+  const dismiss = useCallback(() => {
+    if (!isCallOver(store.getState().state)) return;
+    if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+    resetTimeoutRef.current = null;
+    store.getState().reset();
+  }, [store]);
+
   // ---- Camera (video) -------------------------------------------------------
 
   const startCamera = useCallback(
-    async (deviceId?: string) => {
+    // `preAuthorized`: the caller of this function has just checked "video" itself.
+    async (deviceId?: string, preAuthorized = false) => {
       const sender = videoSenderRef.current;
-      if (!sender) return;
+      if (!sender) return; // not set up yet (the store's `mediaReady` is still false)
       // Video authorization is checked server-side too (never trust the client).
-      const auth = await authorize("video");
-      if (!auth.ok) {
-        store.getState().setCameraError(callErrorMessage(reasonToCode(auth.reason)));
-        return;
+      if (!preAuthorized) {
+        const auth = await authorize("video");
+        if (!auth.ok) {
+          store.getState().setCameraError(callErrorMessage(reasonToCode(auth.reason)));
+          return;
+        }
       }
+      // True while this is still the same call on the same connection.
+      const stillOurs = () => videoSenderRef.current === sender;
       const opts = deviceId ? { deviceId } : { facingMode: facingRef.current };
       let stream: MediaStream;
       try {
@@ -562,9 +662,15 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
         try {
           stream = await navigator.mediaDevices.getUserMedia(relaxedVideoConstraints(opts));
         } catch (err) {
-          store.getState().setCameraError(callErrorMessage(classifyCameraError(err)));
+          if (stillOurs()) store.getState().setCameraError(callErrorMessage(classifyCameraError(err)));
           return;
         }
+      }
+      // The call may have ended while the browser was asking for the camera:
+      // switch it off again instead of leaving it running with no call.
+      if (!stillOurs()) {
+        for (const t of stream.getTracks()) t.stop();
+        return;
       }
       const [track] = stream.getVideoTracks();
       if (!track) {
@@ -635,10 +741,14 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
     if (!el || typeof el.setSinkId !== "function") return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const outs = devices.filter((d) => d.kind === "audiooutput");
+      const outs = realAudioOutputs(devices);
       if (outs.length < 2) return;
-      const currentId = store.getState().outputDeviceId ?? el.sinkId ?? outs[0]!.deviceId;
-      const idx = outs.findIndex((d) => d.deviceId === currentId);
+      // Nothing chosen yet means the system default is playing: start from it.
+      const currentId = store.getState().outputDeviceId || el.sinkId;
+      const systemDefault = devices.find((d) => d.kind === "audiooutput" && d.deviceId === "default");
+      const idx = currentId
+        ? outs.findIndex((d) => d.deviceId === currentId)
+        : outs.findIndex((d) => d.groupId === systemDefault?.groupId);
       const next = outs[(idx + 1) % outs.length]!;
       await el.setSinkId(next.deviceId);
       store.getState().setOutputDevice(next.deviceId);
@@ -679,14 +789,19 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
       const current = store.getState();
       switch (type) {
         case "call_started": {
-          if (current.state !== "idle") {
+          // A call may arrive while the closing screen of the last one is still up.
+          if (current.state !== "idle" && !isCallOver(current.state)) {
             void channel.send("busy", { callId: payload.callId, senderId: me.id });
             return;
           }
           if (!payload.from || !payload.sdp) return;
+          if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+          resetTimeoutRef.current = null;
           callIdRef.current = payload.callId;
           incomingOfferRef.current = payload.sdp;
-          store.getState().startIncoming(payload.callId, payload.from);
+          // Who is calling comes from our own data, not from what the message says:
+          // this channel only ever carries calls from the other person in this chat.
+          store.getState().startIncoming(payload.callId, peerInfo(otherRef.current), payload.media);
           break;
         }
         case "offer": {
@@ -749,8 +864,8 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
           break;
         case "call_cancelled":
           if (payload.callId === callIdRef.current) {
-            teardown();
-            store.getState().reset();
+            // The caller gave up. Say so for a moment instead of just vanishing.
+            finish("ended", current.state === "ringing" ? "Missed call" : undefined);
           }
           break;
         case "call_ended":
@@ -848,6 +963,7 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
     accept,
     reject,
     hangUp,
+    dismiss,
     toggleMute,
     toggleCamera,
     switchCamera,

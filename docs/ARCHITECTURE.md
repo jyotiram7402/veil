@@ -89,7 +89,8 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
 - `webrtc/` — `ice.ts` (STUN + env TURN), `signaling.ts` (private broadcast channel),
   `codec.ts` (audio/video constraints, Opus preference), `stats.ts` (quality from getStats),
-  `audio-level.ts`, `errors.ts` (error codes → friendly text), `ringtone.ts`, `types.ts`.
+  `audio-level.ts`, `errors.ts` (error codes → friendly text), `ringtone.ts` (ring + buzz),
+  `devices.ts` (which cameras / sound outputs can be switched), `types.ts`.
 
 ## Client state & hooks
 
@@ -102,7 +103,8 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - `use-resume-sync` — 5 s poll while visible + immediate resync on focus/visibility/online.
 - `use-heartbeat` — `last_seen_at` every 30 s. `use-ephemeral-session` — exists but is not
   mounted anywhere (V2_NOTES describes it as active; that's outdated).
-- `use-call` — the WebRTC engine (see below).
+- `use-call` — the WebRTC engine (see below). `use-media-devices` — the device list for the
+  call screen.
 
 ## Database (`supabase/*.sql`, mirrored by hand in `src/types/database.ts`)
 
@@ -140,11 +142,18 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - Only 1:1 direct chats: `CallProvider` wraps `user-chat.tsx` and `chat-thread.tsx`
   (`chatType === "direct"`). Room-view call icons are placeholders.
 - Signaling: private Supabase broadcast channel `call:<chatId>`; `realtime.messages` RLS
-  (v7) limits it to chat members. Events: `call_started` (+offer), `call_accepted`,
-  `call_rejected`, `call_cancelled`, `answer`, `ice_candidate`, `offer` (ICE restart),
-  `call_ended`, `busy`, `media_state`. Messages carry `callId`; stale ones are ignored.
-- One `RTCPeerConnection` per call with a pre-negotiated video transceiver, so camera
-  on/off is `replaceTrack` (no renegotiation). Caller-only ICE restart with backoff.
+  (v7) limits it to chat members. Events: `call_started` (+offer, +`media`: the caller's
+  camera on means a video call), `call_accepted`, `call_rejected`, `call_cancelled`, `answer`,
+  `ice_candidate`, `offer` (ICE restart), `call_ended`, `busy`, `media_state` (microphone and
+  camera on/off; the only source for "their camera is on"). Messages carry `callId`; stale
+  ones are ignored. Who is calling is shown from the chat's own member data, not the message.
+- One `RTCPeerConnection` per call. The caller offers a video line with every call, so camera
+  on/off is `replaceTrack` (no renegotiation). The side that answers takes over that same
+  line after reading the offer (`adoptOfferedVideo`); a transceiver it added itself would
+  never be negotiated and its camera would not be sent. Caller-only ICE restart with backoff.
+- UI: `components/call/call-screen.tsx` (+ `call-stage`, `call-controls`, `call.module.css`)
+  only reads `call-store` and calls the actions `use-call` returns. A closing state
+  (`isCallOver`) keeps the screen up for 2.5 s; an error stays until closed (`dismiss`).
 - `/api/calls/authorize` runs at start, accept, every reconnect and every 30 s.
 - Outcome → caller POSTs `/api/calls/[id]/event` → one `system` message in the chat.
 - Media is peer-to-peer; nothing is recorded or stored. TURN comes from `NEXT_PUBLIC_TURN_*`.

@@ -19,6 +19,11 @@ export type CallState =
   | "failed"
   | "ended";
 
+/** The call is over; only its closing screen ("Call ended", an error) is still up. */
+export function isCallOver(state: CallState): boolean {
+  return state === "ended" || state === "failed" || state === "rejected" || state === "busy";
+}
+
 export type SignalType =
   | "call_started"
   | "call_accepted"
@@ -46,8 +51,11 @@ export type SignalPayload = {
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
   reason?: string;
-  // media_state: the sender's current local media state
-  media?: { audio: boolean; video: boolean };
+  // The sender's microphone and camera, on or off. Sent with call_started (so the
+  // other side knows whether it is a voice or a video call) and as media_state.
+  media?: MediaState;
 };
+
+export type MediaState = { audio: boolean; video: boolean };
 
 export const CALL_RING_TIMEOUT_MS = 35_000;

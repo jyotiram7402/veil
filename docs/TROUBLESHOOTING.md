@@ -177,6 +177,13 @@ from a TURN provider (see `.env.example`) and redeploy. Two tabs on the same
 computer should connect without TURN. Calls exist only in 1:1 chats — the
 call icons inside a room are placeholders.
 
+## A call stops with "The microphone is blocked" (or the camera)
+
+The browser has been told not to let this site use the microphone or camera.
+Open the site's permissions in the browser (usually the icon next to the
+address), set Microphone and Camera to Allow, and call again. A blocked camera
+never ends a call: it carries on as a voice call.
+
 ---
 
 Still stuck? Open an issue on the repo with:

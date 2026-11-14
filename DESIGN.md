@@ -29,6 +29,7 @@ appear only on moji tiles and avatars.
 | `--accent` | `217 80% 95%` | `222 30% 19%` | hover and selected tint |
 | `--destructive` | `0 78% 45%` | `0 84% 64%` | errors, delete |
 | `--online` | `145 65% 42%` | `145 60% 48%` | presence dot |
+| `--accept` | `145 70% 32%` | same | the Accept button of a call, nothing else |
 
 Moji grounds (`MOJI_COLORS` in `src/lib/moji.ts`): ink `#16181D`, sun `#FFD233`,
 sky `#62C6F8`, violet `#B67CFF`, mint `#74D69C`, tangerine `#FF6B3D`,
@@ -105,6 +106,35 @@ One screen for the admin (`chat-thread.tsx`), the member (`user-chat.tsx`) and r
   when it comes and goes (`showTyping` on `MessageList`).
 - Composer: one floating pill with attach, the text field and a blue send button.
 
+## Call screen
+
+One screen for every call (`components/call/*`, layout in `call.module.css`). It uses the
+frame of the entry screens: a stage on top, a sheet with 32px corners below. Full screen on
+phones, a centred card over the dimmed app from 640px, stage beside the sheet on a phone
+held sideways.
+
+- Stage: the other person's moji, large, on its own ground colour, with the quiet rings of
+  the log-in stage (white lines on a deep ground, ink lines on a pale one). A photo sits in a
+  white-edged circle on the ground their automatic moji would have. This is the one place a
+  moji colour fills a surface: the stage is that person's tile, enlarged.
+- When their camera is on, the picture takes the stage (it fills the stage on phones and is
+  shown whole from 640px) and fades in on its first frame, so the moji stays until there is
+  something to show. Our own camera is a small rounded window in the top corner, mirrored
+  for a front camera. Until the other side answers a video call, our own picture fills the
+  stage instead.
+- Sheet: the name, one status line (Calling…, the timer, Reconnecting…, why a call ended),
+  one line kept free for a note so the controls never jump, then the controls.
+- Controls are round (56px, 52px on phones under 375px) with their name underneath. Mute and
+  Camera are toggles: filled ink means the named thing is on. Flip and Speaker only appear
+  when there is a second camera or sound output to switch to. End is `--destructive`.
+- An incoming call shows Decline and Accept (64px). A video call adds "Answer without
+  camera". Keyboard focus goes to the card, never to a button: a key press meant for the
+  message box must not answer or decline a call.
+- Chips on the stage (Chat, Muted, Your camera) are `bg-card` pills, because they have to
+  read on any ground and on any picture.
+- "Chat" shrinks the call to a pill under the chat header: avatar, name, timer, Mute, End.
+- A call that failed says what went wrong and what to do, and stays until it is closed.
+
 ## Entry screens
 
 - `/` (`first-screen.tsx`): tiles are placed in percent of the stage (the area
@@ -122,10 +152,12 @@ One screen for the admin (`chat-thread.tsx`), the member (`user-chat.tsx`) and r
   is open. Forms and buttons are never delayed by animation.
 - Easing for arrivals: `cubic-bezier(0.16, 1, 0.3, 1)`. Feedback: 100–150ms.
 - Animate `transform` and `opacity` only.
+- On the call screen, movement means ringing: rings leave the moji and it rocks while a call
+  rings or is being placed. A connected call is still.
 - With "reduce motion" on, the tiles are still and nothing moves.
 
 ## Not redesigned yet
 
-The call screen, the admin pages (Members, Settings) and the room management
-pages still use their old layout with the new colours. They are being rebuilt one branch at a
-time; the order is in `CLAUDE.md` → Current status.
+The admin pages (Members, Settings) and the room management pages still use their old
+layout with the new colours. They are being rebuilt one branch at a time; the order is in
+`CLAUDE.md` → Current status.

@@ -1,0 +1,228 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Maximize, MessageCircle, MicOff, Minimize } from "lucide-react";
+import { mojiFor, parseMojiValue } from "@/lib/moji";
+import { cn } from "@/lib/utils";
+import type { PeerInfo } from "@/lib/webrtc/types";
+import styles from "./call.module.css";
+
+const CHIP =
+  "inline-flex h-10 items-center gap-1.5 rounded-full bg-card pl-3 pr-3.5 text-sm font-semibold text-card-foreground shadow-[0_10px_22px_-14px_rgb(15_18_30/0.6)]";
+
+/**
+ * How the other person looks on the stage: their moji on its own colour. With a
+ * photo, the photo sits on the colour their automatic moji would have.
+ */
+function stageLook(peer: PeerInfo) {
+  const chosen = parseMojiValue(peer.avatarUrl);
+  const moji = chosen ?? mojiFor(peer.id || peer.name);
+  return {
+    emoji: moji.emoji,
+    ground: moji.bg,
+    photoUrl: chosen ? null : peer.avatarUrl,
+    tone: isPale(moji.bg) ? "light" : "dark",
+  };
+}
+
+/** True for a ground light enough that white lines would not show on it. */
+function isPale(hex: string): boolean {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const lin = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance =
+    0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return luminance > 0.45;
+}
+
+/** A front camera is shown mirrored, like a mirror; a back camera is not. */
+function isSelfie(stream: MediaStream): boolean {
+  return stream.getVideoTracks()[0]?.getSettings().facingMode !== "environment";
+}
+
+export function CallStage({
+  peer,
+  alive,
+  remoteVideo,
+  localVideo,
+  previewSelf,
+  remoteMuted,
+  onMinimize,
+  fullscreen,
+}: {
+  peer: PeerInfo;
+  /** Ringing or calling: the stage moves to show that something is happening. */
+  alive: boolean;
+  /** Their camera, while it is on and the call is connected. */
+  remoteVideo: MediaStream | null;
+  /** Our camera, while it is on. */
+  localVideo: MediaStream | null;
+  /** Before the other side has answered, our own camera fills the stage. */
+  previewSelf: boolean;
+  remoteMuted: boolean;
+  /** Goes back to the chat with the call still running. Null hides the button. */
+  onMinimize: (() => void) | null;
+  /** Full screen for a wide picture. Null where it is not on offer. */
+  fullscreen: { on: boolean; toggle: () => void } | null;
+}) {
+  const look = stageLook(peer);
+  // A photo that does not load falls back to the moji.
+  const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
+  const [selfWide, setSelfWide] = useState(false);
+  const showPhoto = !!look.photoUrl && look.photoUrl !== brokenPhoto;
+  const showPip = !!localVideo && !(previewSelf && !remoteVideo);
+
+  return (
+    <div
+      className={styles.stage}
+      data-tone={look.tone}
+      style={{ "--stage": look.ground } as React.CSSProperties}
+    >
+      <div className={styles.rings} aria-hidden="true" />
+
+      <div className={cn(styles.hero, alive && styles.alive)} aria-hidden="true">
+        <div className={styles.heroBody}>
+          <span className={styles.ripple} />
+          <span className={styles.ripple} />
+          <span className={styles.ripple} />
+          {showPhoto ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              className={styles.photo}
+              src={look.photoUrl ?? undefined}
+              alt=""
+              onError={() => setBrokenPhoto(look.photoUrl)}
+            />
+          ) : (
+            <span className={styles.emoji}>{look.emoji}</span>
+          )}
+        </div>
+      </div>
+
+      {remoteVideo ? (
+        <StreamVideo key="theirs" stream={remoteVideo} label={`${peer.name}, camera`} fit />
+      ) : (
+        previewSelf &&
+        localVideo && (
+          <StreamVideo key="mine" stream={localVideo} label="Your camera" mirrored={isSelfie(localVideo)} />
+        )
+      )}
+
+      {showPip && localVideo && (
+        <div className={cn(styles.pip, selfWide && styles.pipWide)}>
+          <StreamVideo
+            key="mine-small"
+            stream={localVideo}
+            label="Your camera"
+            mirrored={isSelfie(localVideo)}
+            onShape={setSelfWide}
+          />
+        </div>
+      )}
+
+      {onMinimize && (
+        <div className={styles.stageTop}>
+          <button
+            type="button"
+            onClick={onMinimize}
+            className={cn(
+              CHIP,
+              "transition-transform duration-150 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            )}
+          >
+            <MessageCircle className="h-[1.125rem] w-[1.125rem]" aria-hidden="true" />
+            Chat
+            <span className="sr-only">: the call keeps running</span>
+          </button>
+        </div>
+      )}
+
+      {(remoteMuted || (previewSelf && !remoteVideo && !!localVideo)) && (
+        <div className={styles.stageNote}>
+          {remoteMuted ? (
+            <span className={CHIP} role="status">
+              <MicOff className="h-[1.125rem] w-[1.125rem]" aria-hidden="true" />
+              Muted
+            </span>
+          ) : (
+            <span className={CHIP}>Your camera</span>
+          )}
+        </div>
+      )}
+
+      {fullscreen && (
+        <div className={styles.stageCorner}>
+          <button
+            type="button"
+            onClick={fullscreen.toggle}
+            aria-label={fullscreen.on ? "Leave full screen" : "Full screen"}
+            className="grid h-10 w-10 place-items-center rounded-full bg-card text-card-foreground shadow-[0_10px_22px_-14px_rgb(15_18_30/0.6)] transition-transform duration-150 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            {fullscreen.on ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A live camera picture. Always silent: call audio plays through the hidden
+ * <audio> element in CallProvider. Stays invisible until its first frame.
+ */
+function StreamVideo({
+  stream,
+  label,
+  mirrored,
+  fit,
+  onShape,
+}: {
+  stream: MediaStream;
+  label: string;
+  mirrored?: boolean;
+  /** Show the whole picture on wide screens instead of filling the stage. */
+  fit?: boolean;
+  /** Reports whether the picture is wider than tall, once it is known. */
+  onShape?: (wide: boolean) => void;
+}) {
+  const ref = useRef<HTMLVideoElement | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (el.srcObject !== stream) el.srcObject = stream;
+    void el.play().catch(() => undefined);
+
+    const check = () => {
+      if (el.videoWidth === 0 || el.videoHeight === 0) return;
+      setReady(true);
+      onShape?.(el.videoWidth >= el.videoHeight);
+    };
+    check();
+    el.addEventListener("loadeddata", check);
+    el.addEventListener("resize", check);
+    return () => {
+      el.removeEventListener("loadeddata", check);
+      el.removeEventListener("resize", check);
+    };
+  }, [stream, onShape]);
+
+  return (
+    <video
+      ref={ref}
+      autoPlay
+      playsInline
+      muted
+      aria-label={label}
+      className={cn(
+        styles.video,
+        ready && styles.videoOn,
+        mirrored && styles.mirror,
+        fit && styles.videoFit,
+      )}
+    />
+  );
+}

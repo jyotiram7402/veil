@@ -57,6 +57,10 @@ const config: Config = {
           DEFAULT: "hsl(var(--online))",
           ink: "hsl(var(--online-ink))",
         },
+        accept: {
+          DEFAULT: "hsl(var(--accept))",
+          foreground: "hsl(var(--accept-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

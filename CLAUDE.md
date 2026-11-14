@@ -74,11 +74,12 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - New page: put it in the right route group; public pages → `isPublic()`, admin pages →
   `ADMIN_ONLY_PREFIXES` in `src/lib/supabase/middleware.ts`.
 - Rooms/invites: `src/lib/rooms.ts`, `src/lib/permissions.ts`, `src/components/rooms/*`.
-- Calls: `src/hooks/use-call.ts`, `src/lib/webrtc/*`, `src/components/call/*`,
-  auth in `src/app/api/calls/authorize/route.ts`.
+- Calls: engine `src/hooks/use-call.ts` + `src/lib/webrtc/*`; screen `src/components/call/*`
+  (`call-screen.tsx`, layout in `call.module.css`); auth in `src/app/api/calls/authorize/route.ts`.
 - Runtime toggles: `src/lib/settings.ts` + `app_settings` table + admin "Defaults" tab.
 - Styling: rules in `DESIGN.md`, tokens in `src/app/globals.css`, primitives in `src/components/ui`,
-  `cn()` from `src/lib/utils.ts`. Avatars without a photo are "moji" (`src/lib/moji.ts`).
+  `cn()` from `src/lib/utils.ts`. Avatars without a photo are "moji" (`src/lib/moji.ts`). Never set
+  one property from both a CSS module class and a Tailwind utility: which wins depends on load order.
 
 ## Conventions
 - Never trust client-sent role/ids: every handler re-checks the session; admin = `profiles.is_admin`;
@@ -158,36 +159,37 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   Dashboard channels (`admin-rooms:`, `admin-room:`) add a random suffix on purpose: newer
   supabase-js reuses a same-named channel and a second `subscribe()` throws.
 - Calls only exist in 1:1 direct chats (room call icons are placeholders); both people must have
-  the chat open; different networks need TURN (otherwise stuck on "Connecting…").
+  the chat open; different networks need TURN. The side that answers must reuse the caller's video
+  line (`adoptOfferedVideo` in `use-call.ts`): a transceiver it adds itself is never sent.
 - Rate limiting (`src/lib/api.ts`) is in-memory per serverless instance — a speed bump only.
-- Preview deployments share the production Supabase project (per `docs/DEPLOY.md`).
 - `error.tsx` shows `Ref: <digest>` — search that digest in Vercel → Logs.
 
 ## Current status
 - Live on Vercel; Supabase migrated through v9 with grants restored. `v10.sql` (sign-up codes):
   whether the owner has run it in production is unverified. Confirmed working by the owner:
   admin login, chat, a video call on the same Wi-Fi.
-- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PRs #4–#6) and
+- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PRs #4–#7) and
   live: the rename to BlackFoxx, new tokens/fonts, moji avatars and the avatar picker, the
   animated first screen, the log-in and invite-link screens, the chat home and the chat
   screen, copy buttons that copy, and sign-up with a code (`/signup`, admin tab "Sign-up
   codes"; not yet confirmed by the owner). Rooms entry points are removed (rooms are on hold).
-  Next: calls (a relay for other networks, new call screen, ring anywhere in the app). Then
-  the admin/settings pages. Proposed: switch the route guard on (first Gotcha).
-- What the assistant can check itself: the public pages on the live site, in the built-in
-  Browser pane. Screens behind login and all previews (Vercel login) are checked by the owner;
-  designs are checked beforehand on a static mock-up.
+  On `feature/call-screen` (not merged): the new call screen. Next: ring anywhere in the app,
+  the relay for other networks, then the admin/settings pages. Proposed: the route guard.
+- What the assistant can check itself: public pages on the live site (built-in Browser pane),
+  and calls, by running the real call code in that pane as two simulated phones (no real camera,
+  network or Supabase). Screens behind login and all previews are checked by the owner.
 - Five Vercel projects build every push: `veil`, `veil-32wk`, `veil-ah7i`, `veil-cqsf`,
   `veil-vo9a`. `veil-cqsf` (the address used so far) builds `main`, but its preview builds fail:
   its variables are set for Production only. Which project is the real one, and deleting the
   rest, is the owner's call.
 - Decided by the owner: sign-up is invite-code only; members chat only with the admin. Open:
   a yellow "Snapchat-style" theme next to the blue.
-- Calls: a video call on the same Wi-Fi works (owner, 2026-11-14, no relay). Other networks are
-  untested; they need a TURN relay when no direct path exists. The owner looked at Cloudflare
-  TURN (asks for a payment method first; free to 1,000 GB a month) and has not decided.
-- Performance: the database is in Singapore (`ap-southeast-1`, read from DNS on 2026-11-14) and
-  functions ran in `iad1` (USA), so every query crossed the Pacific. `vercel.json` now pins `sin1`.
+- Calls: the owner saw a video call work on one Wi-Fi (2026-11-14), but until the call screen
+  branch only the person who started a call could send a camera; that is fixed there and not yet
+  tried on real phones. Other networks need a TURN relay: `feature/calls-turn` (Cloudflare) is
+  parked locally, needs a rebase onto the call screen, and the owner has not decided on Cloudflare.
+- Performance: functions run in `sin1`, next to the database (`vercel.json`). Checked on the live
+  site 2026-11-14: `x-vercel-id` reads `bom1::sin1`, one database round trip takes 20–60 ms.
 - To do: commit `package-lock.json`; add a test runner + CI.
 - Known gaps: `user_session_ephemeral` has no effect (its hook is not mounted); admin-only routes
   echo raw DB errors; small blue text is under 4.5:1 in dark mode on the old screens; more in
