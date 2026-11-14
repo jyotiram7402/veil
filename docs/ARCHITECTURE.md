@@ -80,8 +80,8 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - `rooms.ts` — access codes (`selector.verifier`, PBKDF2-hashed verifier), `validateInvite`,
   `assertRoomAdmin`, `recordAudit`. `permissions.ts` — effective chat/voice/video model.
 - `settings.ts` — `app_settings` defaults merged with `profiles.settings` overrides.
-- `password.ts` (PBKDF2), `invite-token.ts`, `url.ts` (app origin for links), `share.ts`
-  (`navigator.share` → clipboard), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
+- `password.ts` (PBKDF2), `invite-token.ts`, `url.ts` (app origin for links), `clipboard.ts`
+  (`copyText`: copy buttons copy, they never open the share sheet), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
 - `webrtc/` — `ice.ts` (STUN + env TURN), `signaling.ts` (private broadcast channel),
   `codec.ts` (audio/video constraints, Opus preference), `stats.ts` (quality from getStats),

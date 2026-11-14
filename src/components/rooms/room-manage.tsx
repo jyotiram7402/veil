@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useSessionStore } from "@/store/session-store";
-import { shareOrCopy } from "@/lib/share";
+import { copyText } from "@/lib/clipboard";
 import { lastSeen } from "@/lib/format";
 import { apiErrorMessage, cn } from "@/lib/utils";
 import { EXPIRY_OPTIONS, statusBadgeClass } from "@/components/rooms/room-shared";
@@ -550,8 +550,8 @@ function InvitesSection({
       }
       const body = (await res.json()) as { invite: { url: string } };
       setFresh({ url: body.invite.url });
-      const how = await shareOrCopy(body.invite.url, { title: "Room invitation" });
-      toast.success(how === "shared" ? "Invitation created" : "Invitation created — link copied");
+      const copied = await copyText(body.invite.url);
+      toast.success(copied ? "Invitation created — link copied" : "Invitation created");
       onChanged();
     } finally {
       setCreating(false);
@@ -621,11 +621,10 @@ function InvitesSection({
                   size="sm"
                   variant="ghost"
                   onClick={async () => {
-                    const how = await shareOrCopy(fresh.url, { title: "Room invitation" });
-                    if (how !== "failed") toast.success(how === "shared" ? "Shared" : "Copied");
-                    else toast.error("Couldn't copy");
+                    if (await copyText(fresh.url)) toast.success("Link copied");
+                    else toast.error("Couldn't copy. Select the link and copy it yourself.");
                   }}
-                  aria-label="Share or copy invitation link"
+                  aria-label="Copy invitation link"
                 >
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
