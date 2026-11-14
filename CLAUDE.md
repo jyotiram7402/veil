@@ -2,9 +2,10 @@
 
 ## Overview
 BlackFoxx (package name `blackfoxx`; the GitHub repo and Vercel project are still named `veil`)
-is a private, invite-only, mobile-first chat app with 1:1 WebRTC voice/video calls. An admin
-creates every account; members sign in through a personal invite link — no email/phone. Members
-chat only with the admin. Rooms (guest access codes) exist in the code but are on hold.
+is a private, invite-only, mobile-first chat app with 1:1 WebRTC voice/video calls. People get
+in two ways, both through the admin: a personal invite link, or a sign-up code with which they
+create their own username + password. No email/phone. Members chat only with the admin. Rooms
+(guest access codes) exist in the code but are on hold.
 Product facts: `PRODUCT.md`. Look and feel: `DESIGN.md` (read it before touching any screen).
 
 ## Tech stack
@@ -21,7 +22,7 @@ Product facts: `PRODUCT.md`. Look and feel: `DESIGN.md` (read it before touching
 3. `cp .env.example .env.local` and fill it (real values: Vercel → Settings → Environment
    Variables, or Supabase → Settings → API). The old laptop's `.env.local` was only the template.
 4. Database already exists in Supabase. For a brand-new project run every file in `supabase/`
-   in the order in `supabase/README.md` (schema → policies → storage → v2 … v9).
+   in the order in `supabase/README.md` (schema → policies → storage → v2 … v10).
 5. `npm run dev` → http://localhost:3000. Admin login uses the **username** (e.g. `admin`).
 More detail: `docs/SETUP.md`, `docs/SUPABASE.md`.
 
@@ -55,7 +56,7 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - `src/app/(user)/chat` (member's 1:1 chat with admin), `(user)/expired`.
 - `src/app/i/[token]` member invite gate; `src/app/join[/code]` + `src/app/room/[id]` room guests.
 - `src/app/api/**/route.ts` all mutations. `src/lib/` server logic (`supabase/`, `auth/`,
-  `rooms.ts`, `permissions.ts`, `validations.ts`, `api.ts`, `webrtc/`).
+  `rooms.ts`, `permissions.ts`, `signup-codes.ts`, `validations.ts`, `api.ts`, `webrtc/`).
 - `src/components/{ui,chat,call,rooms,layout,auth}`, `src/hooks/`, `src/store/` (Zustand).
 - `supabase/*.sql` migrations; `src/types/database.ts` is a **hand-written** mirror of them.
 - Flow: Server Component (`getSessionUser` + RLS client; does its own redirects) → client component →
@@ -81,7 +82,8 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 ## Conventions
 - Never trust client-sent role/ids: every handler re-checks the session; admin = `profiles.is_admin`;
   room actions also `assertRoomAdmin()`. `supabaseAdmin()` only after those checks, server-side only.
-- Server-only modules start with `import "server-only"` (`rooms`, `permissions`, `queries`, `settings`, `invite-token`).
+- Server-only modules start with `import "server-only"` (`rooms`, `permissions`, `queries`,
+  `settings`, `invite-token`, `signup-codes`).
 - Read env through `src/lib/env.ts`. Only exceptions: `next.config.ts` (Supabase host),
   `src/lib/webrtc/ice.ts` (TURN vars in the browser), `src/app/api/health` (booleans only).
 - Errors: participant-facing routes return generic text; clients show `apiErrorMessage(body, fallback)`.
@@ -132,6 +134,9 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - Bootstrap (`POST /api/admin/users` + `x-admin-token`) only works while `profiles` is empty;
   `/api/admin/users` is deliberately middleware-public for that and self-checks.
 - Login form needs passwords ≥ 8 chars; sign in with the username, not the email.
+- Two kinds of member: invite-link members have a throwaway auth password (every visit to their
+  link sets a new one), sign-up members log in at `/login` with their own. Setting an invite
+  link for a sign-up member, or suspending them, destroys that password.
 - Builds ignore TypeScript/ESLint errors, and there's no lockfile → deps float on every Vercel build.
 - `src/lib/env.ts` throws at build time ("Collecting page data") when a required variable is
   missing in that Vercel environment. Preview builds need the variables ticked for **Preview** too.
@@ -158,22 +163,18 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - `error.tsx` shows `Ref: <digest>` — search that digest in Vercel → Logs.
 
 ## Current status
-- Live on Vercel; Supabase migrated through v9 with grants restored. Confirmed working by the
-  owner: admin login, chat. Deployed but never confirmed: rooms crash hardening (c2de8e6),
-  clearer form errors (36383cb), speed changes (session cache, 5 s resync poll).
+- Live on Vercel; Supabase migrated through v9 with grants restored (`v10.sql` is new: the
+  owner runs it before the sign-up branch is merged). Confirmed working by the owner: admin
+  login, chat.
 - UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PR #4) and
-  live since 2026-11-14:
-  1. rename to BlackFoxx, tokens/fonts, moji avatars, animated first screen, new log-in and
-     invite-link screens;
-  2. chat home: greeting, people row, search, rows; rooms entry points removed (rooms are on
-     hold; their routes still exist);
-  3. chat screen for admin, member and rooms: header, bubbles with the time under each run, pill
-     composer, typing bubble in a fixed slot in the message list;
-  4. avatar picker (Settings, or the member's More menu); the choice is stored in
-     `profiles.avatar_url` as `moji:<id>:<colour>`; Node pinned to 24.x.
-  Then `fix/copy-invite-link`: copy buttons copy instead of opening the system share sheet.
-  Next: 5. sign-up with an invite code (needs `v10.sql`). 6. calls: TURN + call screen. Then
-  the admin/settings pages. Proposed: switch the route guard on (first Gotcha).
+  live: the rename to BlackFoxx, new tokens/fonts, moji avatars and the avatar picker, the
+  animated first screen, the log-in and invite-link screens, the chat home and the chat
+  screen. Rooms entry points are removed (rooms are on hold; their routes still exist).
+  Not merged yet: `fix/copy-invite-link` (copy buttons copy instead of opening the share
+  sheet) and, stacked on it, `feature/signup-invite-code` (5. sign-up with a code: `/signup`,
+  `/api/auth/signup`, admin tab "Sign-up codes", needs `v10.sql`).
+  Next: 6. calls: TURN + call screen. Then the admin/settings pages. Proposed: switch the
+  route guard on (first Gotcha).
 - What the assistant can check itself: the public pages on the live site, in the built-in
   Browser pane. Screens behind login and all previews (Vercel login) are checked by the owner;
   designs are checked beforehand on a static mock-up.

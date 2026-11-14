@@ -34,7 +34,7 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 |---|---|---|
 | `page.tsx` | signed-out | first screen: animated moji wall, Log in / Sign up (`components/auth/first-screen.tsx`); signed-in visitors are redirected by the page |
 | `(auth)/login` | admin | username + password sign-in (`/api/auth/login`), inside `components/auth/auth-shell.tsx` |
-| `(auth)/signup` | signed-out | placeholder: says sign-up needs an invite code (the real flow is not built yet) |
+| `(auth)/signup` | signed-out | sign-up with an invite code (`components/auth/signup-form.tsx` → `/api/auth/signup`); `?code=` pre-fills it |
 | `(app)/layout.tsx` | admin | requires `is_admin`; loads chat list (`loadChatsForUser`) into `AppShell` |
 | `(app)/chats`, `chats/[id]` | admin | chat list + thread (`components/chat/chat-thread.tsx`) |
 | `(app)/admin` | admin | Members / Archive / Defaults / Account tabs (`components/admin-panel.tsx`) |
@@ -49,7 +49,9 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 
 ## API routes (`src/app/api`)
 
-- `auth/` — `login`, `logout`, `end-session` (beacon logout), `session`.
+- `auth/` — `login`, `logout`, `end-session` (beacon logout), `session`, `signup` (public;
+  an invite code + username + password → a member account, signed in).
+- `admin/signup-codes` — list / create (the code is returned once), `[id]` DELETE switches one off.
 - `admin/` — `users` (list; create — bootstrap-token path when `profiles` is empty),
   `users/[id]` (archive / `?hard=1` delete), `.../suspend`, `.../restore`, `.../invite`
   (rotate/enable/revoke invite link), `.../settings` (per-user overrides), `.../chat`
@@ -80,6 +82,8 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - `rooms.ts` — access codes (`selector.verifier`, PBKDF2-hashed verifier), `validateInvite`,
   `assertRoomAdmin`, `recordAudit`. `permissions.ts` — effective chat/voice/video model.
 - `settings.ts` — `app_settings` defaults merged with `profiles.settings` overrides.
+- `signup-code.ts` (shape of a sign-up code, shared with the form), `signup-codes.ts`
+  (server only: generate, SHA-256 hash, hint).
 - `password.ts` (PBKDF2), `invite-token.ts`, `url.ts` (app origin for links), `clipboard.ts`
   (`copyText`: copy buttons copy, they never open the share sheet), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
@@ -106,7 +110,9 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
   `settings`), `chats` (`direct|group|room`; rooms add `status`, `expires_at`,
   `max_participants`, `chat/voice/video_enabled`), `chat_members` (`role`, `blocked`,
   `removed_at`, `can_chat/voice/video`, `last_read_at`), `messages` (`text|image|file|system`),
-  `invite_tokens`, `app_settings`, `room_invites`, `room_audit_log`, `call_sessions`.
+  `invite_tokens`, `app_settings`, `room_invites`, `room_audit_log`, `call_sessions`,
+  `signup_codes` (v10; hash + hint only, RLS on with no policies, so service role only;
+  `profiles.signup_code_id` says which code a member joined with).
 - SECURITY DEFINER helpers used by RLS: `is_chat_member`, `is_chat_admin`, `is_admin`,
   `is_room_admin`, `can_access_chat`, `can_chat_in`, `shares_chat`; RPCs
   `claim_room_seat` (advisory-locked seat claim), `get_or_create_admin_user_chat`,
@@ -120,6 +126,11 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - **Member:** admin creates user in `/admin` → invite link `/i/<token>` → gate password →
   `/api/i/[token]` rotates the auth password to a random value and signs the browser in →
   `/chat`. `SessionLock` (setting `screen_guard`) re-locks on tab hide; unlock via `/api/lock`.
+- **Sign-up member:** admin makes a code in `/admin` → "Sign-up codes" → the person opens
+  `/signup` (or the shared `/signup?code=…` link), picks a username, password and avatar →
+  `/api/auth/signup` checks the code, claims one use atomically (`claim_signup_code`), creates
+  the auth user + profile and signs the browser in → `/chat`. Later they use `/login`. Their
+  lock-screen password is their login password (`/api/lock` falls back to it).
 - **Room guest:** admin creates room + invitation → `/join/<code>` → `/api/rooms/join`
   creates an ephemeral `is_room_guest` user, claims a seat, consumes one invite use →
   `/room/<id>`.

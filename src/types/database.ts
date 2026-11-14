@@ -20,6 +20,7 @@ type ProfileRow = {
   archived: boolean;
   settings: Json;
   is_room_guest: boolean;
+  signup_code_id: string | null;
 };
 type ProfileInsert = {
   id: string;
@@ -34,6 +35,7 @@ type ProfileInsert = {
   archived?: boolean;
   settings?: Json;
   is_room_guest?: boolean;
+  signup_code_id?: string | null;
 };
 type ProfileUpdate = Partial<ProfileInsert>;
 
@@ -255,6 +257,35 @@ type CallSessionInsert = {
 };
 type CallSessionUpdate = Partial<CallSessionInsert>;
 
+// -------- signup_codes (v10) --------
+type SignupCodeRow = {
+  id: string;
+  code_hash: string;
+  code_hint: string;
+  label: string | null;
+  max_uses: number;
+  use_count: number;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+type SignupCodeInsert = {
+  id?: string;
+  code_hash: string;
+  code_hint: string;
+  label?: string | null;
+  max_uses?: number;
+  use_count?: number;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  last_used_at?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+};
+type SignupCodeUpdate = Partial<SignupCodeInsert>;
+
 export type Database = {
   public: {
     Tables: {
@@ -312,6 +343,12 @@ export type Database = {
         Update: CallSessionUpdate;
         Relationships: [];
       };
+      signup_codes: {
+        Row: SignupCodeRow;
+        Insert: SignupCodeInsert;
+        Update: SignupCodeUpdate;
+        Relationships: [];
+      };
     };
     Functions: {
       get_or_create_direct_chat: {
@@ -349,6 +386,14 @@ export type Database = {
       can_chat_in: {
         Args: { p_chat: string; p_user: string };
         Returns: boolean;
+      };
+      claim_signup_code: {
+        Args: { p_code_hash: string };
+        Returns: string | null;
+      };
+      release_signup_code: {
+        Args: { p_id: string };
+        Returns: undefined;
       };
     };
     Views: Record<string, never>;

@@ -15,9 +15,10 @@ import {
 import {
   MOJI,
   MOJI_COLORS,
-  mojiFor,
+  autoMojiChoice,
   mojiValue,
   parseMojiValue,
+  type MojiChoice,
   type MojiColor,
   type MojiGroup,
 } from "@/lib/moji";
@@ -33,70 +34,41 @@ const GROUPS: { key: MojiGroup; label: string }[] = [
 
 const COLORS = Object.keys(MOJI_COLORS) as MojiColor[];
 
-/** What the person has now: their saved choice, or the moji picked for them. */
-function startingPoint(profile: Profile): { id: string; color: MojiColor } {
-  const saved = parseMojiValue(profile.avatar_url);
-  if (saved) return { id: saved.id, color: saved.color };
-  const auto = mojiFor(profile.id);
-  const entry = MOJI.find((m) => m.emoji === auto.emoji) ?? MOJI[0]!;
-  return { id: entry.id, color: entry.color };
-}
-
 /**
- * Dialog to choose your own avatar: an emoji and the colour behind it.
- * Saves to the profile as "moji:<id>:<colour>".
+ * The avatar chooser itself: pick an emoji and the colour behind it. It only
+ * reports the choice; what happens with it is up to the caller (the sign-up
+ * form keeps it until the account is made, MojiPicker below saves it).
  */
-export function MojiPicker({
+export function MojiChooser({
   open,
   onOpenChange,
-  profile,
+  value,
+  onConfirm,
+  confirmLabel = "Save",
+  busy = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  profile: Profile;
+  /** What is selected when the chooser opens. */
+  value: MojiChoice;
+  onConfirm: (choice: MojiChoice) => void;
+  confirmLabel?: string;
+  /** Shows a spinner on the confirm button and blocks a second press. */
+  busy?: boolean;
 }) {
-  const router = useRouter();
-  const patchProfile = useSessionStore((s) => s.patchProfile);
-  const [choice, setChoice] = useState(() => startingPoint(profile));
+  const [choice, setChoice] = useState<MojiChoice>(value);
   const [group, setGroup] = useState<MojiGroup>("animals");
-  const [saving, setSaving] = useState(false);
 
-  // Start from what is saved each time the picker opens.
+  // Start from the current value each time it opens.
   useEffect(() => {
     if (!open) return;
-    const start = startingPoint(profile);
-    setChoice(start);
-    setGroup(MOJI.find((m) => m.id === start.id)?.group ?? "animals");
-    // Only when it opens: typing in the profile elsewhere must not reset it.
+    setChoice(value);
+    setGroup(MOJI.find((m) => m.id === value.id)?.group ?? "animals");
+    // Only when it opens: a new `value` object on every render must not reset it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const entry = MOJI.find((m) => m.id === choice.id) ?? MOJI[0]!;
-
-  async function save() {
-    if (saving) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatarUrl: mojiValue(entry.id, choice.color) }),
-      });
-      const body: unknown = await res.json().catch(() => null);
-      if (!res.ok) {
-        toast.error(apiErrorMessage(body, "Couldn't save your avatar. Try again."));
-        return;
-      }
-      patchProfile((body as { profile: Profile }).profile);
-      router.refresh();
-      onOpenChange(false);
-      toast.success("Avatar updated");
-    } catch {
-      toast.error("No connection. Check your internet and try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -181,17 +153,82 @@ export function MojiPicker({
 
         <div className="flex gap-2 border-t border-border/70 px-5 py-4">
           <Button
+            type="button"
             variant="secondary"
             className="h-12 flex-1 shadow-none"
             onClick={() => onOpenChange(false)}
           >
             Cancel
           </Button>
-          <Button className="h-12 flex-1 [&_svg]:size-5" onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="animate-spin" aria-label="Saving" /> : "Save"}
+          <Button
+            type="button"
+            className="h-12 flex-1 [&_svg]:size-5"
+            onClick={() => onConfirm(choice)}
+            disabled={busy}
+          >
+            {busy ? <Loader2 className="animate-spin" aria-label="Saving" /> : confirmLabel}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Avatar chooser for someone who is signed in: saves the choice to their
+ * profile as "moji:<id>:<colour>".
+ */
+export function MojiPicker({
+  open,
+  onOpenChange,
+  profile,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  profile: Profile;
+}) {
+  const router = useRouter();
+  const patchProfile = useSessionStore((s) => s.patchProfile);
+  const [saving, setSaving] = useState(false);
+
+  // What they have now: their saved choice, or the moji picked for them.
+  const saved = parseMojiValue(profile.avatar_url);
+  const current: MojiChoice = saved
+    ? { id: saved.id, color: saved.color }
+    : autoMojiChoice(profile.id);
+
+  async function save(choice: MojiChoice) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarUrl: mojiValue(choice.id, choice.color) }),
+      });
+      const body: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(apiErrorMessage(body, "Couldn't save your avatar. Try again."));
+        return;
+      }
+      patchProfile((body as { profile: Profile }).profile);
+      router.refresh();
+      onOpenChange(false);
+      toast.success("Avatar updated");
+    } catch {
+      toast.error("No connection. Check your internet and try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <MojiChooser
+      open={open}
+      onOpenChange={onOpenChange}
+      value={current}
+      onConfirm={save}
+      busy={saving}
+    />
   );
 }

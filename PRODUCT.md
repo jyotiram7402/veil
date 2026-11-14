@@ -36,8 +36,8 @@ on a laptop. The owner manages members from the same app.
   typing and online indicators, read receipts.
 - One-to-one voice and video calls inside a chat. Calls between different
   networks need a TURN relay, which is not set up yet.
-- Members get in through a personal invite link today. Sign-up with an invite
-  code is decided but not built.
+- Members get in through a personal invite link, or create their own account
+  on the Sign up screen with a code the owner gives them.
 - Members cannot chat with each other. This is a deliberate decision.
 - Rooms (group spaces with temporary access codes) exist in the code but are on
   hold.

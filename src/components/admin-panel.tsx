@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/chat/user-avatar";
+import { SignupCodesTab } from "@/components/signup-codes-tab";
 import { copyText } from "@/lib/clipboard";
 import { lastSeen } from "@/lib/format";
 import { useSessionStore } from "@/store/session-store";
@@ -64,7 +65,7 @@ type Row = {
   invite: Invite | null;
 };
 
-type Tab = "users" | "archive" | "defaults" | "account";
+type Tab = "users" | "codes" | "archive" | "defaults" | "account";
 
 export function AdminPanel() {
   const [tab, setTab] = useState<Tab>("users");
@@ -74,6 +75,9 @@ export function AdminPanel() {
       <div className="rounded-lg border border-border/60 bg-background/40 p-1 inline-flex mb-6 flex-wrap gap-1">
         <TabButton active={tab === "users"} onClick={() => setTab("users")}>
           Users
+        </TabButton>
+        <TabButton active={tab === "codes"} onClick={() => setTab("codes")}>
+          Sign-up codes
         </TabButton>
         <TabButton active={tab === "archive"} onClick={() => setTab("archive")}>
           Archive
@@ -87,6 +91,7 @@ export function AdminPanel() {
       </div>
 
       {tab === "users" && <UsersTab archived={false} />}
+      {tab === "codes" && <SignupCodesTab />}
       {tab === "archive" && <UsersTab archived={true} />}
       {tab === "defaults" && <SettingsTab />}
       {tab === "account" && <AccountTab />}
