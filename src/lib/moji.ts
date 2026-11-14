@@ -35,6 +35,9 @@ export type MojiEntry = {
 /** What a screen needs to draw one: the emoji and its ground colour. */
 export type Moji = { emoji: string; bg: string; name: string };
 
+/** A choice someone can make and we can store: which emoji, on which colour. */
+export type MojiChoice = { id: string; color: MojiColor };
+
 // The first 24 entries are the pool for automatic avatars. Their order decides
 // who gets which, so only ever add new entries after them.
 export const MOJI: readonly MojiEntry[] = [
@@ -107,13 +110,23 @@ function isColor(value: string | undefined): value is MojiColor {
   return !!value && Object.prototype.hasOwnProperty.call(MOJI_COLORS, value);
 }
 
-/** Stable pick: the same seed (a user id, or a name) always gets the same moji. */
-export function mojiFor(seed: string | null | undefined): Moji {
+function autoEntry(seed: string | null | undefined): MojiEntry {
   const s = seed || "?";
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  const entry = MOJI[h % AUTO_POOL]!;
+  return MOJI[h % AUTO_POOL]!;
+}
+
+/** Stable pick: the same seed (a user id, or a name) always gets the same moji. */
+export function mojiFor(seed: string | null | undefined): Moji {
+  const entry = autoEntry(seed);
   return { emoji: entry.emoji, bg: MOJI_COLORS[entry.color], name: entry.name };
+}
+
+/** The same automatic pick, as a choice that can be shown in the picker and saved. */
+export function autoMojiChoice(seed: string | null | undefined): MojiChoice {
+  const entry = autoEntry(seed);
+  return { id: entry.id, color: entry.color };
 }
 
 /** The text stored in `profiles.avatar_url` for a chosen moji. */

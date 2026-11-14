@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { USERNAME_REGEX } from "@/lib/auth/username";
 import { isMojiValue } from "@/lib/moji";
+import { isCompleteSignupCode } from "@/lib/signup-code";
 
 export const usernameSchema = z
   .string()
@@ -142,3 +143,34 @@ export const updateParticipantSchema = z
   })
   .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
 export type UpdateParticipantInput = z.infer<typeof updateParticipantSchema>;
+
+// ---------------------------------------------------------------------------
+// Sign-up with an invite code
+// ---------------------------------------------------------------------------
+
+// The public sign-up form. The code may be typed with or without the dash and
+// in any case; the server normalises it before looking it up.
+export const signupSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .max(40)
+    .refine(isCompleteSignupCode, "Enter all 10 characters of your invite code"),
+  username: usernameSchema,
+  password: passwordSchema,
+  displayName: z
+    .union([displayNameSchema, z.literal("")])
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  avatar: z.string().max(60).refine(isMojiValue, "Pick an avatar from the list").optional(),
+});
+export type SignupInput = z.infer<typeof signupSchema>;
+
+// Admin: make a new sign-up code.
+export const createSignupCodeSchema = z.object({
+  label: z.string().trim().max(60).optional(),
+  maxUses: z.number().int().min(1).max(100).optional(),
+  // number = expires in N days; null = never; left out = 7 days
+  expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
+});
+export type CreateSignupCodeInput = z.infer<typeof createSignupCodeSchema>;

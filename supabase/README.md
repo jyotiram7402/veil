@@ -26,6 +26,9 @@ Run these files in order in **Supabase Studio → SQL Editor → New query**:
 11. `v9.sql` — admin-gates the
     `get_or_create_direct_chat` RPC, tightens `profiles` SELECT (self/admin/shares-a-chat),
     removes `invite_tokens`/`app_settings` from the realtime publication, and re-asserts RLS.
+12. `v10.sql` — sign-up with an invite code: the `signup_codes` table (hashes only, no
+    policies, service role only), `profiles.signup_code_id`, and the atomic
+    `claim_signup_code()` / `release_signup_code()` functions.
 
 Optionally run `security-tests.sql` with **psql** afterwards (see its header) to verify the
 RLS negative cases — it uses psql `\set` variables, so it won't run in the dashboard editor.

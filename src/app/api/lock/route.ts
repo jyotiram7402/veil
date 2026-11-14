@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { verifyPassword } from "@/lib/password";
 import { clientKey, jsonError, rateLimit } from "@/lib/api";
+import { usernameToInternalEmail } from "@/lib/auth/username";
+import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -49,6 +52,13 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   if (!row || !row.enabled || !row.gate_password_hash) {
+    // A member who signed up with a code has no invite link at all. Their lock
+    // password is simply the password they log in with.
+    if (!row && session.profile.signup_code_id) {
+      const ok = await loginPasswordMatches(session.profile.username, password);
+      if (!ok) return jsonError(401, "Wrong password");
+      return NextResponse.json({ ok: true });
+    }
     return jsonError(403, "No active invite — sign in again");
   }
 
@@ -56,4 +66,21 @@ export async function POST(req: Request) {
   if (!ok) return jsonError(401, "Wrong password");
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Checks a login password without touching the caller's own session: a
+ * throwaway client signs in, and the session that creates is dropped again.
+ */
+async function loginPasswordMatches(username: string, password: string): Promise<boolean> {
+  const probe = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const { data, error } = await probe.auth.signInWithPassword({
+    email: usernameToInternalEmail(username),
+    password,
+  });
+  if (error || !data.session) return false;
+  await probe.auth.signOut({ scope: "local" }).catch(() => undefined);
+  return true;
 }

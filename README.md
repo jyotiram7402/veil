@@ -1,8 +1,8 @@
 # BlackFoxx
 
 A small, private, real-time chat for people you actually want to talk to.
-Username + password, no email, no phone, no signups — accounts are created
-by an admin and that's it.
+Username + password, no email, no phone, no open signups — the admin either
+creates an account or hands out a one-off sign-up code.
 
 It's deliberately minimal: one Next.js 15 app, one Supabase project,
 deployable to Vercel's free tier in about ten minutes.

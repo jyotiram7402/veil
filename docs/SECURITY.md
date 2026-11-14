@@ -67,6 +67,21 @@ Negative RLS tests: `supabase/security-tests.sql`.
   Recommended future work: migrate to the selector/verifier hashed scheme (a
   non-destructive dual-read migration).
 
+### Sign-up codes
+
+A second, self-service way in. The admin creates a code; whoever holds it can make one member
+account (never an admin).
+
+- Codes are 10 random characters (about 49 bits). The database stores only a SHA-256 hash and
+  the last 4 characters; the code itself is shown once, when it is created.
+- `signup_codes` has RLS on and no policies, and the claim/release functions are executable by
+  the service role only, so the browser cannot read or use them directly.
+- Each code has a use limit and (by default) an expiry, and can be switched off. A use is
+  claimed in a single SQL statement, so the last use cannot be taken twice.
+- `POST /api/auth/signup` is public and rate-limited per IP. Every bad-code case returns the
+  same message, and the username check only runs after the code check, so the endpoint cannot
+  be used to list usernames without a valid code.
+
 ## WebRTC / calling security
 
 - Signaling rides a **private** Supabase Realtime channel `call:<chatId>`;
