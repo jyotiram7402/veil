@@ -161,20 +161,22 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - Live on Vercel; Supabase migrated through v9 with grants restored. Confirmed working by the
   owner: admin login, chat. Deployed but never confirmed: rooms crash hardening (c2de8e6),
   clearer form errors (36383cb), speed changes (session cache, 5 s resync poll).
-- UI redesign (started 2026-11-14), one stacked branch per feature; none is merged yet:
-  1. `feature/first-screen` (PR #1) — rename to BlackFoxx, tokens/fonts, moji avatars, animated
-     first screen, new log-in and invite-link screens.
-  2. `feature/chat-list` (PR #2) — chat home: greeting, people row, search, rows; rooms entry
-     points removed (rooms are on hold; their routes still exist).
-  3. `feature/chat-thread` — chat screen for admin, member and rooms: header, bubbles with the
-     time under each run, pill composer, typing bubble in a fixed slot in the message list.
-  4. `feature/avatar-picker` — choose your moji (Settings, or the member's More menu); stored in
-     `profiles.avatar_url` as `moji:<id>:<colour>`; `PATCH /api/profile` now only changes the
-     fields it is sent; Node pinned to 24.x.
+- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PR #4) and
+  live since 2026-11-14:
+  1. rename to BlackFoxx, tokens/fonts, moji avatars, animated first screen, new log-in and
+     invite-link screens;
+  2. chat home: greeting, people row, search, rows; rooms entry points removed (rooms are on
+     hold; their routes still exist);
+  3. chat screen for admin, member and rooms: header, bubbles with the time under each run, pill
+     composer, typing bubble in a fixed slot in the message list;
+  4. avatar picker (Settings, or the member's More menu); the choice is stored in
+     `profiles.avatar_url` as `moji:<id>:<colour>`; Node pinned to 24.x.
+  Then `fix/copy-invite-link`: copy buttons copy instead of opening the system share sheet.
   Next: 5. sign-up with an invite code (needs `v10.sql`). 6. calls: TURN + call screen. Then
   the admin/settings pages. Proposed: switch the route guard on (first Gotcha).
-- The assistant has not seen any of this on a real build (previews need a Vercel login): the
-  owner checks previews; designs are checked beforehand on a static mock-up.
+- What the assistant can check itself: the public pages on the live site, in the built-in
+  Browser pane. Screens behind login and all previews (Vercel login) are checked by the owner;
+  designs are checked beforehand on a static mock-up.
 - Five Vercel projects build every push: `veil`, `veil-32wk`, `veil-ah7i`, `veil-cqsf`,
   `veil-vo9a`. `veil-cqsf` (the address used so far) builds `main`, but its preview builds fail:
   its variables are set for Production only. Which project is the real one, and deleting the

@@ -38,7 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/chat/user-avatar";
-import { shareOrCopy } from "@/lib/share";
+import { copyText } from "@/lib/clipboard";
 import { lastSeen } from "@/lib/format";
 import { useSessionStore } from "@/store/session-store";
 import { apiErrorMessage, cn, normalizeUsernameInput } from "@/lib/utils";
@@ -231,9 +231,8 @@ function UsersTab({ archived }: { archived: boolean }) {
   }
 
   async function copyLink(url: string) {
-    const how = await shareOrCopy(url, { title: "Invite link" });
-    if (how === "failed") toast.error("Copy failed");
-    else toast.success(how === "shared" ? "Shared" : "Link copied");
+    if (await copyText(url)) toast.success("Link copied");
+    else toast.error("Couldn't copy. Select the link and copy it yourself.");
   }
 
   return (
@@ -426,10 +425,15 @@ function UsersTab({ archived }: { archived: boolean }) {
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreated={(invite) => {
+        onCreated={async (invite) => {
           if (invite?.url) {
-            navigator.clipboard.writeText(invite.url).catch(() => undefined);
-            toast.success("User created — invite link copied");
+            // Only say "copied" when it really was.
+            const copied = await copyText(invite.url);
+            toast.success(
+              copied
+                ? "User created — invite link copied"
+                : "User created. Use Copy next to their invite link.",
+            );
           } else {
             toast.success("Admin created");
           }
@@ -629,8 +633,12 @@ function RotateInviteDialog({
       }
       if (mode === "new-link") {
         const body = (await res.json()) as { invite: { url: string } };
-        navigator.clipboard.writeText(body.invite.url).catch(() => undefined);
-        toast.success("New link copied — share it with the user");
+        const copied = await copyText(body.invite.url);
+        toast.success(
+          copied
+            ? "New link copied — send it to the user"
+            : "New link created. Use Copy next to it.",
+        );
       } else {
         toast.success("Password updated");
       }
