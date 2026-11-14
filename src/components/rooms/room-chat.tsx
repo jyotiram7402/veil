@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
-import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LiveIndicator } from "@/components/chat/live-indicator";
 import { RoomClosed } from "@/components/rooms/room-closed";
@@ -197,8 +196,12 @@ export function RoomChat({
         </Button>
       </header>
 
-      <MessageList chatId={roomId} me={me} memberProfiles={memberProfiles} />
-      {settings.typing_indicator ? <TypingIndicator chatId={roomId} /> : <div className="h-5" />}
+      <MessageList
+        chatId={roomId}
+        me={me}
+        memberProfiles={memberProfiles}
+        showTyping={settings.typing_indicator}
+      />
 
       {chatOn ? (
         <Composer

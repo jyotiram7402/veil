@@ -84,6 +84,22 @@ white column from tablet up.
 - Header controls are 40px circles. Members, Settings, the theme switch and Sign out live in
   the menu behind your own avatar.
 
+## Chat screen
+
+One screen for the admin (`chat-thread.tsx`), the member (`user-chat.tsx`) and rooms.
+
+- Header, 64px: avatar, name, and a status line ("Online" in `text-online-ink`, otherwise
+  "Last seen …"), then video and voice call. For the admin, tapping the name opens the chat
+  details; the member has a "More" menu with the theme switch and Sign out.
+- Bubbles: 20px corners. Outgoing is `--bubble-out` blue with white text, incoming is white
+  (slate in dark mode). The last bubble of a run gets one tight corner and the time under it,
+  with ticks for your own messages. No names or avatars in a 1:1 chat; groups show both.
+- A photo fills its bubble. A file is a row with a round icon, its name and size.
+- Call results and other notes are a small centred pill.
+- The typing bubble sits in a slot of fixed height under the newest message, so nothing moves
+  when it comes and goes (`showTyping` on `MessageList`).
+- Composer: one floating pill with attach, the text field and a blue send button.
+
 ## Entry screens
 
 - `/` (`first-screen.tsx`): tiles are placed in percent of the stage (the area
@@ -105,6 +121,6 @@ white column from tablet up.
 
 ## Not redesigned yet
 
-The chat thread, call screen, admin pages and room pages still use their old
-layout with the new colours. They are being rebuilt one branch at a
+The call screen, the admin pages (Members, Settings) and the room management
+pages still use their old layout with the new colours. They are being rebuilt one branch at a
 time; the order is in `CLAUDE.md` → Current status.

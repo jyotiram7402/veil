@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, Loader2 } from "lucide-react";
 import { MessageBubble } from "@/components/chat/message-bubble";
+import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { useChatStore } from "@/store/chat-store";
 import { dayLabel } from "@/lib/format";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import type { MessageWithSender, Profile } from "@/types/chat";
 
 function isSameDay(a: string, b: string) {
@@ -24,10 +26,13 @@ export function MessageList({
   chatId,
   me,
   memberProfiles,
+  showTyping = true,
 }: {
   chatId: string;
   me: Profile;
   memberProfiles: Record<string, Pick<Profile, "id" | "username" | "display_name" | "avatar_url">>;
+  /** Show the "is typing" bubble under the newest message. */
+  showTyping?: boolean;
 }) {
   const messages = useChatStore((s) => s.messagesByChat[chatId] ?? []);
   const hasMore = useChatStore((s) => s.hasMore[chatId] ?? false);
@@ -40,6 +45,8 @@ export function MessageList({
   const [unseenCount, setUnseenCount] = useState(0);
   const prevHeightRef = useRef(0);
   const prevCountRef = useRef(0);
+  // With more than two people the bubbles need names and avatars.
+  const isGroup = Object.keys(memberProfiles).length > 2;
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = scrollRef.current;
@@ -132,7 +139,7 @@ export function MessageList({
     <div className="relative flex-1 min-h-0">
       <div
         ref={scrollRef}
-        className="absolute inset-0 overflow-y-auto px-3 sm:px-6 py-4"
+        className="absolute inset-0 overflow-y-auto overscroll-contain px-3 pb-2 pt-4 sm:px-6"
       >
         <div ref={sentinelRef} className="h-1" />
         {loadingOlder && (
@@ -143,14 +150,14 @@ export function MessageList({
 
         {messages.length === 0 && !loadingOlder && (
           <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
-            <p className="text-sm text-muted-foreground">No messages yet</p>
-            <p className="mt-1 text-xs text-muted-foreground/70">
+            <p className="text-base font-bold">No messages yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
               Say hello to start the conversation.
             </p>
           </div>
         )}
 
-        <div className="space-y-1">
+        <div>
           {messages.map((m, i) => {
             const prev = i > 0 ? messages[i - 1]! : null;
             const next = i < messages.length - 1 ? messages[i + 1]! : null;
@@ -171,7 +178,7 @@ export function MessageList({
               <div key={m.id}>
                 {showDay && (
                   <div className="my-4 flex items-center justify-center">
-                    <span className="rounded-full bg-card/70 backdrop-blur border border-border/60 px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <span className="rounded-full bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
                       {dayLabel(m.created_at)}
                     </span>
                   </div>
@@ -180,7 +187,8 @@ export function MessageList({
                   message={m}
                   sender={sender}
                   fromMe={fromMe}
-                  showSender={!fromMe && !prevFromSame}
+                  showSender={isGroup && !fromMe && !prevFromSame}
+                  showAvatar={isGroup}
                   groupedTop={prevFromSame}
                   groupedBottom={nextFromSame}
                   readByOther={false}
@@ -190,17 +198,31 @@ export function MessageList({
             );
           })}
         </div>
+        {/* Slot for the typing bubble. Always the same height, so nothing
+            moves when the bubble comes and goes. */}
+        <div className="mt-2 flex h-9 items-end" role="status" aria-live="polite">
+          {showTyping && <TypingIndicator chatId={chatId} />}
+        </div>
       </div>
 
-      {/* "New messages" pill — visible only when scrolled up. */}
+      {/* Jump to the newest message: visible only when scrolled up. Turns
+          blue and counts when new messages arrived meanwhile. */}
       {!nearBottom && (
         <button
           type="button"
           onClick={() => scrollToBottom("smooth")}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-transform"
+          aria-label={
+            unseenCount > 0 ? `${unseenCount} new, go to the latest message` : "Go to the latest message"
+          }
+          className={cn(
+            "absolute bottom-3 right-3 z-10 flex h-10 items-center gap-1.5 rounded-full shadow-lg transition-transform active:scale-95 sm:right-6",
+            unseenCount > 0
+              ? "bg-primary px-3.5 text-sm font-semibold text-primary-foreground"
+              : "w-10 justify-center border border-border/70 bg-card text-foreground",
+          )}
         >
-          <ArrowDown className="h-3.5 w-3.5" />
-          {unseenCount > 0 ? `${unseenCount} new` : "Scroll to bottom"}
+          <ArrowDown className="h-4 w-4" />
+          {unseenCount > 0 && `${unseenCount} new`}
         </button>
       )}
     </div>

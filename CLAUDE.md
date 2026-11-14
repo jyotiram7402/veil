@@ -162,7 +162,9 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
      screen, new log-in and invite-link screens. Pushed (PR #1), not merged yet.
   2. `feature/chat-list` (stacked on 1) — new chat home: greeting, people row, search, rows;
      rooms entry points removed (rooms are on hold; their routes still exist). Built.
-  3. Chat thread redesign (header, bubbles, composer) for the admin and member views.
+  3. `feature/chat-thread` (stacked on 2) — chat screen for admin, member and rooms: new
+     header, blue/white bubbles with the time under each run, pill composer, typing bubble in a
+     fixed slot inside the message list. Built.
   4. Avatar picker (choose your moji). 5. Sign-up with an invite code (needs a `v10.sql`
      migration). 6. Calls: TURN + call screen. Then the admin/settings pages.
   None of the new screens has been seen on a real build by the assistant (previews need a Vercel

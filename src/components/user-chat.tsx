@@ -2,14 +2,19 @@
 
 import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Moon, MoreHorizontal, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
-import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { SessionLock } from "@/components/session-lock";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { useTheme } from "@/components/theme-toggle";
 import { CallProvider } from "@/components/call/call-provider";
 import { CallButton } from "@/components/call/call-button";
 import { LiveIndicator } from "@/components/chat/live-indicator";
@@ -21,6 +26,7 @@ import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
 import { usePresenceStore } from "@/store/presence-store";
 import { lastSeen } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { SettingsShape } from "@/lib/settings";
 import type { MessageWithSender, Profile } from "@/types/chat";
 
@@ -68,7 +74,8 @@ export function UserChat({
   useResumeSync(chatId, me);
 
   const adminOnline = usePresenceStore((s) => s.online.has(adminProfile.id));
-  const subtitle = adminOnline ? "online" : `last seen ${lastSeen(adminProfile.last_seen_at)}`;
+  const subtitle = adminOnline ? "Online" : `Last seen ${lastSeen(adminProfile.last_seen_at)}`;
+  const { theme, toggle: toggleTheme } = useTheme();
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -77,10 +84,8 @@ export function UserChat({
 
   const chat = (
     <div className="flex h-screen-mobile flex-col chat-bg">
-      <header
-        className="flex h-14 items-center gap-3 px-3 border-b border-border/70 bg-header text-header-foreground"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
-      >
+      {/* The page body already keeps clear of the notch (see globals.css). */}
+      <header className="flex h-16 shrink-0 items-center gap-1 border-b border-border/70 bg-header pl-3 pr-2 text-header-foreground sm:px-4">
         <UserAvatar
           userId={adminProfile.id}
           username={adminProfile.username}
@@ -89,29 +94,46 @@ export function UserChat({
           size="md"
           showPresence
         />
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate flex items-center gap-2">
-            {adminProfile.display_name ?? adminProfile.username}
+        <div className="ml-2 min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[15px] font-bold leading-tight">
+            <span className="truncate">{adminProfile.display_name ?? adminProfile.username}</span>
             <LiveIndicator />
           </div>
-          <div className="text-[11px] opacity-80 truncate">{subtitle}</div>
+          <div
+            className={cn(
+              "truncate text-xs",
+              adminOnline ? "font-medium text-online-ink" : "text-muted-foreground",
+            )}
+          >
+            {subtitle}
+          </div>
         </div>
-        <CallButton mode="voice" className="text-current hover:bg-foreground/10" />
-        <CallButton mode="video" className="text-current hover:bg-foreground/10" />
-        <ThemeToggle />
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={signOut}
-          aria-label="Sign out"
-          className="text-current hover:bg-foreground/10"
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
+        <CallButton mode="video" className="[&_svg]:size-5" />
+        <CallButton mode="voice" className="[&_svg]:size-5" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon" variant="ghost" aria-label="More" className="[&_svg]:size-5">
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem className="px-3 py-2.5" onClick={toggleTheme}>
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </DropdownMenuItem>
+            <DropdownMenuItem className="px-3 py-2.5 text-destructive" onClick={signOut}>
+              <LogOut className="h-4 w-4" /> Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
-      <MessageList chatId={chatId} me={me} memberProfiles={memberProfiles} />
-      {settings.typing_indicator ? <TypingIndicator chatId={chatId} /> : <div className="h-5" />}
+      <MessageList
+        chatId={chatId}
+        me={me}
+        memberProfiles={memberProfiles}
+        showTyping={settings.typing_indicator}
+      />
       <Composer
         chatId={chatId}
         me={me}

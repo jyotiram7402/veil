@@ -48,11 +48,15 @@ const config: Config = {
         bubble: {
           in: "hsl(var(--bubble-in))",
           out: "hsl(var(--bubble-out))",
+          "out-foreground": "hsl(var(--bubble-out-foreground))",
           foreground: "hsl(var(--bubble-foreground))",
           meta: "hsl(var(--bubble-meta))",
         },
         tick: "hsl(var(--tick))",
-        online: "hsl(var(--online))",
+        online: {
+          DEFAULT: "hsl(var(--online))",
+          ink: "hsl(var(--online-ink))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
