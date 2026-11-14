@@ -15,6 +15,7 @@ Product facts: `PRODUCT.md`. Look and feel: `DESIGN.md` (read it before touching
   `next/font`: Figtree (UI) and Baloo 2 (wordmark, entry screens only).
 - WebRTC (native browser APIs) for calls; Supabase Realtime only carries signaling.
 - Hosting: Vercel (prod: https://veil-cqsf.vercel.app), repo github.com/jyotiram7402/veil, branch `main`.
+  Functions run in `sin1` (Singapore), next to the Supabase database: `vercel.json` → `regions`.
 
 ## Setup on a fresh machine
 1. Node 24 (`engines` is pinned to `24.x`, the version set in the Vercel projects). Git.
@@ -163,18 +164,16 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - `error.tsx` shows `Ref: <digest>` — search that digest in Vercel → Logs.
 
 ## Current status
-- Live on Vercel; Supabase migrated through v9 with grants restored (`v10.sql` is new: the
-  owner runs it before the sign-up branch is merged). Confirmed working by the owner: admin
-  login, chat.
-- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PR #4) and
+- Live on Vercel; Supabase migrated through v9 with grants restored. `v10.sql` (sign-up codes):
+  whether the owner has run it in production is unverified. Confirmed working by the owner:
+  admin login, chat, a video call on the same Wi-Fi.
+- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PRs #4–#6) and
   live: the rename to BlackFoxx, new tokens/fonts, moji avatars and the avatar picker, the
   animated first screen, the log-in and invite-link screens, the chat home and the chat
-  screen. Rooms entry points are removed (rooms are on hold; their routes still exist).
-  Not merged yet: `fix/copy-invite-link` (copy buttons copy instead of opening the share
-  sheet) and, stacked on it, `feature/signup-invite-code` (5. sign-up with a code: `/signup`,
-  `/api/auth/signup`, admin tab "Sign-up codes", needs `v10.sql`).
-  Next: 6. calls: TURN + call screen. Then the admin/settings pages. Proposed: switch the
-  route guard on (first Gotcha).
+  screen, copy buttons that copy, and sign-up with a code (`/signup`, admin tab "Sign-up
+  codes"; not yet confirmed by the owner). Rooms entry points are removed (rooms are on hold).
+  Next: calls (a relay for other networks, new call screen, ring anywhere in the app). Then
+  the admin/settings pages. Proposed: switch the route guard on (first Gotcha).
 - What the assistant can check itself: the public pages on the live site, in the built-in
   Browser pane. Screens behind login and all previews (Vercel login) are checked by the owner;
   designs are checked beforehand on a static mock-up.
@@ -184,11 +183,11 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   rest, is the owner's call.
 - Decided by the owner: sign-up is invite-code only; members chat only with the admin. Open:
   a yellow "Snapchat-style" theme next to the blue.
-- Calls: cross-network calls fail — TURN not configured (whether `NEXT_PUBLIC_TURN_*` are set in
-  Vercel is unverified). Options: Metered (static creds, no code) or Cloudflare TURN
-  (short-lived creds → needs a server route). Same-network call untested.
-- Performance: Vercel builds (and by default functions) run in iad1; the Supabase region is
-  unknown — set Vercel → Settings → Functions → Region to match it.
+- Calls: a video call on the same Wi-Fi works (owner, 2026-11-14, no relay). Other networks are
+  untested; they need a TURN relay when no direct path exists. The owner looked at Cloudflare
+  TURN (asks for a payment method first; free to 1,000 GB a month) and has not decided.
+- Performance: the database is in Singapore (`ap-southeast-1`, read from DNS on 2026-11-14) and
+  functions ran in `iad1` (USA), so every query crossed the Pacific. `vercel.json` now pins `sin1`.
 - To do: commit `package-lock.json`; add a test runner + CI.
 - Known gaps: `user_session_ephemeral` has no effect (its hook is not mounted); admin-only routes
   echo raw DB errors; small blue text is under 4.5:1 in dark mode on the old screens; more in

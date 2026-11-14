@@ -81,6 +81,10 @@ is missing when a server route needs it.
 - Node: `engines.node >= 18.18` in `package.json` — select Node 18 or 20 LTS.
 - Production branch: **`main`** (or a dedicated `production` branch — deploy only
   from the intended branch).
+- Function region: `vercel.json` pins the functions to `sin1` (Singapore), the region of the
+  Supabase database (`ap-southeast-1`). It overrides the dashboard setting. A page makes several
+  database round trips, so the functions must sit next to the database, not next to the users.
+  If the database ever moves, change the code there (list: vercel.com/docs/regions).
 - Add all env vars (§2) to Production; give Preview its own (non-production)
   Supabase project or restricted values so previews never touch production data.
 - Note: builds run with `typescript.ignoreBuildErrors` / `eslint.ignoreDuringBuilds`
