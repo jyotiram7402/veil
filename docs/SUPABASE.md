@@ -11,7 +11,8 @@ Go to [supabase.com](https://supabase.com) → **New project**.
 - Database password: anything — you won't type it again, just keep it
   in a password manager in case you need to use the SQL editor as
   `postgres`.
-- Region: closest to most of your users.
+- Region: closest to most of your users. The server functions must run in the same region:
+  put the matching Vercel code in `vercel.json` → `regions` (now `sin1`, Singapore).
 - Plan: **Free**.
 
 The project takes ~1 minute to provision.

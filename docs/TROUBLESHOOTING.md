@@ -158,6 +158,16 @@ browser-exposed variable. Pick type **Config** for every `NEXT_PUBLIC_*`
 variable (keep `SUPABASE_SERVICE_ROLE_KEY` as Secret), then **redeploy** —
 `NEXT_PUBLIC_*` values are baked into the build.
 
+## Every page and every action is slow (a second or more)
+
+Check that the server runs next to the database. Open `/api/health` and read the
+`x-vercel-id` response header (browser dev tools → Network). It looks like
+`bom1::sin1::…`: where the request entered Vercel, then where the function ran. The
+second code must be the region of the Supabase project (`sin1` = Singapore =
+`ap-southeast-1`). It is set in `vercel.json` → `regions`, which overrides the Vercel
+dashboard. With the Vercel default (`iad1`, USA) every database query crossed the
+Pacific and back.
+
 ## Voice/video call stays on "Connecting…" (timer at 0:00)
 
 The two devices can't reach each other directly — typical when they're on
