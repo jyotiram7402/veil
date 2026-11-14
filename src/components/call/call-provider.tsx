@@ -3,7 +3,7 @@
 import { createContext, useContext, useRef } from "react";
 import { useCall } from "@/hooks/use-call";
 import { useCallStore } from "@/store/call-store";
-import { CallOverlay } from "@/components/call/call-overlay";
+import { CallScreen } from "@/components/call/call-screen";
 import type { Profile } from "@/types/chat";
 
 type CallActions = {
@@ -24,7 +24,7 @@ export function useCallActions(): CallActions {
 
 /**
  * Wraps a 1-to-1 (direct) chat. Owns the signaling channel + WebRTC engine for
- * that conversation, renders the call overlay, and exposes `startCall` to the
+ * that conversation, renders the call screen, and exposes `startCall` to the
  * header button via context. Mount this ONLY around direct chats.
  */
 export function CallProvider({
@@ -44,6 +44,7 @@ export function CallProvider({
     accept,
     reject,
     hangUp,
+    dismiss,
     toggleMute,
     toggleCamera,
     switchCamera,
@@ -58,11 +59,11 @@ export function CallProvider({
       {children}
       {/* Remote audio sink — hidden, autoplay. Never plays local audio (no echo). */}
       <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-      <CallOverlay
-        me={me}
+      <CallScreen
         accept={accept}
         reject={reject}
         hangUp={hangUp}
+        dismiss={dismiss}
         toggleMute={toggleMute}
         toggleCamera={toggleCamera}
         switchCamera={switchCamera}

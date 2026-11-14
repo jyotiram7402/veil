@@ -87,7 +87,8 @@ account (never an admin).
 - Signaling rides a **private** Supabase Realtime channel `call:<chatId>`;
   `realtime.messages` RLS restricts send/receive to chat members. Client-supplied
   caller/callee/room IDs are not trusted; every message carries the `callId` and
-  stale/ended-call messages are ignored.
+  stale/ended-call messages are ignored. The name and avatar shown for an incoming
+  call come from the chat's own member data, not from the signaling message.
 - Authorization is re-checked server-side at call start, on accept, on every
   reconnection, and every 30s while connected. Removed/blocked/suspended
   participants and ended rooms cannot start or keep a call; disabling room video

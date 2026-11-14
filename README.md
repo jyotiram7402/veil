@@ -73,11 +73,11 @@ src/
     ui/                    — shadcn primitives
     chat/                  — list, thread, bubble, composer, dialogs
     rooms/                 — admin room management + participant room UI
-    call/                  — call provider, overlay, buttons
+    call/                  — call provider, call screen, buttons
     auth/, layout/         — login form, app shell, sidebar
   lib/
     supabase/{client,server,admin,middleware}.ts
-    webrtc/{ice,signaling,codec,stats,audio-level,errors,types}.ts
+    webrtc/{ice,signaling,codec,stats,audio-level,devices,errors,ringtone,types}.ts
     {rooms,permissions,share,api,env,queries,validations,...}.ts
   hooks/                   — realtime, presence, typing, calling
   store/                   — zustand stores (session, chat, presence, call)
@@ -95,15 +95,15 @@ Media is peer-to-peer WebRTC; Supabase Realtime carries only signaling
 - **Signaling** rides a *private* Supabase Realtime channel `call:<chatId>`.
   RLS on `realtime.messages` limits it to the two members of that chat, so
   nobody can inject offers/ICE into someone else's call.
-- **One peer connection** handles voice and video. A video transceiver is
-  pre-negotiated, so turning the camera on/off is a plain
-  `RTCRtpSender.replaceTrack()` — no renegotiation. Voice-only calls never
-  touch the camera.
+- **One peer connection** handles voice and video. The caller offers a video
+  line with every call and the side that answers reuses it, so turning the
+  camera on/off is a plain `RTCRtpSender.replaceTrack()` on either side — no
+  renegotiation. Voice-only calls never touch the camera.
 - **Reliability:** both `connectionState` and `iceConnectionState` are watched;
   a drop triggers an ICE restart with backoff (up to 3 attempts) over the same
   channel; network changes (`online`, `pageshow`, `visibilitychange`) nudge
   recovery. Connection quality (RTT / loss / jitter via `getStats()`, sampled
-  locally) shows as a subtle 🟢/🟡/🔴 indicator.
+  locally) is watched; a weak connection is named on the call screen.
 - **Devices:** mic/speaker/camera switching via `enumerateDevices` +
   `replaceTrack` / `setSinkId` (feature-detected); mute is `track.enabled`;
   echo cancellation, noise suppression, and AGC are on; Opus is preferred when
@@ -112,9 +112,11 @@ Media is peer-to-peer WebRTC; Supabase Realtime carries only signaling
   start, on accept, on every reconnect, and every 30s while connected. A
   removed/blocked participant or an ended room cannot start or keep a call;
   disabling video stops the camera while voice continues.
-- **In the chat:** header 📞/📹 buttons start calls; incoming calls show a
-  full-screen prompt with a ringtone; you can minimize a call to a bar and keep
-  chatting; completed/missed/failed calls leave one small event in the timeline.
+- **In the chat:** header 📞/📹 buttons start calls; an incoming call takes the
+  screen with a ringtone and says whether it is a voice or a video call (a
+  video call can be answered with or without your camera); "Chat" shrinks a
+  call to a pill so you can keep chatting; completed/missed/failed calls leave
+  one small event in the timeline.
 
 ### STUN / TURN
 

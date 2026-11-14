@@ -50,6 +50,9 @@
     --online: 145 65% 42%;           /* presence dot */
     --online-ink: 145 70% 27%;       /* "Online" as text */
 
+    --accept: 145 70% 32%;           /* answer a call (white icon on it) */
+    --accept-foreground: 0 0% 100%;
+
     --chat-bg: 220 20% 96%;
 
     --radius: 1rem;
@@ -94,6 +97,9 @@
 
     --online: 145 60% 48%;
     --online-ink: 145 55% 62%;
+
+    --accept: 145 70% 32%;
+    --accept-foreground: 0 0% 100%;
 
     --chat-bg: 228 18% 7%;
 

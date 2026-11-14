@@ -23,17 +23,19 @@ export type CallErrorCode =
   | "UNKNOWN";
 
 const MESSAGES: Record<CallErrorCode, string> = {
-  MIC_PERMISSION_DENIED: "Microphone access is required for voice calls.",
-  MIC_UNAVAILABLE: "Your microphone is unavailable.",
-  MIC_NOT_FOUND: "No microphone was found.",
-  CAMERA_PERMISSION_DENIED: "Camera access was denied. Voice calling is still available.",
-  CAMERA_UNAVAILABLE: "Camera unavailable.",
-  CAMERA_NOT_FOUND: "No camera was found.",
+  MIC_PERMISSION_DENIED:
+    "The microphone is blocked. Allow it for this site in your browser, then call again.",
+  MIC_UNAVAILABLE: "The microphone could not be started. Close other apps that use it and try again.",
+  MIC_NOT_FOUND: "No microphone was found on this device.",
+  CAMERA_PERMISSION_DENIED:
+    "The camera is blocked. Allow it for this site in your browser to use video.",
+  CAMERA_UNAVAILABLE: "The camera could not be started.",
+  CAMERA_NOT_FOUND: "No camera was found on this device.",
   NETWORK_DISCONNECTED: "You appear to be offline.",
   ICE_FAILED: "Couldn't connect the call.",
   CONNECTION_FAILED: "The call connection failed.",
   SIGNALING_FAILED: "Couldn't reach the other person.",
-  RECONNECT_FAILED: "Unable to reconnect.",
+  RECONNECT_FAILED: "The connection was lost and could not be restored.",
   CALL_ENDED: "Call ended.",
   SESSION_EXPIRED: "Your session has expired.",
   ROOM_ENDED: "This room is no longer available.",
