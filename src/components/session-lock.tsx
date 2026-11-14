@@ -127,6 +127,7 @@ export function SessionLock({
           <form onSubmit={submit} className="w-full max-w-sm">
             <div className="flex flex-col items-center text-center mb-8">
               <UserAvatar
+                userId={me.id}
                 username={me.username}
                 displayName={me.display_name}
                 avatarUrl={me.avatar_url}

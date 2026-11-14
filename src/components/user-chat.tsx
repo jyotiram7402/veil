@@ -78,7 +78,7 @@ export function UserChat({
   const chat = (
     <div className="flex h-screen-mobile flex-col chat-bg">
       <header
-        className="flex h-14 items-center gap-3 px-3 bg-header text-header-foreground"
+        className="flex h-14 items-center gap-3 px-3 border-b border-border/70 bg-header text-header-foreground"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <UserAvatar
@@ -96,15 +96,15 @@ export function UserChat({
           </div>
           <div className="text-[11px] opacity-80 truncate">{subtitle}</div>
         </div>
-        <CallButton mode="voice" className="text-current hover:bg-white/10" />
-        <CallButton mode="video" className="text-current hover:bg-white/10" />
+        <CallButton mode="voice" className="text-current hover:bg-foreground/10" />
+        <CallButton mode="video" className="text-current hover:bg-foreground/10" />
         <ThemeToggle />
         <Button
           size="icon"
           variant="ghost"
           onClick={signOut}
           aria-label="Sign out"
-          className="text-current hover:bg-white/10"
+          className="text-current hover:bg-foreground/10"
         >
           <LogOut className="h-5 w-5" />
         </Button>

@@ -162,10 +162,10 @@ export function RoomChat({
   return (
     <div className="flex h-screen-mobile flex-col chat-bg">
       <header
-        className="flex h-14 items-center gap-3 px-3 bg-header text-header-foreground"
+        className="flex h-14 items-center gap-3 px-3 border-b border-border/70 bg-header text-header-foreground"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-white/15 shrink-0">
+        <div className="grid h-9 w-9 place-items-center rounded-full bg-foreground/10 shrink-0">
           <Users className="h-4 w-4" />
         </div>
         <div className="flex-1 min-w-0">
@@ -191,7 +191,7 @@ export function RoomChat({
           variant="ghost"
           onClick={leave}
           aria-label="Leave room"
-          className="text-current hover:bg-white/10"
+          className="text-current hover:bg-foreground/10"
         >
           <LogOut className="h-5 w-5" />
         </Button>

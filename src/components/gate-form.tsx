@@ -8,10 +8,12 @@ import { UserAvatar } from "@/components/chat/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
-const ERROR_TEXT: Record<string, string> = {
-  invalid: "That password doesn't match. Try again.",
-  locked: "Too many attempts. Wait a minute and try again.",
-};
+/** Message for the ?error= code the gate route redirects back with. */
+function errorMessage(code: string | undefined): string | undefined {
+  if (code === "invalid") return "That password doesn't match. Try again.";
+  if (code === "locked") return "Too many attempts. Wait a minute and try again.";
+  return undefined;
+}
 
 export function GateForm({
   token,
@@ -30,7 +32,7 @@ export function GateForm({
 }) {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const errorText = error ? ERROR_TEXT[error] : undefined;
+  const errorText = errorMessage(error);
 
   return (
     <form action={`/api/i/${token}`} method="POST" onSubmit={() => setSubmitting(true)}>

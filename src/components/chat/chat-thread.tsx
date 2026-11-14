@@ -105,14 +105,14 @@ export function ChatThread({
       <header
         className={cn(
           "flex h-14 items-center gap-3 px-3",
-          "bg-header text-header-foreground",
+          "border-b border-border/70 bg-header text-header-foreground",
         )}
       >
         <Button
           asChild
           size="icon"
           variant="ghost"
-          className="md:hidden text-current hover:bg-white/10"
+          className="md:hidden text-current hover:bg-foreground/10"
           aria-label="Back to chats"
         >
           <Link href="/chats">
@@ -139,8 +139,8 @@ export function ChatThread({
         </button>
         {chatType === "direct" && other && (
           <>
-            <CallButton mode="voice" className="text-current hover:bg-white/10" />
-            <CallButton mode="video" className="text-current hover:bg-white/10" />
+            <CallButton mode="voice" className="text-current hover:bg-foreground/10" />
+            <CallButton mode="video" className="text-current hover:bg-foreground/10" />
           </>
         )}
         <Button
@@ -148,7 +148,7 @@ export function ChatThread({
           variant="ghost"
           onClick={() => setInfoOpen(true)}
           aria-label="Chat info"
-          className="text-current hover:bg-white/10"
+          className="text-current hover:bg-foreground/10"
         >
           <Info className="h-5 w-5" />
         </Button>

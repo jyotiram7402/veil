@@ -18,7 +18,7 @@ export default async function LoginPage({
     <AuthShell>
       <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-tight">Log in</h1>
       <p className="mt-1.5 text-[15px] leading-relaxed text-muted-foreground">
-        Use the username and password for your account.
+        Use your admin username and password.
       </p>
 
       <LoginForm nextPath={next} />

@@ -42,8 +42,8 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - Migrations: paste `supabase/vNN.sql` into Supabase → SQL Editor (no CLI / config.toml).
 - Rollback: Vercel → Deployments → previous → Promote to Production.
 - Workflow (owner's rule): one feature per branch (`feature/<name>`). Commit locally, tell the
-  owner; the owner pushes, Vercel builds a preview, the preview gets tested with the Playwright
-  MCP, and only then does the next feature start. Never push or merge yourself.
+  owner; the owner pushes, Vercel builds a preview, the preview gets tested in a browser (see
+  Gotchas for what works), and only then does the next feature start. Never push or merge yourself.
 - Nothing is installed or built on the owner's machine (no `npm install`): Vercel is the build.
 
 ## Project map (full module map: read docs/ARCHITECTURE.md before cross-cutting changes)
@@ -140,9 +140,10 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - The app was renamed to BlackFoxx. Old names survive only where renaming would break things:
   `INTERNAL_EMAIL_DOMAIN=rooms.local` (part of every login, never change), the GitHub repo /
   Vercel URL (`veil`), and "rooms" as the name of the rooms feature.
-- The Playwright MCP browser cannot open `localhost` or `file://` on the owner's machine; it
-  can only test deployed URLs (Vercel previews). It must not type real passwords there: previews
-  use the production database, so the owner signs in by hand for screens behind login.
+- Testing on the owner's machine: the Playwright MCP runs in Docker, so it cannot reach the
+  host's `localhost`, and every HTTPS site fails with a certificate error (corporate network).
+  Use the built-in Browser pane instead. Vercel previews sit behind a Vercel login and use the
+  production database: never type real passwords there, the owner signs in by hand.
 - Broadcast channels `chat:<chatId>` and `call:<chatId>` must keep identical names on both peers
   (same for the presence channel `blackfoxx-presence`).
   Dashboard channels (`admin-rooms:`, `admin-room:`) add a random suffix on purpose: newer

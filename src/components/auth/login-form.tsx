@@ -24,7 +24,13 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
     e.preventDefault();
     if (submitting) return;
 
-    const parsed = loginSchema.safeParse({ username, password });
+    // Read the fields themselves, not only our state: a browser can autofill
+    // them without firing the change events React listens for.
+    const data = new FormData(e.currentTarget);
+    const parsed = loginSchema.safeParse({
+      username: normalizeUsernameInput(String(data.get("username") ?? username)),
+      password: String(data.get("password") ?? password),
+    });
     if (!parsed.success) {
       const fields = parsed.error.flatten().fieldErrors;
       setErrors({ username: fields.username?.[0], password: fields.password?.[0] });
