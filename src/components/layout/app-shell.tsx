@@ -56,13 +56,11 @@ export function AppShell({
   });
 
   return (
-    <div className="flex h-screen-mobile overflow-hidden chat-bg">
+    <div className="flex h-screen-mobile overflow-hidden bg-background">
       <aside
         className={cn(
-          "w-full md:w-[340px] md:min-w-[300px] md:max-w-[380px] flex-shrink-0",
-          "border-r border-border/60 bg-card/40 backdrop-blur",
+          "w-full flex-shrink-0 flex-col bg-card md:w-[380px] md:border-r md:border-border",
           sidebarVisibleOnMobile ? "flex" : "hidden md:flex",
-          "flex-col",
         )}
       >
         <Sidebar me={me} activeChatId={activeChatId} />

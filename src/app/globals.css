@@ -162,6 +162,16 @@
   }
 }
 
+@layer utilities {
+  /* Scrolls, but shows no scrollbar (the people row on the chat home). */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer components {
   /* Raised white panel. The name is historical: it used to be frosted glass. */
   .glass {

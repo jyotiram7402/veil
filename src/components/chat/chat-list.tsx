@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { ImageIcon, Paperclip, Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { useChatStore } from "@/store/chat-store";
+import { usePresenceStore } from "@/store/presence-store";
 import { chatListTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ChatSummary, Profile } from "@/types/chat";
@@ -27,22 +28,63 @@ function chatDisplay(chat: ChatSummary, meId: string) {
   };
 }
 
-function previewText(chat: ChatSummary): string {
-  const m = chat.last_message;
-  if (!m) return "Say hi 👋";
-  if (m.type === "image") return "📷 Photo";
-  if (m.type === "file") return "📎 File";
-  if (m.type === "system") return m.content ?? "";
-  return (m.content ?? "").replace(/\s+/g, " ").trim();
+function firstWord(name: string): string {
+  return name.trim().split(/\s+/)[0] || name;
 }
 
-export function ChatList({ me, activeChatId }: { me: Profile; activeChatId?: string }) {
+/** One-line summary of the newest message in a chat. */
+function Preview({ chat, meId }: { chat: ChatSummary; meId: string }) {
+  const m = chat.last_message;
+  if (!m) return <>No messages yet</>;
+  if (m.type === "system") return <>{m.content ?? ""}</>;
+
+  const mine = m.sender_id === meId;
+  const icon = "mr-1 inline h-3.5 w-3.5 align-[-2px]";
+  return (
+    <>
+      {mine && "You: "}
+      {m.type === "image" && <ImageIcon className={icon} aria-hidden="true" />}
+      {m.type === "file" && <Paperclip className={icon} aria-hidden="true" />}
+      {m.type === "image"
+        ? "Photo"
+        : m.type === "file"
+          ? "File"
+          : (m.content ?? "").replace(/\s+/g, " ").trim()}
+    </>
+  );
+}
+
+export function ChatList({
+  me,
+  activeChatId,
+  onNewChat,
+}: {
+  me: Profile;
+  activeChatId?: string;
+  onNewChat: () => void;
+}) {
   const chats = useChatStore((s) => s.chats);
+  const online = usePresenceStore((s) => s.online);
+  const [searching, setSearching] = useState(false);
   const [q, setQ] = useState("");
 
+  // People you can reach in one tap: everyone you have a 1:1 chat with,
+  // whoever is online first, otherwise most recent first.
+  const people = useMemo(() => {
+    const list: { chatId: string; userId: string; name: string; avatarUrl: string | null }[] = [];
+    for (const c of chats) {
+      if (c.type !== "direct") continue;
+      const d = chatDisplay(c, me.id);
+      if (!d.otherUserId) continue;
+      list.push({ chatId: c.id, userId: d.otherUserId, name: d.name, avatarUrl: d.avatarUrl });
+    }
+    // Stable sort: online people move to the front, the rest keep their order.
+    return list.sort((a, b) => Number(online.has(b.userId)) - Number(online.has(a.userId)));
+  }, [chats, me.id, online]);
+
   const filtered = useMemo(() => {
-    if (!q.trim()) return chats;
     const term = q.trim().toLowerCase();
+    if (!term) return chats;
     return chats.filter((c) => {
       const d = chatDisplay(c, me.id);
       return (
@@ -52,41 +94,107 @@ export function ChatList({ me, activeChatId }: { me: Profile; activeChatId?: str
     });
   }, [chats, q, me.id]);
 
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="px-3 py-3">
-        <div className="relative">
-          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search chats"
-            className="pl-9 h-9 bg-background/40"
-          />
-        </div>
-      </div>
+  function closeSearch() {
+    setSearching(false);
+    setQ("");
+  }
 
-      <ScrollArea className="flex-1 px-2">
-        {filtered.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-8 px-4">
-            {chats.length === 0
-              ? "No chats yet. Start one from the top right."
-              : "No matches."}
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {searching ? (
+        <div className="flex items-center gap-2 px-5 pb-4">
+          <div className="relative flex-1">
+            <Search
+              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && closeSearch()}
+              autoFocus
+              type="search"
+              enterKeyHint="search"
+              placeholder="Search chats"
+              aria-label="Search chats"
+              className="h-12 rounded-full border-transparent bg-muted pl-11 pr-4 shadow-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <Button size="icon" variant="ghost" onClick={closeSearch} aria-label="Close search">
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+      ) : (
+        <nav
+          aria-label="People"
+          className="no-scrollbar flex gap-4 overflow-x-auto px-5 pb-4"
+        >
+          <button
+            type="button"
+            onClick={() => setSearching(true)}
+            className="group flex w-14 shrink-0 flex-col items-center gap-1.5 rounded-2xl focus-visible:outline-none"
+          >
+            <span className="grid h-14 w-14 place-items-center rounded-full bg-muted transition-colors group-hover:bg-accent group-focus-visible:ring-2 group-focus-visible:ring-ring">
+              <Search className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span className="text-xs font-medium">Search</span>
+          </button>
+
+          {people.map((p) => (
+            <Link
+              key={p.chatId}
+              href={`/chats/${p.chatId}`}
+              className="group flex w-14 shrink-0 flex-col items-center gap-1.5 rounded-2xl focus-visible:outline-none"
+            >
+              <UserAvatar
+                userId={p.userId}
+                username={p.name}
+                displayName={p.name}
+                avatarUrl={p.avatarUrl}
+                size="story"
+                showPresence
+                className="rounded-full group-focus-visible:ring-2 group-focus-visible:ring-ring"
+              />
+              <span className="w-full truncate text-center text-xs font-medium">
+                {firstWord(p.name)}
+              </span>
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      <div className="mx-5 h-px shrink-0 bg-border" />
+
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4 pt-2">
+        {chats.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <p className="text-base font-bold">No chats yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Start a chat with one of your members.
+            </p>
+            <Button className="mt-5" onClick={onNewChat}>
+              New chat
+            </Button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="px-6 py-12 text-center text-sm text-muted-foreground">
+            No chat matches &ldquo;{q.trim()}&rdquo;.
           </p>
         ) : (
-          <ul className="pb-3 space-y-0.5">
+          <ul>
             {filtered.map((chat) => {
               const d = chatDisplay(chat, me.id);
               const active = chat.id === activeChatId;
+              const unread = chat.unread_count > 0;
               return (
                 <li key={chat.id}>
                   <Link
                     href={`/chats/${chat.id}`}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-2.5 py-2.5 transition-colors",
-                      active
-                        ? "bg-primary/15 hover:bg-primary/15"
-                        : "hover:bg-accent/60",
+                      "flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                      active ? "bg-accent" : "hover:bg-muted/70 active:bg-muted",
                     )}
                   >
                     <UserAvatar
@@ -94,24 +202,44 @@ export function ChatList({ me, activeChatId }: { me: Profile; activeChatId?: str
                       username={d.name}
                       displayName={d.name}
                       avatarUrl={d.avatarUrl}
-                      size="md"
+                      size="lg"
                       showPresence={chat.type === "direct"}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-sm font-medium truncate">{d.name}</span>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span
+                          className={cn(
+                            "truncate text-[15px]",
+                            unread ? "font-bold" : "font-semibold",
+                          )}
+                        >
+                          {d.name}
+                        </span>
                         {chat.last_message && (
-                          <span className="text-[11px] text-muted-foreground shrink-0">
+                          <span
+                            className={cn(
+                              "shrink-0 text-xs tabular-nums",
+                              unread ? "font-semibold text-foreground" : "text-muted-foreground",
+                            )}
+                          >
                             {chatListTime(chat.last_message.created_at)}
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-muted-foreground truncate">
-                          {previewText(chat)}
+                      <div className="mt-0.5 flex items-center justify-between gap-3">
+                        <p
+                          className={cn(
+                            "truncate text-sm",
+                            unread ? "font-medium text-foreground" : "text-muted-foreground",
+                          )}
+                        >
+                          <Preview chat={chat} meId={me.id} />
                         </p>
-                        {chat.unread_count > 0 && (
-                          <span className="ml-2 shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                        {unread && (
+                          <span
+                            className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-bold tabular-nums text-primary-foreground"
+                            aria-label={`${chat.unread_count} unread`}
+                          >
                             {chat.unread_count > 99 ? "99+" : chat.unread_count}
                           </span>
                         )}
@@ -123,7 +251,7 @@ export function ChatList({ me, activeChatId }: { me: Profile; activeChatId?: str
             })}
           </ul>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 }

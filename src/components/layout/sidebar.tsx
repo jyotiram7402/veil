@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DoorOpen, LogOut, MessageSquarePlus, Settings, Shield, Users } from "lucide-react";
+import { LogOut, MessageSquarePlus, Moon, Settings, Sun, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,19 +12,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { ChatList } from "@/components/chat/chat-list";
 import { NewChatDialog } from "@/components/chat/new-chat-dialog";
 import { UserAvatar } from "@/components/chat/user-avatar";
+import { useTheme } from "@/components/theme-toggle";
+import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
-import { APP_NAME } from "@/lib/constants";
 import type { Profile } from "@/types/chat";
 
+/**
+ * The chat home: greeting, new-chat button, account menu, then the chat list.
+ * Full screen on phones, the left column from tablet up.
+ * (Rooms are on hold, so there is no entry point to them here.)
+ */
 export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: string }) {
   const router = useRouter();
   const profile = useSessionStore((s) => s.profile) ?? me;
+  const unread = useChatStore((s) => s.chats.reduce((n, c) => n + c.unread_count, 0));
+  const { theme, toggle: toggleTheme } = useTheme();
   const [newChatOpen, setNewChatOpen] = useState(false);
+
+  const name = profile.display_name ?? profile.username;
+  const firstName = name.trim().split(/\s+/)[0] || name;
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -35,97 +43,77 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
 
   return (
     <>
-      <header className="flex items-center justify-between px-4 h-14 border-b border-border/60">
-        <div className="flex items-center gap-2 min-w-0">
+      <header className="flex items-start justify-between gap-3 px-5 pb-4 pt-5">
+        <div className="min-w-0">
+          <h1 className="truncate text-[1.625rem] font-extrabold leading-tight tracking-tight">
+            Hello, {firstName}
+          </h1>
+          <p className="mt-0.5 text-sm text-muted-foreground" aria-live="polite">
+            {unread > 0
+              ? `${unread} unread ${unread === 1 ? "message" : "messages"}`
+              : "You're all caught up"}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            size="icon"
+            variant="secondary"
+            onClick={() => setNewChatOpen(true)}
+            aria-label="New chat"
+            className="shadow-none [&_svg]:size-5"
+          >
+            <MessageSquarePlus />
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 min-w-0 group">
+              <button
+                type="button"
+                aria-label="Your account"
+                className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+              >
                 <UserAvatar
                   userId={profile.id}
                   username={profile.username}
                   displayName={profile.display_name}
                   avatarUrl={profile.avatar_url}
-                  size="sm"
+                  size="md"
                 />
-                <div className="hidden sm:block text-left truncate">
-                  <div className="text-sm font-medium leading-tight truncate">
-                    {profile.display_name ?? profile.username}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
-                    @{profile.username}
-                  </div>
-                </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>{APP_NAME}</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuLabel className="px-3 py-2">
+                <span className="block truncate text-sm font-semibold text-foreground">{name}</span>
+                <span className="block truncate">@{profile.username}</span>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/settings")}>
+              {profile.is_admin && (
+                <DropdownMenuItem className="px-3 py-2.5" onClick={() => router.push("/admin")}>
+                  <Users className="h-4 w-4" /> Members
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem className="px-3 py-2.5" onClick={() => router.push("/settings")}>
                 <Settings className="h-4 w-4" /> Settings
               </DropdownMenuItem>
-              {profile.is_admin && (
-                <DropdownMenuItem onClick={() => router.push("/admin")}>
-                  <Shield className="h-4 w-4" /> Members
-                </DropdownMenuItem>
-              )}
-              {profile.is_admin && (
-                <DropdownMenuItem onClick={() => router.push("/rooms")}>
-                  <DoorOpen className="h-4 w-4" /> Rooms
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem className="px-3 py-2.5" onClick={toggleTheme}>
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {theme === "dark" ? "Light mode" : "Dark mode"}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut} className="text-destructive">
+              <DropdownMenuItem className="px-3 py-2.5 text-destructive" onClick={signOut}>
                 <LogOut className="h-4 w-4" /> Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setNewChatOpen(true)}
-                aria-label="New chat"
-              >
-                <MessageSquarePlus className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>New chat</TooltipContent>
-          </Tooltip>
-
-          {profile.is_admin && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" asChild aria-label="Members">
-                  <Link href="/admin">
-                    <Users className="h-5 w-5" />
-                  </Link>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Members</TooltipContent>
-            </Tooltip>
-          )}
-
-          {profile.is_admin && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" asChild aria-label="Rooms">
-                  <Link href="/rooms">
-                    <DoorOpen className="h-5 w-5" />
-                  </Link>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Rooms</TooltipContent>
-            </Tooltip>
-          )}
-        </div>
       </header>
 
-      <ChatList me={profile} activeChatId={activeChatId} />
+      <ChatList
+        me={profile}
+        activeChatId={activeChatId}
+        onNewChat={() => setNewChatOpen(true)}
+      />
 
       <NewChatDialog open={newChatOpen} onOpenChange={setNewChatOpen} />
     </>

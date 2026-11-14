@@ -70,6 +70,20 @@ ground it stands out on; keep that pairing when adding more.
 
 Emoji are for avatars and tiles only. Interface icons come from `lucide-react`.
 
+## Chat home
+
+The admin's home screen (`sidebar.tsx` + `chat-list.tsx`): full screen on phones, a 380px
+white column from tablet up.
+
+- The greeting is the heading ("Hello, Jay") with the unread count as its supporting line.
+  Do not put a small label above a title.
+- People row: a Search circle, then everyone with a 1:1 chat as 56px moji (online first).
+  Search swaps the row for a pill search field.
+- Rows: 48px moji, name, one-line preview, time, and a blue count when unread. Unread rows
+  use heavier text. Only a green dot marks presence; offline shows nothing.
+- Header controls are 40px circles. Members, Settings, the theme switch and Sign out live in
+  the menu behind your own avatar.
+
 ## Entry screens
 
 - `/` (`first-screen.tsx`): tiles are placed in percent of the stage (the area
@@ -91,6 +105,6 @@ Emoji are for avatars and tiles only. Interface icons come from `lucide-react`.
 
 ## Not redesigned yet
 
-The chat list, chat thread, call screen, admin pages and room pages still use
-their old layout with the new colours. They are being rebuilt one branch at a
+The chat thread, call screen, admin pages and room pages still use their old
+layout with the new colours. They are being rebuilt one branch at a
 time; the order is in `CLAUDE.md` → Current status.

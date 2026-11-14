@@ -159,15 +159,19 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   owner: admin login, chat.
 - UI redesign in progress (started 2026-11-14), one branch per feature, in this order:
   1. `feature/first-screen` — BlackFoxx rename, new tokens/fonts, moji avatars, animated first
-     screen, new log-in and invite-link screens. Built; waiting for the owner's push and a
-     preview test. Old screens only got the new colours.
-  2. Sign-up with an invite code (admin creates codes; needs a `v10.sql` migration).
-  3. Chat list redesign; hide the rooms entry points (rooms are on hold).
-  4. Chat thread redesign (header, bubbles, composer) for the admin and member views.
-  5. Avatar picker (choose your moji). 6. Calls: TURN + call screen. Then admin/settings pages.
+     screen, new log-in and invite-link screens. Pushed (PR #1), not merged yet.
+  2. `feature/chat-list` (stacked on 1) — new chat home: greeting, people row, search, rows;
+     rooms entry points removed (rooms are on hold; their routes still exist). Built.
+  3. Chat thread redesign (header, bubbles, composer) for the admin and member views.
+  4. Avatar picker (choose your moji). 5. Sign-up with an invite code (needs a `v10.sql`
+     migration). 6. Calls: TURN + call screen. Then the admin/settings pages.
+  None of the new screens has been seen on a real build by the assistant (previews need a Vercel
+  login): the owner checks previews; designs are checked beforehand on a static mock-up.
 - Proposed, not started: switch the route guard on (see the first Gotcha) with a lighter matcher.
-- Two Vercel projects build this repo: `veil-cqsf` and `veil-ah7i` (the preview URLs come from
-  `veil-ah7i`); which one is the real production is unconfirmed. Previews need a Vercel login.
+- Five Vercel projects build every push of this repo: `veil`, `veil-32wk`, `veil-ah7i`,
+  `veil-cqsf`, `veil-vo9a`. `veil-cqsf` (the address used so far) builds `main` fine but its
+  preview builds of PR #1 failed while the other four succeeded; the cause is unknown (its build
+  log was not available). Which project is the real one, and deleting the rest, is the owner's call.
 - Decided by the owner: sign-up is invite-code only; members chat only with the admin; tests run
   on Vercel previews only. Open: whether to add a yellow "Snapchat-style" theme next to the blue.
 - Deployed but not yet confirmed: rooms-page crash hardening (c2de8e6), clearer form errors
