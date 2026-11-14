@@ -48,18 +48,18 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 
 ## Project map (full module map: read docs/ARCHITECTURE.md before cross-cutting changes)
 - `middleware.ts` → `src/lib/supabase/middleware.ts`: session refresh + route gating (public
-  paths, admin-only prefixes, member vs admin redirects).
+  paths, admin-only prefixes, member vs admin redirects). **Not active in production** (Gotchas).
 - `src/app/(app)` admin shell (layout requires `is_admin`): `chats`, `rooms`, `admin`, `settings`.
-- `src/app/page.tsx` first screen (static; Log in / Sign up); `src/app/(auth)/login`, `(auth)/signup`
-  (placeholder until invite-code sign-up is built). Their UI is `src/components/auth/*`:
-  `first-screen.tsx`, `auth-shell.tsx`, styles in `entry.module.css`.
+- `src/app/page.tsx` first screen (Log in / Sign up); `src/app/(auth)/login`, `(auth)/signup`
+  (placeholder until invite-code sign-up is built). Each calls `redirectIfSignedIn()` itself.
+  Their UI is `src/components/auth/*`: `first-screen.tsx`, `auth-shell.tsx`, `entry.module.css`.
 - `src/app/(user)/chat` (member's 1:1 chat with admin), `(user)/expired`.
 - `src/app/i/[token]` member invite gate; `src/app/join[/code]` + `src/app/room/[id]` room guests.
 - `src/app/api/**/route.ts` all mutations. `src/lib/` server logic (`supabase/`, `auth/`,
   `rooms.ts`, `permissions.ts`, `validations.ts`, `api.ts`, `webrtc/`).
 - `src/components/{ui,chat,call,rooms,layout,auth}`, `src/hooks/`, `src/store/` (Zustand).
 - `supabase/*.sql` migrations; `src/types/database.ts` is a **hand-written** mirror of them.
-- Flow: middleware → Server Component (`getSessionUser` + RLS client) → client component →
+- Flow: Server Component (`getSessionUser` + RLS client; does its own redirects) → client component →
   `fetch('/api/…')` → handler auth check → `supabaseServer` (RLS) or `supabaseAdmin` (service role).
 - Docs: `DEPLOYMENT.md`, `PRODUCTION_RUNBOOK.md` (ops); `docs/SECURITY.md` (security model);
   `docs/TROUBLESHOOTING.md`; `docs/V2_NOTES.md` is historical.
@@ -114,6 +114,12 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   private), Vercel (hosting, auto-deploy from `main`), GitHub, Google public STUN servers.
 
 ## Gotchas
+- **The middleware has never run in production.** `middleware.ts` is in the repo root, but with
+  `src/app` Next.js only loads `src/middleware.ts`. Checked on the live site 2026-11-14: a
+  signed-out request to an unknown `/api/...` path returns 404 instead of redirecting. So every
+  page and API route must do its own auth check and redirect (they do), and nothing refreshes the
+  session cookie on the server. Moving the file into `src/` switches it on for every request
+  (two Supabase round trips each as written): do that only as its own tested branch.
 - **Never `drop schema public cascade`**: it wipes Supabase's default grants → login "works"
   but every page bounces to `/login` ("permission denied for table profiles"). Fix: grant block
   in `supabase/README.md` → Recovery recipes (also has admin creation + password reset SQL).
@@ -158,6 +164,9 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   3. Chat list redesign; hide the rooms entry points (rooms are on hold).
   4. Chat thread redesign (header, bubbles, composer) for the admin and member views.
   5. Avatar picker (choose your moji). 6. Calls: TURN + call screen. Then admin/settings pages.
+- Proposed, not started: switch the route guard on (see the first Gotcha) with a lighter matcher.
+- Two Vercel projects build this repo: `veil-cqsf` and `veil-ah7i` (the preview URLs come from
+  `veil-ah7i`); which one is the real production is unconfirmed. Previews need a Vercel login.
 - Decided by the owner: sign-up is invite-code only; members chat only with the admin; tests run
   on Vercel previews only. Open: whether to add a yellow "Snapchat-style" theme next to the blue.
 - Deployed but not yet confirmed: rooms-page crash hardening (c2de8e6), clearer form errors

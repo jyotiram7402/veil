@@ -5,6 +5,11 @@ setup and day-to-day rules see `CLAUDE.md`. Security model: `docs/SECURITY.md`.
 
 ## Request / data flow
 
+> **The first step below does not run in production.** `middleware.ts` sits in the repo root,
+> but with `src/app` Next.js only loads `src/middleware.ts`. Pages, layouts and API routes do
+> the auth checks and redirects themselves (`getSessionUser`, `requireSessionUser`,
+> `redirectIfSignedIn`). The diagram shows the intended design once the file is moved.
+
 ```
 Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSession)
               │  refresh auth cookie, getUser(), load profiles(is_admin, suspended, archived)
@@ -27,7 +32,7 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 
 | Path | Who | What |
 |---|---|---|
-| `page.tsx` | signed-out | first screen: animated moji wall, Log in / Sign up (`components/auth/first-screen.tsx`); static |
+| `page.tsx` | signed-out | first screen: animated moji wall, Log in / Sign up (`components/auth/first-screen.tsx`); signed-in visitors are redirected by the page |
 | `(auth)/login` | admin | username + password sign-in (`/api/auth/login`), inside `components/auth/auth-shell.tsx` |
 | `(auth)/signup` | signed-out | placeholder: says sign-up needs an invite code (the real flow is not built yet) |
 | `(app)/layout.tsx` | admin | requires `is_admin`; loads chat list (`loadChatsForUser`) into `AppShell` |

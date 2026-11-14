@@ -32,6 +32,16 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   return { id: user.id, profile };
 });
 
+/**
+ * For the entry screens (first screen, log in, sign up): a visitor who is
+ * already signed in is sent on to the app. The pages do this themselves
+ * because the middleware is not active (see CLAUDE.md → Gotchas).
+ */
+export async function redirectIfSignedIn(): Promise<void> {
+  const session = await getSessionUser();
+  if (session) redirect(session.profile.is_admin ? "/chats" : "/chat");
+}
+
 /** Same as getSessionUser but redirects to /login when signed out. */
 export async function requireSessionUser(): Promise<SessionUser> {
   const session = await getSessionUser();

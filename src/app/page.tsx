@@ -1,8 +1,9 @@
 import { FirstScreen } from "@/components/auth/first-screen";
+import { redirectIfSignedIn } from "@/lib/auth/session";
 
-// Static on purpose: signed-in visitors never reach this page (the middleware
-// sends them straight to their chats), so it needs no session lookup and can
-// be served from the edge cache.
-export default function RootPage() {
+export default async function RootPage() {
+  // Signed-in visitors (for example the installed app opening at "/") go
+  // straight to their chats instead of seeing Log in / Sign up.
+  await redirectIfSignedIn();
   return <FirstScreen />;
 }
