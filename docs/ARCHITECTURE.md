@@ -87,7 +87,8 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - `password.ts` (PBKDF2), `invite-token.ts`, `url.ts` (app origin for links), `clipboard.ts`
   (`copyText`: copy buttons copy, they never open the share sheet), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
-- `webrtc/` — `ice.ts` (STUN + env TURN), `signaling.ts` (private broadcast channel),
+- `webrtc/` — `ice.ts` (STUN + env TURN; no candidate pool, the file says why),
+  `signaling.ts` (private broadcast channel; a message sent while it is joining waits),
   `codec.ts` (audio/video constraints, Opus preference), `stats.ts` (quality from getStats),
   `audio-level.ts`, `errors.ts` (error codes → friendly text), `ringtone.ts` (ring + buzz),
   `devices.ts` (which cameras / sound outputs can be switched), `types.ts`.
@@ -139,8 +140,12 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 
 ## Calling
 
-- Only 1:1 direct chats: `CallProvider` wraps `user-chat.tsx` and `chat-thread.tsx`
-  (`chatType === "direct"`). Room-view call icons are placeholders.
+- Only 1:1 direct chats. One `CallProvider` serves the whole app: `app-shell.tsx` mounts it
+  for the admin with every direct chat from the chat list, `user-chat.tsx` for a member with
+  their one chat. The engine joins the `call:` channel of each of those chats, so a call rings
+  on any screen and keeps running across navigation; it runs one call at a time and answers
+  `busy` on the other channels (the caller then logs a missed call). Header buttons start a
+  call with `useCallActions().startVoice(chatId)`. Room-view call icons are placeholders.
 - Signaling: private Supabase broadcast channel `call:<chatId>`; `realtime.messages` RLS
   (v7) limits it to chat members. Events: `call_started` (+offer, +`media`: the caller's
   camera on means a video call), `call_accepted`, `call_rejected`, `call_cancelled`, `answer`,
@@ -154,6 +159,9 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - UI: `components/call/call-screen.tsx` (+ `call-stage`, `call-controls`, `call.module.css`)
   only reads `call-store` and calls the actions `use-call` returns. A closing state
   (`isCallOver`) keeps the screen up for 2.5 s; an error stays until closed (`dismiss`).
+  "Chat" shrinks the call to a pill and, for the admin, opens that chat (`onOpenChat`).
+- Limits: the app has to be open to ring (no push notifications). The admin holds one Realtime
+  channel per person; Supabase caps channels per connection (100 by default, unverified).
 - `/api/calls/authorize` runs at start, accept, every reconnect and every 30 s.
 - Outcome → caller POSTs `/api/calls/[id]/event` → one `system` message in the chat.
 - Media is peer-to-peer; nothing is recorded or stored. TURN comes from `NEXT_PUBLIC_TURN_*`.

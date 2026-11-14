@@ -74,8 +74,8 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - New page: put it in the right route group; public pages → `isPublic()`, admin pages →
   `ADMIN_ONLY_PREFIXES` in `src/lib/supabase/middleware.ts`.
 - Rooms/invites: `src/lib/rooms.ts`, `src/lib/permissions.ts`, `src/components/rooms/*`.
-- Calls: engine `src/hooks/use-call.ts` + `src/lib/webrtc/*`; screen `src/components/call/*`
-  (`call-screen.tsx`, layout in `call.module.css`); auth in `src/app/api/calls/authorize/route.ts`.
+- Calls: one engine for the whole app (`src/hooks/use-call.ts`, `src/lib/webrtc/*`), mounted by
+  `CallProvider` in `app-shell.tsx` / `user-chat.tsx`; screen `src/components/call/*`; `api/calls/authorize`.
 - Runtime toggles: `src/lib/settings.ts` + `app_settings` table + admin "Defaults" tab.
 - Styling: rules in `DESIGN.md`, tokens in `src/app/globals.css`, primitives in `src/components/ui`,
   `cn()` from `src/lib/utils.ts`. Avatars without a photo are "moji" (`src/lib/moji.ts`). Never set
@@ -155,12 +155,12 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   Use the built-in Browser pane instead. Vercel previews sit behind a Vercel login and use the
   production database: never type real passwords there, the owner signs in by hand.
 - Broadcast channels `chat:<chatId>` and `call:<chatId>` must keep identical names on both peers
-  (same for the presence channel `blackfoxx-presence`).
-  Dashboard channels (`admin-rooms:`, `admin-room:`) add a random suffix on purpose: newer
-  supabase-js reuses a same-named channel and a second `subscribe()` throws.
-- Calls only exist in 1:1 direct chats (room call icons are placeholders); both people must have
-  the chat open; different networks need TURN. The side that answers must reuse the caller's video
-  line (`adoptOfferedVideo` in `use-call.ts`): a transceiver it adds itself is never sent.
+  (so must `blackfoxx-presence`). Dashboard channels (`admin-rooms:`, `admin-room:`) add a random
+  suffix: newer supabase-js reuses a same-named channel and a second `subscribe()` throws.
+- Calls only exist in 1:1 direct chats (room call icons are placeholders); the other person must
+  have the app open (any screen; a closed app does not ring); different networks need TURN. The
+  side that answers must reuse the caller's video line (`adoptOfferedVideo` in `use-call.ts`). No
+  `iceCandidatePoolSize` (`ice.ts` says why). The admin joins one `call:` channel per person.
 - Rate limiting (`src/lib/api.ts`) is in-memory per serverless instance — a speed bump only.
 - `error.tsx` shows `Ref: <digest>` — search that digest in Vercel → Logs.
 
@@ -168,26 +168,26 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - Live on Vercel; Supabase migrated through v9 with grants restored. `v10.sql` (sign-up codes):
   whether the owner has run it in production is unverified. Confirmed working by the owner:
   admin login, chat, a video call on the same Wi-Fi.
-- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PRs #4–#7) and
+- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PRs #4–#8) and
   live: the rename to BlackFoxx, new tokens/fonts, moji avatars and the avatar picker, the
   animated first screen, the log-in and invite-link screens, the chat home and the chat
-  screen, copy buttons that copy, and sign-up with a code (`/signup`, admin tab "Sign-up
-  codes"; not yet confirmed by the owner). Rooms entry points are removed (rooms are on hold).
-  On `feature/call-screen` (not merged): the new call screen. Next: ring anywhere in the app,
-  the relay for other networks, then the admin/settings pages. Proposed: the route guard.
+  screen, copy buttons that copy, sign-up with a code (`/signup`, admin tab "Sign-up codes"),
+  and the new call screen (the last two not yet confirmed by the owner). Rooms are on hold.
+  On `feature/call-anywhere` (not merged): calls ring on every screen. Next: the relay for
+  other networks, then the admin/settings pages. Proposed: the route guard.
 - What the assistant can check itself: public pages on the live site (built-in Browser pane),
-  and calls, by running the real call code in that pane as two simulated phones (no real camera,
-  network or Supabase). Screens behind login and all previews are checked by the owner.
+  and calls, by running the real call code in that pane as simulated phones (the admin's shell
+  and two members; no real camera, network or Supabase). The owner checks previews and logins.
 - Five Vercel projects build every push: `veil`, `veil-32wk`, `veil-ah7i`, `veil-cqsf`,
   `veil-vo9a`. `veil-cqsf` (the address used so far) builds `main`, but its preview builds fail:
   its variables are set for Production only. Which project is the real one, and deleting the
   rest, is the owner's call.
 - Decided by the owner: sign-up is invite-code only; members chat only with the admin. Open:
   a yellow "Snapchat-style" theme next to the blue.
-- Calls: the owner saw a video call work on one Wi-Fi (2026-11-14), but until the call screen
-  branch only the person who started a call could send a camera; that is fixed there and not yet
-  tried on real phones. Other networks need a TURN relay: `feature/calls-turn` (Cloudflare) is
-  parked locally, needs a rebase onto the call screen, and the owner has not decided on Cloudflare.
+- Calls: the owner saw a video call work on one Wi-Fi (2026-11-14). Two-way video (PR #8) and
+  ring-anywhere are tested with simulated phones only, not yet on real ones. Other networks need
+  a TURN relay: `feature/calls-turn` (Cloudflare) is parked locally, needs a rebase onto `main`,
+  and the owner has not decided on Cloudflare. A closed app cannot ring (no push notifications).
 - Performance: functions run in `sin1`, next to the database (`vercel.json`). Checked on the live
   site 2026-11-14: `x-vercel-id` reads `bom1::sin1`, one database round trip takes 20–60 ms.
 - To do: commit `package-lock.json`; add a test runner + CI.

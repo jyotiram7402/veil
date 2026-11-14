@@ -7,6 +7,8 @@ import type { Quality } from "@/lib/webrtc/stats";
 type CallStore = {
   state: CallState;
   callId: string | null;
+  /** The 1:1 chat this call belongs to. */
+  chatId: string | null;
   isCaller: boolean;
   peer: PeerInfo | null;
   muted: boolean;
@@ -30,9 +32,9 @@ type CallStore = {
   remoteStream: MediaStream | null; // remote audio+video
   minimized: boolean; // call collapsed to a pill so chat is usable underneath
 
-  startOutgoing: (callId: string, peer: PeerInfo) => void;
+  startOutgoing: (callId: string, chatId: string, peer: PeerInfo) => void;
   /** `media` is what the caller has on: its camera makes this a video call. */
-  startIncoming: (callId: string, peer: PeerInfo, media?: MediaState) => void;
+  startIncoming: (callId: string, chatId: string, peer: PeerInfo, media?: MediaState) => void;
   setState: (state: CallState) => void;
   setConnected: () => void;
   setMuted: (muted: boolean) => void;
@@ -55,6 +57,7 @@ type CallStore = {
 const initial = {
   state: "idle" as CallState,
   callId: null,
+  chatId: null,
   isCaller: false,
   peer: null,
   muted: false,
@@ -77,13 +80,14 @@ const initial = {
 export const useCallStore = create<CallStore>((set) => ({
   ...initial,
 
-  startOutgoing: (callId, peer) =>
-    set({ ...initial, state: "calling", callId, peer, isCaller: true }),
-  startIncoming: (callId, peer, media) =>
+  startOutgoing: (callId, chatId, peer) =>
+    set({ ...initial, state: "calling", callId, chatId, peer, isCaller: true }),
+  startIncoming: (callId, chatId, peer, media) =>
     set({
       ...initial,
       state: "ringing",
       callId,
+      chatId,
       peer,
       isCaller: false,
       remoteAudioOn: media?.audio ?? true,

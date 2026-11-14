@@ -29,10 +29,18 @@ import {
 } from "@/lib/webrtc/types";
 import type { Profile } from "@/types/chat";
 
+type Person = Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
+
+/** A 1:1 chat a call can happen in, and the person on its other end. */
+export type CallChat = { chatId: string; other: Person };
+
 type UseCallArgs = {
-  chatId: string;
   me: Profile;
-  other: Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
+  /**
+   * Every chat to listen on for incoming calls. A member has one (with the
+   * admin); the admin has one per person, so a call rings on any screen.
+   */
+  chats: CallChat[];
   remoteAudioRef: React.RefObject<HTMLAudioElement | null>;
 };
 
@@ -44,7 +52,7 @@ const DISCONNECT_GRACE_MS = 2000;
 // do, so it stays until it is closed.
 const ENDED_LINGER_MS = 2500;
 
-function peerInfo(p: Pick<Profile, "id" | "username" | "display_name" | "avatar_url">): PeerInfo {
+function peerInfo(p: Person): PeerInfo {
   return { id: p.id, name: p.display_name ?? p.username, avatarUrl: p.avatar_url };
 }
 
@@ -62,19 +70,22 @@ function reasonToCode(reason?: string): CallErrorCode {
 }
 
 /**
- * The 1-to-1 voice-calling engine (quality,
- * monitoring & reconnection). One RTCPeerConnection per call; the signaling
- * channel lives for the whole chat view. All WebRTC lifecycle lives here — UI
- * only reads the store and calls the returned actions.
+ * The 1-to-1 calling engine (voice, video, quality monitoring, reconnection).
+ * One instance serves the whole app: it listens on the signaling channel of
+ * every chat in `chats` and runs at most one call at a time, on one
+ * RTCPeerConnection. All WebRTC lifecycle lives here — UI only reads the store
+ * and calls the returned actions.
  */
-export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
+export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const store = useCallStore;
-  // The signaling handlers below are created once per chat; this keeps them
-  // reading the current profile of the other person.
-  const otherRef = useRef(other);
-  otherRef.current = other;
+  // Who is on the other end of each chat. Read through a ref, so the signal
+  // handlers always see the current list.
+  const peopleRef = useRef(new Map<string, Person>());
+  peopleRef.current = new Map(chats.map((c) => [c.chatId, c.other]));
 
-  const signalingRef = useRef<SignalingChannel | null>(null);
+  // One signaling channel per chat, and the chat the current call runs in.
+  const channelsRef = useRef(new Map<string, SignalingChannel>());
+  const activeChatRef = useRef<string | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const senderRef = useRef<RTCRtpSender | null>(null);
   const videoSenderRef = useRef<RTCRtpSender | null>(null);
@@ -103,11 +114,13 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
   const samplerRef = useRef<ReturnType<typeof createQualitySampler> | null>(null);
   const audioMonitorRef = useRef<AudioLevelMonitor | null>(null);
 
+  /** Send to the other person of the current call (on that chat's channel). */
   const send = useCallback(
     (type: SignalType, extra: Partial<SignalPayload> = {}) => {
       const callId = callIdRef.current;
-      if (!callId) return;
-      void signalingRef.current?.send(type, { callId, senderId: me.id, ...extra });
+      const chatId = activeChatRef.current;
+      if (!callId || !chatId) return;
+      void channelsRef.current.get(chatId)?.send(type, { callId, senderId: me.id, ...extra });
     },
     [me.id],
   );
@@ -121,9 +134,11 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
     );
   }, []);
 
-  /** Server re-authorization for this chat (membership / room / voice|video). */
+  /** Server re-authorization for the chat of the current call (membership / room / voice|video). */
   const authorize = useCallback(
     async (feature: "voice" | "video" = "voice"): Promise<{ ok: boolean; reason?: string }> => {
+      const chatId = activeChatRef.current;
+      if (!chatId) return { ok: false, reason: "SESSION_EXPIRED" };
       try {
         const res = await fetch(
           `/api/calls/authorize?chatId=${encodeURIComponent(chatId)}&feature=${feature}`,
@@ -135,7 +150,7 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
         return { ok: false, reason: "SESSION_EXPIRED" };
       }
     },
-    [chatId],
+    [],
   );
 
   const broadcastMediaState = useCallback(() => {
@@ -238,6 +253,7 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
     incomingOfferRef.current = null;
     pendingCandidatesRef.current = [];
     callIdRef.current = null;
+    activeChatRef.current = null;
   }, [clearReconnect, stopMonitors, remoteAudioRef]);
 
   /**
@@ -282,7 +298,11 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
     // own (camera stops, voice continues).
     if (!authTimerRef.current) {
       authTimerRef.current = setInterval(async () => {
+        // The answers below belong to this call only: by the time they arrive
+        // it may have ended and another one begun.
+        const callId = callIdRef.current;
         const voice = await authorize("voice");
+        if (callIdRef.current !== callId) return;
         if (!voice.ok) {
           postOutcome();
           finishWithError(reasonToCode(voice.reason));
@@ -290,6 +310,7 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
         }
         if (store.getState().videoEnabled) {
           const video = await authorize("video");
+          if (callIdRef.current !== callId) return;
           if (!video.ok) void stopCameraRef.current?.("PERMISSION_REVOKED");
         }
       }, 30_000);
@@ -487,15 +508,18 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
   // ---- Public actions -------------------------------------------------------
 
   const startCall = useCallback(
-    async (withVideo = false) => {
+    async (chatId: string, withVideo = false) => {
+      const other = peopleRef.current.get(chatId);
+      if (!other) return; // not a chat we can call in
       if (store.getState().state !== "idle") return; // double-call protection
 
       const callId = crypto.randomUUID();
       callIdRef.current = callId;
+      activeChatRef.current = chatId;
       usedVideoRef.current = false;
       // Open the call screen at once: the steps below can each take a moment,
       // and any of them failing needs a screen to say so.
-      store.getState().startOutgoing(callId, peerInfo(other));
+      store.getState().startOutgoing(callId, chatId, peerInfo(other));
       // False once this call has been cancelled or replaced (teardown clears the id).
       const stillOurs = () => callIdRef.current === callId;
 
@@ -555,7 +579,7 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
         finishWithError(classifyMediaError(err));
       }
     },
-    [store, other, me, chatId, authorize, createPeer, attachLocalMedia, send, updateSession, finish, finishWithError, postOutcome],
+    [store, me, authorize, createPeer, attachLocalMedia, send, updateSession, finish, finishWithError, postOutcome],
   );
 
   /** Answer the ringing call. `withVideo` also turns our camera on. */
@@ -781,118 +805,165 @@ export function useCall({ chatId, me, other, remoteAudioRef }: UseCallArgs) {
 
   // ---- Signaling wiring -----------------------------------------------------
 
-  useEffect(() => {
-    const channel = new SignalingChannel(chatId);
-    signalingRef.current = channel;
+  /**
+   * One message, from the channel of `chatId`. The channels are opened once and
+   * call this through a ref, so they always run the current version.
+   */
+  const onSignal = async (chatId: string, type: SignalType, payload: SignalPayload) => {
+    const current = store.getState();
 
-    channel.onSignal(async (type, payload) => {
-      const current = store.getState();
-      switch (type) {
-        case "call_started": {
-          // A call may arrive while the closing screen of the last one is still up.
-          if (current.state !== "idle" && !isCallOver(current.state)) {
-            void channel.send("busy", { callId: payload.callId, senderId: me.id });
-            return;
-          }
-          if (!payload.from || !payload.sdp) return;
-          if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
-          resetTimeoutRef.current = null;
-          callIdRef.current = payload.callId;
-          incomingOfferRef.current = payload.sdp;
-          // Who is calling comes from our own data, not from what the message says:
-          // this channel only ever carries calls from the other person in this chat.
-          store.getState().startIncoming(payload.callId, peerInfo(otherRef.current), payload.media);
-          break;
+    if (type === "call_started") {
+      // Already in a call (with anyone): tell this caller so. A call may still
+      // arrive while the closing screen of the last one is up.
+      if (current.state !== "idle" && !isCallOver(current.state)) {
+        void channelsRef.current
+          .get(chatId)
+          ?.send("busy", { callId: payload.callId, senderId: me.id });
+        return;
+      }
+      const caller = peopleRef.current.get(chatId);
+      if (!caller || !payload.from || !payload.sdp) return;
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+      resetTimeoutRef.current = null;
+      callIdRef.current = payload.callId;
+      activeChatRef.current = chatId;
+      incomingOfferRef.current = payload.sdp;
+      // Who is calling comes from our own data, not from what the message says:
+      // a chat's channel only ever carries calls from the other person in it.
+      store.getState().startIncoming(payload.callId, chatId, peerInfo(caller), payload.media);
+      return;
+    }
+
+    // Everything else belongs to the call in progress, on its own channel.
+    if (chatId !== activeChatRef.current || payload.callId !== callIdRef.current) return;
+
+    switch (type) {
+      case "offer": {
+        // Renegotiation / ICE-restart offer (callee side) on an existing call.
+        const pc = pcRef.current;
+        if (!pc || !payload.sdp) return;
+        try {
+          await pc.setRemoteDescription(payload.sdp);
+          await drainCandidates();
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          send("answer", { sdp: answer });
+        } catch {
+          /* recovery will retry */
         }
-        case "offer": {
-          // Renegotiation / ICE-restart offer (callee side) on an existing call.
-          if (payload.callId !== callIdRef.current || !payload.sdp) return;
-          const pc = pcRef.current;
-          if (!pc) return;
-          try {
-            await pc.setRemoteDescription(payload.sdp);
-            await drainCandidates();
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            send("answer", { sdp: answer });
-          } catch {
-            /* recovery will retry */
-          }
-          break;
+        break;
+      }
+      case "answer": {
+        const pc = pcRef.current;
+        if (!pc || !payload.sdp) return;
+        try {
+          await pc.setRemoteDescription(payload.sdp);
+          await drainCandidates();
+          if (store.getState().state === "calling") store.getState().setState("connecting");
+        } catch {
+          /* ignore */
         }
-        case "answer": {
-          if (payload.callId !== callIdRef.current || !payload.sdp) return;
-          const pc = pcRef.current;
-          if (!pc) return;
+        break;
+      }
+      case "call_accepted":
+        if (current.state === "calling") store.getState().setState("connecting");
+        break;
+      case "ice_candidate": {
+        if (!payload.candidate) return;
+        const pc = pcRef.current;
+        if (pc && pc.remoteDescription) {
           try {
-            await pc.setRemoteDescription(payload.sdp);
-            await drainCandidates();
-            if (store.getState().state === "calling") store.getState().setState("connecting");
+            await pc.addIceCandidate(payload.candidate);
           } catch {
             /* ignore */
           }
-          break;
+        } else {
+          pendingCandidatesRef.current.push(payload.candidate);
         }
-        case "call_accepted": {
-          if (payload.callId === callIdRef.current && current.state === "calling") {
-            store.getState().setState("connecting");
-          }
-          break;
-        }
-        case "ice_candidate": {
-          if (payload.callId !== callIdRef.current || !payload.candidate) return;
-          const pc = pcRef.current;
-          if (pc && pc.remoteDescription) {
-            try {
-              await pc.addIceCandidate(payload.candidate);
-            } catch {
-              /* ignore */
-            }
-          } else {
-            pendingCandidatesRef.current.push(payload.candidate);
-          }
-          break;
-        }
-        case "call_rejected":
-          if (payload.callId === callIdRef.current) {
-            postOutcome("declined");
-            finish("rejected");
-          }
-          break;
-        case "busy":
-          if (payload.callId === callIdRef.current) finish("busy");
-          break;
-        case "call_cancelled":
-          if (payload.callId === callIdRef.current) {
-            // The caller gave up. Say so for a moment instead of just vanishing.
-            finish("ended", current.state === "ringing" ? "Missed call" : undefined);
-          }
-          break;
-        case "call_ended":
-          if (payload.callId === callIdRef.current) {
-            postOutcome(); // caller posts completed/cancelled; callee is a no-op
-            finish("ended");
-          }
-          break;
-        case "media_state":
-          if (payload.callId === callIdRef.current && payload.media) {
-            store.getState().setRemoteMedia(payload.media);
-          }
-          break;
+        break;
       }
-    });
+      case "call_rejected":
+        postOutcome("declined");
+        finish("rejected");
+        break;
+      case "busy":
+        // They are talking to someone else. Leave a "missed call" in the chat,
+        // so they see afterwards that we tried.
+        postOutcome("missed");
+        finish("busy");
+        break;
+      case "call_cancelled":
+        // The caller gave up. Say so for a moment instead of just vanishing.
+        finish("ended", current.state === "ringing" ? "Missed call" : undefined);
+        break;
+      case "call_ended":
+        postOutcome(); // caller posts completed/cancelled; callee is a no-op
+        finish("ended");
+        break;
+      case "media_state":
+        if (payload.media) store.getState().setRemoteMedia(payload.media);
+        break;
+    }
+  };
+  const onSignalRef = useRef(onSignal);
+  onSignalRef.current = onSignal;
 
-    void channel.connect();
+  // Listen on the channel of every chat. Channels open and close as the list
+  // changes (someone is added or removed); the one a call is running on is
+  // never closed under it.
+  const chatIds = chats
+    .map((c) => c.chatId)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    const wanted = new Set(chatIds ? chatIds.split(",") : []);
+    const channels = channelsRef.current;
+    for (const [id, channel] of channels) {
+      if (wanted.has(id) || id === activeChatRef.current) continue;
+      channels.delete(id);
+      void channel.disconnect();
+    }
+    for (const id of wanted) {
+      if (channels.has(id)) continue;
+      const channel = new SignalingChannel(id);
+      channel.onSignal((type, payload) => void onSignalRef.current(id, type, payload));
+      channels.set(id, channel);
+      void channel.connect();
+    }
+  }, [chatIds]);
 
+  // Leaving the app: end whatever is running, tell the other side, stop listening.
+  useEffect(() => {
+    const channels = channelsRef.current;
     return () => {
       if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+      const state = store.getState().state;
+      const callId = callIdRef.current;
+      const chatId = activeChatRef.current;
+      let goodbye: Promise<void> | undefined;
+      if (callId && chatId && state !== "idle" && !isCallOver(state)) {
+        const wasTalking = state === "connected" || state === "reconnecting";
+        const parting = wasTalking
+          ? "call_ended"
+          : state === "ringing"
+            ? "call_rejected"
+            : "call_cancelled";
+        goodbye = channels.get(chatId)?.send(parting, { callId, senderId: me.id, reason: "left" });
+        postOutcome();
+      }
       teardown();
-      void channel.disconnect();
-      signalingRef.current = null;
       store.getState().reset();
+      // The goodbye has to leave before its channel is closed.
+      const closing = [...channels.values()];
+      channels.clear();
+      void Promise.resolve(goodbye)
+        .catch(() => undefined)
+        .then(() => {
+          for (const channel of closing) void channel.disconnect();
+        });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId]);
+  }, []);
 
   // ---- Browser lifecycle & network transitions ------------------------------
 

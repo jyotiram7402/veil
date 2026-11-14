@@ -34,8 +34,9 @@ on a laptop. The owner manages members from the same app.
 
 - One-to-one chat between the owner and each member: text, images, files,
   typing and online indicators, read receipts.
-- One-to-one voice and video calls inside a chat. Calls between different
-  networks need a TURN relay, which is not set up yet.
+- One-to-one voice and video calls. A call rings on any screen while the app is
+  open; a closed app does not ring. Calls between different networks need a TURN
+  relay, which is not set up yet.
 - Members get in through a personal invite link, or create their own account
   on the Sign up screen with a code the owner gives them.
 - Members cannot chat with each other. This is a deliberate decision.

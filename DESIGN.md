@@ -133,6 +133,8 @@ held sideways.
 - Chips on the stage (Chat, Muted, Your camera) are `bg-card` pills, because they have to
   read on any ground and on any picture.
 - "Chat" shrinks the call to a pill under the chat header: avatar, name, timer, Mute, End.
+  In the admin's app it also opens that person's chat, and the pill then stays on every
+  screen until the call ends. An incoming call takes the whole screen wherever the person is.
 - A call that failed says what went wrong and what to do, and stays until it is closed.
 
 ## Entry screens

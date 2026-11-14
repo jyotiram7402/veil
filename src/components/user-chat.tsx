@@ -74,6 +74,8 @@ export function UserChat({
   useChatRealtime({ chatId, me, memberProfiles });
   useResumeSync(chatId, me);
 
+  const callChats = useMemo(() => [{ chatId, other: adminProfile }], [chatId, adminProfile]);
+
   const adminOnline = usePresenceStore((s) => s.online.has(adminProfile.id));
   const subtitle = adminOnline ? "Online" : `Last seen ${lastSeen(adminProfile.last_seen_at)}`;
   const { theme, toggle: toggleTheme } = useTheme();
@@ -112,8 +114,8 @@ export function UserChat({
             {subtitle}
           </div>
         </div>
-        <CallButton mode="video" className="[&_svg]:size-5" />
-        <CallButton mode="voice" className="[&_svg]:size-5" />
+        <CallButton chatId={chatId} mode="video" className="[&_svg]:size-5" />
+        <CallButton chatId={chatId} mode="voice" className="[&_svg]:size-5" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="icon" variant="ghost" aria-label="More" className="[&_svg]:size-5">
@@ -156,10 +158,11 @@ export function UserChat({
   // to unlock. We keep the old screen_guard setting as a no-op kill-switch
   // (off = no lock at all, on = lock as designed).
   // CallProvider wraps everything so the WebRTC signaling channel + call
-  // overlay live for the whole time this 1-to-1 chat is open.
+  // screen live for the whole time the app is open. A member has one chat to
+  // be called in: this one, with the admin.
   const inner = settings.screen_guard ? <SessionLock me={me}>{chat}</SessionLock> : chat;
   return (
-    <CallProvider me={me} other={adminProfile} chatId={chatId}>
+    <CallProvider me={me} chats={callChats}>
       {inner}
     </CallProvider>
   );
