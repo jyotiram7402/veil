@@ -196,6 +196,15 @@
   opacity: 1;
 }
 
+/* A picture whose shape is far from the stage's (a phone held upright seen on
+   a laptop, a laptop seen on a phone) is shown whole, not cut to fill. The
+   padding keeps it clear of the part of the stage that is under the sheet. */
+.videoFit {
+  box-sizing: border-box;
+  padding-bottom: 2rem;
+  object-fit: contain;
+}
+
 .mirror {
   transform: scaleX(-1);
 }
@@ -310,14 +319,6 @@
     height: min(32.5rem, calc(100dvh - 19rem));
   }
 
-  /* Their picture is shown whole here; a phone held upright is not cropped.
-     The padding keeps it clear of the part of the stage under the sheet. */
-  .videoFit {
-    box-sizing: border-box;
-    padding-bottom: 2rem;
-    object-fit: contain;
-  }
-
   .stageCorner {
     display: flex;
   }
@@ -376,6 +377,12 @@
   .pip {
     top: 0.75rem;
     right: 2.75rem;
+  }
+
+  /* Here the sheet covers the right edge of the stage, not the bottom. */
+  .videoFit {
+    padding-right: 2rem;
+    padding-bottom: 0;
   }
 
   .stageTop {

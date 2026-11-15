@@ -177,6 +177,18 @@ from a TURN provider (see `.env.example`) and redeploy. Two tabs on the same
 computer should connect without TURN. Calls exist only in 1:1 chats — the
 call icons inside a room are placeholders.
 
+## The video looks soft or jerky
+
+During the call, tap the timer under the name. A line appears like
+"Sending 720×1280 at 28 fps · receiving 480×854 at 15 fps".
+
+- A small size (less than 720 on the short side) means that side's phone or
+  network could not keep up, and the app stepped the picture down so it keeps
+  moving. It steps back up by itself when things improve.
+- A full size but few frames per second (under about 12) means the same thing a
+  moment earlier: the app waits a few seconds before it steps down.
+- "no video" on one side means that camera is off.
+
 ## A call does not ring on the other side
 
 The other person has to have the app open, on any screen: a closed app or a

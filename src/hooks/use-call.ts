@@ -6,11 +6,13 @@ import { useCallStore } from "@/store/call-store";
 import { getRtcConfig, isWebRtcSupported } from "@/lib/webrtc/ice";
 import {
   audioConstraints,
+  keepResolution,
   preferOpus,
   relaxedVideoConstraints,
   videoConstraints,
   type CameraChoice,
 } from "@/lib/webrtc/codec";
+import { createVideoGovernor } from "@/lib/webrtc/video-governor";
 import { createQualitySampler, STATS_INTERVAL_MS } from "@/lib/webrtc/stats";
 import { monitorAudioLevel, type AudioLevelMonitor } from "@/lib/webrtc/audio-level";
 import { realAudioOutputs } from "@/lib/webrtc/devices";
@@ -149,6 +151,10 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const cameraBusyRef = useRef<RTCRtpSender | null>(null);
   const cameraStopsRef = useRef(0);
   const samplerRef = useRef<ReturnType<typeof createQualitySampler> | null>(null);
+  // How large a picture to send (full size unless the frame rate collapses),
+  // and the queue that applies it: sender settings are changed one at a time.
+  const governorRef = useRef(createVideoGovernor());
+  const tuningRef = useRef<Promise<void>>(Promise.resolve());
   const audioMonitorRef = useRef<AudioLevelMonitor | null>(null);
 
   /** Send to the other person of the current call (on that chat's channel). */
@@ -216,6 +222,13 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     [store],
   );
 
+  /** Apply the picture settings (hold the resolution, current size) to our video sender. */
+  const tuneVideo = useCallback(() => {
+    const sender = videoSenderRef.current;
+    const scale = governorRef.current.scale();
+    tuningRef.current = tuningRef.current.then(() => keepResolution(sender, scale));
+  }, []);
+
   const stopMonitors = useCallback(() => {
     if (statsTimerRef.current) clearInterval(statsTimerRef.current);
     statsTimerRef.current = null;
@@ -226,6 +239,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     audioMonitorRef.current = null;
     store.getState().setSpeaking(false);
     store.getState().setQuality("unknown");
+    store.getState().setVideoNumbers(null, null);
   }, [store]);
 
   const startMonitors = useCallback(() => {
@@ -237,7 +251,17 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         const sampler = samplerRef.current;
         if (!pc || !sampler) return;
         const s = await sampler(pc);
-        store.getState().setQuality(s.quality);
+        if (pcRef.current !== pc) return; // the call ended while the numbers were read
+        const now = store.getState();
+        now.setQuality(s.quality);
+        const sent = now.videoEnabled ? s.video.sent : null;
+        now.setVideoNumbers(sent, now.remoteVideoOn ? s.video.received : null);
+        // Send a smaller picture when the frame rate has collapsed, a larger
+        // one again when the link has been fine for a while.
+        const scale = governorRef.current.next(
+          sent ? { fps: sent.fps, cameraFps: s.video.cameraFps, limited: sent.limited } : null,
+        );
+        if (scale !== null) tuneVideo();
       }, STATS_INTERVAL_MS);
     }
     // Local mic activity → "speaking" dot.
@@ -246,7 +270,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         store.getState().setSpeaking(speaking),
       );
     }
-  }, [store]);
+  }, [store, tuneVideo]);
 
   const clearReconnect = useCallback(() => {
     if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
@@ -288,9 +312,11 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
       videoStreamRef.current = null;
     }
-    // The next call starts on the front camera again, whichever was used last.
+    // The next call starts on the front camera again, whichever was used last,
+    // and at full picture size.
     facingRef.current = "user";
     cameraStopsRef.current++;
+    governorRef.current.reset();
     remoteStreamRef.current = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     incomingOfferRef.current = null;
@@ -333,6 +359,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     store.getState().setConnected();
     updateSession({ status: "connected", connected_at: new Date().toISOString() });
     startMonitors();
+    tuneVideo();
     // Resync media state with the peer after (re)connect.
     broadcastMediaState();
     // Periodically re-check authorization so a mid-call revocation (participant
@@ -358,7 +385,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         }
       }, 30_000);
     }
-  }, [clearReconnect, store, updateSession, startMonitors, authorize, finishWithError, broadcastMediaState, postOutcome]);
+  }, [clearReconnect, store, updateSession, startMonitors, tuneVideo, authorize, finishWithError, broadcastMediaState, postOutcome]);
 
   const doIceRestart = useCallback(async () => {
     const pc = pcRef.current;
@@ -509,11 +536,12 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       // add a line of its own; it takes over the offered one (adoptOfferedVideo).
       if (role === "caller") {
         videoSenderRef.current = pc.addTransceiver("video", { direction: "sendrecv" }).sender;
+        tuneVideo();
         store.getState().setMediaReady(true);
       }
       return true;
     },
-    [store],
+    [store, tuneVideo],
   );
 
   /**
@@ -529,9 +557,10 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         .find((t) => t.mid !== null && t.receiver.track.kind === "video");
       if (offered) offered.direction = "sendrecv";
       videoSenderRef.current = offered?.sender ?? null;
+      tuneVideo();
       store.getState().setMediaReady(!!offered);
     },
-    [store],
+    [store, tuneVideo],
   );
 
   const drainCandidates = useCallback(async () => {
@@ -801,6 +830,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         videoStreamRef.current = stream;
         await sender.replaceTrack(track); // no renegotiation (transceiver exists)
         if (!stillWanted()) return; // stopped meanwhile; whoever stopped it let the camera go
+        tuneVideo();
         const facing = track.getSettings().facingMode;
         if (facing === "user" || facing === "environment") facingRef.current = facing;
         usedVideoRef.current = true;
@@ -813,7 +843,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         if (cameraBusyRef.current === sender) cameraBusyRef.current = null;
       }
     },
-    [authorize, store, broadcastMediaState, releaseCamera],
+    [authorize, store, broadcastMediaState, releaseCamera, tuneVideo],
   );
 
   const stopCamera = useCallback(

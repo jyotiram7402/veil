@@ -64,6 +64,37 @@ function whichCamera(camera?: CameraChoice): MediaTrackConstraints {
 }
 
 /**
+ * Tells the browser to hold the picture's resolution, sending it scaled down
+ * by `scaleDown` (1 = full size).
+ *
+ * Left alone, Chromium answers a slow start or a weak link by shrinking the
+ * picture: measured on a perfect connection, a call began at 180×320 and was
+ * still at 360×640 a quarter of a minute later. Asked to hold the resolution,
+ * it sends the full 720p from the first second and lowers the frame rate when
+ * it has to; the video governor (video-governor.ts) then steps the size down
+ * if that gets too slow. Best effort: a browser that does not know the setting
+ * ignores it.
+ */
+export async function keepResolution(
+  sender: RTCRtpSender | null | undefined,
+  scaleDown = 1,
+): Promise<void> {
+  try {
+    if (!sender || typeof sender.getParameters !== "function") return;
+    const params = sender.getParameters() as RTCRtpSendParameters & {
+      degradationPreference?: string;
+    };
+    const encoding = params.encodings?.[0];
+    if (!encoding) return; // not negotiated that far yet: it is applied again later
+    params.degradationPreference = "maintain-resolution";
+    encoding.scaleResolutionDownBy = scaleDown;
+    await sender.setParameters(params);
+  } catch {
+    /* best effort */
+  }
+}
+
+/**
  * Prefer Opus on the audio transceiver when the browser exposes codec
  * preferences. No-op (and safe) on browsers without setCodecPreferences or
  * getCapabilities (e.g. older Safari), where Opus is already the default.

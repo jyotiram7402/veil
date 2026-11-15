@@ -90,7 +90,8 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - `webrtc/` — `ice.ts` (STUN + env TURN; no candidate pool, the file says why),
   `signaling.ts` (private broadcast channel; a message sent while it is joining waits),
   `codec.ts` (audio/video constraints, Opus preference), `stats.ts` (quality from getStats),
-  `audio-level.ts`, `errors.ts` (error codes → friendly text), `ringtone.ts` (ring + buzz),
+  `video-governor.ts` (how large a picture to send), `audio-level.ts`,
+  `errors.ts` (error codes → friendly text), `ringtone.ts` (ring + buzz),
   `devices.ts` (which cameras / sound outputs can be switched), `types.ts`.
 
 ## Client state & hooks
@@ -162,6 +163,13 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
   pick the lens; stepping through device ids lands on the wide or the zoom lens. A computer's
   cameras do not report a side: there Flip takes the next device. Camera changes run one at a
   time, and a camera that opens after it was switched off (or after the call ended) is let go.
+- Picture quality: the video sender is told to hold the resolution (`keepResolution` in
+  `codec.ts`, `degradationPreference: "maintain-resolution"`). Left alone, Chromium began a
+  call at 180×320 and was still at 360×640 a quarter of a minute later, on a perfect
+  connection; told to hold, it sends 720p from the first second and pays in frames per second
+  when it must. `video-governor.ts` is the safety valve: fed by the 3 s stats sample, it
+  steps the sent size down (`scaleResolutionDownBy` 1 → 1.5 → 2 → 3) when the frame rate
+  has collapsed, and back up after a good stretch. The same sample fills "call details".
 - UI: `components/call/call-screen.tsx` (+ `call-stage`, `call-controls`, `call.module.css`)
   only reads `call-store` and calls the actions `use-call` returns. A closing state
   (`isCallOver`) keeps the screen up for 2.5 s; an error stays until closed (`dismiss`).
