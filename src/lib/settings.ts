@@ -6,6 +6,11 @@ export type SettingsShape = {
   typing_indicator: boolean;
   screen_guard: boolean;
   user_session_ephemeral: boolean;
+  /**
+   * Disappearing messages: a message is deleted for good once the person it
+   * was sent to has read it and leaves the chat (see src/lib/vanish.ts).
+   */
+  disappearing_messages: boolean;
   max_message_length: number;
 };
 
@@ -14,6 +19,8 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   typing_indicator: true,
   screen_guard: true,
   user_session_ephemeral: true,
+  // Off unless the admin switches it on: it deletes messages for good.
+  disappearing_messages: false,
   max_message_length: 4000,
 };
 

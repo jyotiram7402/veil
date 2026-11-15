@@ -103,6 +103,34 @@ for participants. Identities are temporary. No call recording/storage, no
 analytics on invite URLs, `Referrer-Policy` limits leakage and join pages send
 `referrer: no-referrer`.
 
+## Disappearing messages
+
+Off by default. Only an admin can switch it on: `/api/admin/settings` (everyone) and
+`/api/admin/users/[id]/settings` (one person) both require `is_admin`.
+
+- `POST /api/chats/[id]/vanish` needs a session and `can_access_chat`. It deletes only
+  messages that were sent *to the caller*, in that chat, up to the time the caller reports
+  (never later than now). Nobody can use it on their own messages or on another chat, and it
+  does nothing where the setting is off. The reported time is parsed and rebuilt; the text
+  the browser sent never reaches the database. 60 requests a minute per user.
+- The delete runs with the service role, after those checks. The file of a message is found
+  from the signed link stored with it, and only accepted inside the chat's own folder
+  (`src/lib/attachment-path.ts`): a doctored link cannot get another chat's file deleted.
+- What "deleted for good" covers: the row in `messages` and the file in the `attachments`
+  bucket. The row is removed outright (the `deleted_at` column is not used), the app keeps
+  no copy, and nothing a message said is written to a log.
+- What it does not cover:
+  - Backups Supabase makes of the database. They depend on the plan and are outside the app
+    (unverified what this project has).
+  - A copy of a file's signed link made before the file was deleted. Whether such a link
+    stops working at once is unverified (a cache in front of storage may still serve it).
+  - A screenshot or a photo of the screen, and a message already showing on a device that is
+    offline: it stays on that screen until the app next reaches the server.
+  - A message that has not been read. It stays until it is.
+- The `vanished` broadcast travels on the public `chat:<id>` channel. A forged one hides
+  messages on an open screen until the next 5 s check puts them back. It cannot delete
+  anything: only the route above deletes.
+
 ## Secrets management
 
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only (never `NEXT_PUBLIC_`), used by
@@ -124,7 +152,7 @@ CSP is recommended future work.
 ## Rate limiting / abuse
 
 In-memory token-bucket (`src/lib/api.ts`) on login, invite gate, room join,
-message send, room/invite creation, and lock. It is per-instance (resets on
+message send, room/invite creation, lock, and the disappearing-messages route. It is per-instance (resets on
 cold start, not shared across serverless instances) and keys on a spoofable
 `x-forwarded-for` — adequate as a speed bump, not a hard control. A shared store
 (e.g. Postgres/Upstash) is recommended before public launch.
@@ -134,7 +162,8 @@ cold start, not shared across serverless instances) and keys on a spoofable
 Messages, call events (system messages), and `call_sessions`/`room_audit_log`
 persist until the room/user is deleted (cascades on FK delete). Ephemeral room
 guests are flagged `is_room_guest` and are candidates for a future cleanup job.
-No automatic purging is implemented; document and revisit per product needs.
+No automatic purging is implemented, with one exception the admin can switch on:
+disappearing messages (above) delete read messages and their files for good.
 
 ## Remaining risks
 
@@ -143,6 +172,7 @@ No automatic purging is implemented; document and revisit per product needs.
 - CSP allows `'unsafe-inline'` for scripts/styles (no nonce yet).
 - Public chat realtime channels (`chat:<id>`, presence) are not private —
   typing/presence could be observed/spoofed by someone who knows the random
-  chat UUID (low severity; IDs are unguessable).
+  chat UUID (low severity; IDs are unguessable). The same goes for the
+  `vanished` notice of disappearing messages (it can hide, never delete).
 - Browser calls cannot run while the page is fully suspended/terminated.
 - No automated test runner in the repo (see the manual matrix in the report).

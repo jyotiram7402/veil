@@ -104,6 +104,11 @@ One screen for the admin (`chat-thread.tsx`), the member (`user-chat.tsx`) and r
 - Call results and other notes are a small centred pill.
 - The typing bubble sits in a slot of fixed height under the newest message, so nothing moves
   when it comes and goes (`showTyping` on `MessageList`).
+- Disappearing messages (only in chats where the owner has switched them on): one small
+  centred pill under the newest message, a lucide `Timer` and "Seen messages disappear when
+  you leave", in the same quiet style as the day label. It must stay on one line on a 320px
+  phone. An empty chat then says "Nothing here right now" / "Messages in this chat disappear
+  once they have been read." Messages simply go: no animation, no "deleted" placeholder.
 - Composer: one floating pill with attach, the text field and a blue send button.
 
 ## Call screen

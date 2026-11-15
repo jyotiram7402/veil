@@ -26,6 +26,7 @@ export function useChatRealtime(params: {
 
   const appendMessage = useChatStore((s) => s.appendMessage);
   const removeMessage = useChatStore((s) => s.removeMessage);
+  const dropReadMessages = useChatStore((s) => s.dropReadMessages);
   const bumpChatPreview = useChatStore((s) => s.bumpChatPreview);
   const setTyping = usePresenceStore((s) => s.setTyping);
   const clearTyping = usePresenceStore((s) => s.clearTyping);
@@ -59,6 +60,14 @@ export function useChatRealtime(params: {
           removeMessage(chatId, old.id);
         },
       )
+      // Disappearing messages: the server says what has just been deleted, as
+      // "everything `reader` had received up to `upTo`" (src/lib/vanish.ts).
+      .on("broadcast", { event: "vanished" }, ({ payload }) => {
+        const p = payload as { reader?: unknown; upTo?: unknown };
+        if (typeof p.reader === "string" && typeof p.upTo === "string") {
+          dropReadMessages(chatId, p.reader, p.upTo);
+        }
+      })
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         const p = payload as { userId: string; username: string };
         if (p.userId === me.id) return;
@@ -73,5 +82,5 @@ export function useChatRealtime(params: {
       clearChatChannel(chatId);
       supabase.removeChannel(channel);
     };
-  }, [chatId, me, memberProfiles, appendMessage, removeMessage, bumpChatPreview, setTyping, clearTyping]);
+  }, [chatId, me, memberProfiles, appendMessage, removeMessage, dropReadMessages, bumpChatPreview, setTyping, clearTyping]);
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/chat/user-avatar";
+import { useSessionStore } from "@/store/session-store";
 import type { Profile } from "@/types/chat";
 
 /**
@@ -31,6 +32,15 @@ export function SessionLock({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Let the rest of the app know while the chat is covered: a message that
+  // arrives behind the lock has not been read (see use-vanish-on-leave.ts).
+  // Layout effects, so it is known before any other part of the screen starts
+  // its own work, wherever that part sits.
+  useLayoutEffect(() => {
+    useSessionStore.getState().setLocked(locked);
+  }, [locked]);
+  useLayoutEffect(() => () => useSessionStore.getState().setLocked(false), []);
+
   // Disable common screenshot / save / print shortcuts everywhere
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -55,6 +65,9 @@ export function SessionLock({
   // messages while they're staring right at the screen.
   useEffect(() => {
     const relock = () => {
+      // Said at once, not when the lock has been drawn: a phone may freeze the
+      // page before that, and it must not wake up looking unlocked.
+      useSessionStore.getState().setLocked(true);
       setLocked(true);
       setPassword("");
       setError(null);

@@ -14,6 +14,8 @@ deployable to Vercel's free tier in about ten minutes.
 - 1-to-1 WebRTC **voice and video** calling, built into the chat
 - Image and file attachments (10 MB cap, images compressed in-browser)
 - Typing indicators, online presence, read receipts, unread counts
+- Disappearing messages (off until the admin switches them on): a read message is deleted
+  for both people, for good, when its reader leaves the chat
 - Mobile-first UI (light/dark), safe-area aware, works on phones and tablets
 - Admin panel: members, rooms, invitations, participant permissions
 - Strict Row-Level Security on every table; private storage with signed URLs

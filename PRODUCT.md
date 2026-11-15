@@ -37,6 +37,11 @@ on a laptop. The owner manages members from the same app.
 - One-to-one voice and video calls. A call rings on any screen while the app is
   open; a closed app does not ring. Calls between different networks need a TURN
   relay, which is not set up yet.
+- Disappearing messages, off unless the owner switches them on (for everyone, or for one
+  person): a message is deleted for both people once the person it was sent to has read it
+  and then leaves the chat (goes back, switches app or tab, locks the phone). A message that
+  has not been read stays. Photos and files go with their message. Nobody can bring a deleted
+  message back, the owner included.
 - Members get in through a personal invite link, or create their own account
   on the Sign up screen with a code the owner gives them.
 - Members cannot chat with each other. This is a deliberate decision.

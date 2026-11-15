@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useChatStore } from "@/store/chat-store";
 import { useSyncStore } from "@/store/sync-store";
+import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
 import type { MessageWithSender, Profile } from "@/types/chat";
 
 // Safety net only — realtime delivers messages instantly, and we also resync
@@ -24,8 +25,17 @@ const POLL_INTERVAL_MS = 5_000;
  *
  *  Polling pauses automatically while `document.visibilityState !== "visible"`
  *  so we don't hammer the API from a backgrounded tab.
+ *
+ *  A chat with nothing on screen (a new one, or one where every message has
+ *  disappeared) asks for the newest page instead of "newer than the latest".
+ *
+ *  `exact` is for chats with disappearing messages. There a message can also
+ *  stop existing while this screen is not listening (the other person read it
+ *  and left while our page was in the background). So each round asks for the
+ *  newest page and makes the list agree with it: what the server no longer
+ *  has is taken off the screen, what is new is added.
  */
-export function useResumeSync(chatId: string | null, me: Profile | null) {
+export function useResumeSync(chatId: string | null, me: Profile | null, exact = false) {
   useEffect(() => {
     if (!chatId || !me) return;
 
@@ -50,33 +60,61 @@ export function useResumeSync(chatId: string | null, me: Profile | null) {
             break;
           }
         }
-        if (!latest) {
-          sync.markSynced();
-          return;
+
+        // Disappearing messages: the newest page, and what we had before asking.
+        let page: MessageWithSender[] | null = null;
+        const known = new Set<string>();
+        if (exact) {
+          for (const m of messages) if (!m.id.startsWith("local-")) known.add(m.id);
+          const res = await fetch(`/api/chats/${chatId}/messages`, { cache: "no-store" });
+          if (cancelled) return;
+          if (!res.ok) {
+            sync.markFailed();
+            return;
+          }
+          page = ((await res.json()) as { messages?: MessageWithSender[] }).messages ?? [];
         }
+        const pageIsFull = page !== null && page.length >= MESSAGE_PAGE_SIZE;
+        // The page holds everything that is new, unless more than a page
+        // arrived while we were away: then the rest is fetched the usual way.
+        const latestId = latest?.id;
+        const pageCoversIt =
+          page !== null && (!pageIsFull || !latestId || page.some((m) => m.id === latestId));
 
-        const url = new URL(
-          `/api/chats/${chatId}/messages`,
-          window.location.origin,
-        );
-        url.searchParams.set("after", latest.created_at);
+        if (!pageCoversIt) {
+          const url = new URL(
+            `/api/chats/${chatId}/messages`,
+            window.location.origin,
+          );
+          // Nothing on screen to count from: the newest page it is. Before, an
+          // empty chat never caught up at all.
+          if (latest) url.searchParams.set("after", latest.created_at);
 
-        const res = await fetch(url.toString(), { cache: "no-store" });
-        if (cancelled) return;
-        if (!res.ok) {
-          sync.markFailed();
-          return;
-        }
-        const body = (await res.json()) as { messages: MessageWithSender[] };
-        const incoming = body.messages ?? [];
+          const res = await fetch(url.toString(), { cache: "no-store" });
+          if (cancelled) return;
+          if (!res.ok) {
+            sync.markFailed();
+            return;
+          }
+          const body = (await res.json()) as { messages: MessageWithSender[] };
+          const incoming = body.messages ?? [];
 
-        if (incoming.length > 0) {
-          const liveStore = useChatStore.getState();
-          for (const m of incoming) {
-            liveStore.appendMessage(chatId, m);
-            if (m.sender_id && m.sender_id !== me.id) {
-              liveStore.bumpChatPreview(chatId, m, false);
+          if (incoming.length > 0) {
+            const liveStore = useChatStore.getState();
+            for (const m of incoming) {
+              liveStore.appendMessage(chatId, m);
+              if (m.sender_id && m.sender_id !== me.id) {
+                liveStore.bumpChatPreview(chatId, m, false);
+              }
             }
+          }
+        }
+
+        if (page !== null) {
+          const liveStore = useChatStore.getState();
+          const added = liveStore.matchServer(chatId, page, known, pageIsFull);
+          for (const m of added) {
+            if (m.sender_id && m.sender_id !== me.id) liveStore.bumpChatPreview(chatId, m, false);
           }
         }
         sync.markSynced();
@@ -122,5 +160,5 @@ export function useResumeSync(chatId: string | null, me: Profile | null) {
       window.removeEventListener("blackfoxx:resume", onResume);
       window.removeEventListener("online", onOnline);
     };
-  }, [chatId, me]);
+  }, [chatId, me, exact]);
 }

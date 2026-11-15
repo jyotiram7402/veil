@@ -51,9 +51,8 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - `middleware.ts` → `src/lib/supabase/middleware.ts`: session refresh + route gating (public
   paths, admin-only prefixes, member vs admin redirects). **Not active in production** (Gotchas).
 - `src/app/(app)` admin shell (layout requires `is_admin`): `chats`, `rooms`, `admin`, `settings`.
-- `src/app/page.tsx` first screen (Log in / Sign up); `src/app/(auth)/login`, `(auth)/signup`
-  (placeholder until invite-code sign-up is built). Each calls `redirectIfSignedIn()` itself.
-  Their UI is `src/components/auth/*`: `first-screen.tsx`, `auth-shell.tsx`, `entry.module.css`.
+- `src/app/page.tsx` first screen (Log in / Sign up); `src/app/(auth)/login`, `(auth)/signup`; each calls
+  `redirectIfSignedIn()`. UI in `src/components/auth/*`: `first-screen.tsx`, `auth-shell.tsx`, `entry.module.css`.
 - `src/app/(user)/chat` (member's 1:1 chat with admin), `(user)/expired`.
 - `src/app/i/[token]` member invite gate; `src/app/join[/code]` + `src/app/room/[id]` room guests.
 - `src/app/api/**/route.ts` all mutations. `src/lib/` server logic (`supabase/`, `auth/`,
@@ -77,6 +76,8 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - Calls: one engine for the whole app (`src/hooks/use-call.ts`, `src/lib/webrtc/*`), mounted by
   `CallProvider` in `app-shell.tsx` / `user-chat.tsx`; screen `src/components/call/*`; `api/calls/authorize`.
 - Runtime toggles: `src/lib/settings.ts` + `app_settings` table + admin "Defaults" tab.
+- Disappearing messages: `src/lib/vanish.ts` (server) + `src/hooks/use-vanish-on-leave.ts` (screen).
+  Read `docs/ARCHITECTURE.md` → Disappearing messages first: a mistake there deletes real messages.
 - Styling: rules in `DESIGN.md`, tokens in `src/app/globals.css`, primitives in `src/components/ui`,
   `cn()` from `src/lib/utils.ts`. Avatars without a photo are "moji" (`src/lib/moji.ts`). Never set
   one property from both a CSS module class and a Tailwind utility: which wins depends on load order.
@@ -85,7 +86,7 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - Never trust client-sent role/ids: every handler re-checks the session; admin = `profiles.is_admin`;
   room actions also `assertRoomAdmin()`. `supabaseAdmin()` only after those checks, server-side only.
 - Server-only modules start with `import "server-only"` (`rooms`, `permissions`, `queries`,
-  `settings`, `invite-token`, `signup-codes`).
+  `settings`, `invite-token`, `signup-codes`, `vanish`).
 - Read env through `src/lib/env.ts`. Only exceptions: `next.config.ts` (Supabase host),
   `src/lib/webrtc/ice.ts` (TURN vars in the browser), `src/app/api/health` (booleans only).
 - Errors: participant-facing routes return generic text; clients show `apiErrorMessage(body, fallback)`.
@@ -174,26 +175,25 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   screen, copy buttons that copy, sign-up with a code (`/signup`, admin tab "Sign-up codes"),
   and the new call screen (the last two not yet confirmed by the owner). Rooms are on hold.
   Not merged, stacked in this order: `feature/call-anywhere`, `fix/flip-camera`,
-  `fix/video-quality`. Next: the relay, then the admin/settings pages. Proposed: the route guard.
+  `fix/video-quality`, `feature/disappearing-messages`. Next: the relay, then the
+  admin/settings pages. Proposed: the route guard.
+- Disappearing messages (off until the admin switches them on; no migration): tested with
+  simulated phones and a pretend server only, nothing of it has run on the live site yet.
 - What the assistant can check itself: public pages on the live site (built-in Browser pane),
-  and calls, by running the real call code in that pane as simulated phones (the admin's shell
-  and two members; no real camera, network or Supabase). The owner checks previews and logins.
+  and calls and disappearing messages, by running the real code in that pane as simulated
+  phones (no real camera, network or Supabase). The owner checks previews and logins.
 - Five Vercel projects build every push: `veil`, `veil-32wk`, `veil-ah7i`, `veil-cqsf`,
-  `veil-vo9a`. `veil-cqsf` (the address used so far) builds `main`, but its preview builds fail:
-  its variables are set for Production only. Which project is the real one, and deleting the
-  rest, is the owner's call.
-- Decided by the owner: sign-up is invite-code only; members chat only with the admin. Open:
-  a yellow "Snapchat-style" theme next to the blue.
+  `veil-vo9a`. `veil-cqsf` (the address in use) builds `main`; its previews fail (variables are
+  set for Production only). Which one is real, and deleting the rest, is the owner's call.
+- Decided by the owner: sign-up is invite-code only; members chat only with the admin. Open: a
+  yellow "Snapchat-style" theme. To do: commit `package-lock.json`; add a test runner + CI.
 - Calls: the owner saw a video call work on one Wi-Fi (2026-11-14). Two-way video (PR #8) and
-  ring-anywhere are tested with simulated phones only, not yet on real ones. Other networks need
-  a TURN relay: `feature/calls-turn` (Cloudflare) is parked locally, needs a rebase onto `main`,
-  and the owner has not decided on Cloudflare. A closed app cannot ring (no push notifications).
+  ring-anywhere are tested with simulated phones only. Other networks need a TURN relay:
+  `feature/calls-turn` (Cloudflare) is parked locally, needs a rebase, the owner has not decided.
 - Performance: functions run in `sin1`, next to the database (`vercel.json`). Checked on the live
   site 2026-11-14: `x-vercel-id` reads `bom1::sin1`, one database round trip takes 20–60 ms.
-- To do: commit `package-lock.json`; add a test runner + CI.
 - Known gaps: `user_session_ephemeral` has no effect (its hook is not mounted); admin-only routes
   echo raw DB errors; small blue text is under 4.5:1 in dark mode on the old screens; more in
-  `docs/SECURITY.md` (in-memory rate limit, plaintext `invite_tokens`, CSP `'unsafe-inline'`,
-  public chat/presence channels). No TODO/FIXME markers in the code.
+  `docs/SECURITY.md` (rate limit, plaintext `invite_tokens`, CSP, public chat channels). No TODO/FIXME in the code.
 
 When you change commands, structure, env vars or conventions, update this file in the same commit.

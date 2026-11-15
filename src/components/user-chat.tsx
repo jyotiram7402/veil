@@ -21,6 +21,7 @@ import { CallButton } from "@/components/call/call-button";
 import { LiveIndicator } from "@/components/chat/live-indicator";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
+import { useVanishOnLeave } from "@/hooks/use-vanish-on-leave";
 import { usePresence } from "@/hooks/use-presence";
 import { useTypingPrune } from "@/hooks/use-typing-prune";
 import { useChatStore } from "@/store/chat-store";
@@ -71,8 +72,13 @@ export function UserChat({
     return m;
   }, [me, adminProfile]);
 
+  // Disappearing messages (only where the admin has switched them on).
+  const disappearing = settings.disappearing_messages === true;
   useChatRealtime({ chatId, me, memberProfiles });
-  useResumeSync(chatId, me);
+  // With disappearing messages the screen is kept exactly like the server: a
+  // message may also have gone while this page was not listening.
+  useResumeSync(chatId, me, disappearing);
+  useVanishOnLeave({ chatId, myId: me.id, enabled: disappearing });
 
   const callChats = useMemo(() => [{ chatId, other: adminProfile }], [chatId, adminProfile]);
 
@@ -142,6 +148,7 @@ export function UserChat({
         me={me}
         memberProfiles={memberProfiles}
         showTyping={settings.typing_indicator}
+        disappearing={disappearing}
       />
       <Composer
         chatId={chatId}
