@@ -177,6 +177,14 @@ from a TURN provider (see `.env.example`) and redeploy. Two tabs on the same
 computer should connect without TURN. Calls exist only in 1:1 chats — the
 call icons inside a room are placeholders.
 
+## A call does not ring on the other side
+
+The other person has to have the app open, on any screen: a closed app or a
+closed tab cannot ring, because there are no push notifications. If they were
+on another call, the caller sees "On another call" and a missed call is logged
+in the chat. Whether a locked phone or a tab in the background still rings has
+not been tested.
+
 ## A call stops with "The microphone is blocked" (or the camera)
 
 The browser has been told not to let this site use the microphone or camera.

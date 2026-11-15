@@ -36,6 +36,11 @@ export type CallScreenActions = {
   toggleCamera: () => void;
   switchCamera: () => void;
   selectOutputDevice: () => void;
+  /**
+   * "Chat" on the call screen: where an app with more than one screen takes the
+   * person (the chat of this call). Without it, "Chat" only shrinks the call.
+   */
+  onOpenChat?: (chatId: string) => void;
 };
 
 /** "4:07", or "1:02:09" from an hour on. Ticks once a second while `running`. */
@@ -103,6 +108,7 @@ export function CallScreen({
   toggleCamera,
   switchCamera,
   selectOutputDevice,
+  onOpenChat,
 }: CallScreenActions) {
   const call = useCallStore();
   const { state, peer, setMinimized } = call;
@@ -129,6 +135,19 @@ export function CallScreen({
     const ring = playRingtone();
     return () => ring.stop();
   }, [state]);
+
+  // Say it in the tab title too, for a tab that is open but not in front.
+  const callerName = state === "ringing" ? (peer?.name ?? null) : null;
+  useEffect(() => {
+    if (!callerName) return;
+    const before = document.title;
+    const ringing = `${callerName} is calling…`;
+    document.title = ringing;
+    return () => {
+      // Leave the title alone if the page has changed it in the meantime.
+      if (document.title === ringing) document.title = before;
+    };
+  }, [callerName]);
 
   // After switching the sound output, name the new one for a moment.
   const [soundNote, setSoundNote] = useState<string | null>(null);
@@ -178,6 +197,11 @@ export function CallScreen({
   const minimize = () => {
     if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
     setMinimized(true);
+  };
+  // "Chat": shrink the call and, where there is more than one screen, go to its chat.
+  const backToChat = () => {
+    minimize();
+    if (call.chatId) onOpenChat?.(call.chatId);
   };
   const status = statusText(state, {
     message: call.errorMessage,
@@ -289,7 +313,7 @@ export function CallScreen({
           localVideo={myVideo}
           previewSelf={previewSelf}
           remoteMuted={live && !call.remoteAudioOn}
-          onMinimize={canMinimize ? minimize : null}
+          onMinimize={canMinimize ? backToChat : null}
           fullscreen={
             fullscreenOffered && pictureOnStage && !over
               ? { on: fullscreenOn, toggle: toggleFullscreen }

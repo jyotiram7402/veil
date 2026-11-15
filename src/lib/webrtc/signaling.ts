@@ -17,6 +17,25 @@ const SIGNAL_EVENTS: SignalType[] = [
 
 type Handler = (type: SignalType, payload: SignalPayload) => void;
 
+// Private channels are authorized against the caller's JWT. Channels opened in
+// the same moment (the admin listens on one per person) share a single round.
+let authorizing: Promise<void> | null = null;
+
+function authorizeRealtime(): Promise<void> {
+  if (!authorizing) {
+    authorizing = (async () => {
+      const supabase = supabaseBrowser();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) await supabase.realtime.setAuth(session.access_token);
+    })().finally(() => {
+      authorizing = null;
+    });
+  }
+  return authorizing;
+}
+
 /**
  * Thin wrapper over a Supabase Realtime PRIVATE broadcast channel used purely
  * for WebRTC signaling on `call:<chatId>`. Private + realtime.messages RLS
@@ -27,6 +46,8 @@ type Handler = (type: SignalType, payload: SignalPayload) => void;
 export class SignalingChannel {
   private channel: RealtimeChannel | null = null;
   private handler: Handler | null = null;
+  private joined: Promise<void> | null = null;
+  private closed = false;
   private readonly topic: string;
 
   constructor(private readonly chatId: string) {
@@ -37,18 +58,17 @@ export class SignalingChannel {
     this.handler = handler;
   }
 
-  async connect(): Promise<void> {
-    const supabase = supabaseBrowser();
+  /** Joins the channel. Resolves once it is subscribed; safe to call twice. */
+  connect(): Promise<void> {
+    if (!this.joined) this.joined = this.join();
+    return this.joined;
+  }
 
-    // Private channels are authorized against the caller's JWT.
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      await supabase.realtime.setAuth(session.access_token);
-    }
+  private async join(): Promise<void> {
+    await authorizeRealtime();
+    if (this.closed) return;
 
-    const channel = supabase.channel(this.topic, {
+    const channel = supabaseBrowser().channel(this.topic, {
       config: { broadcast: { self: false, ack: false }, private: true },
     });
 
@@ -57,26 +77,28 @@ export class SignalingChannel {
         this.handler?.(event, payload as SignalPayload);
       });
     }
+    this.channel = channel;
 
     await new Promise<void>((resolve) => {
       channel.subscribe((status) => {
         if (status === "SUBSCRIBED") resolve();
       });
     });
-
-    this.channel = channel;
   }
 
+  /** Sends one message. One sent while the channel is still joining waits for it. */
   async send(type: SignalType, payload: SignalPayload): Promise<void> {
-    if (!this.channel) return;
+    if (this.closed || !this.joined) return;
+    await this.joined;
+    if (this.closed || !this.channel) return;
     await this.channel.send({ type: "broadcast", event: type, payload });
   }
 
   async disconnect(): Promise<void> {
-    if (!this.channel) return;
-    const supabase = supabaseBrowser();
-    await supabase.removeChannel(this.channel);
-    this.channel = null;
+    this.closed = true;
     this.handler = null;
+    const channel = this.channel;
+    this.channel = null;
+    if (channel) await supabaseBrowser().removeChannel(channel);
   }
 }

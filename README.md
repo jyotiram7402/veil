@@ -131,8 +131,9 @@ not commit TURN secrets — prefer a provider's short-lived credentials.
 - Calls need a **secure context** — HTTPS in production (automatic on Vercel),
   or `http://localhost` for dev. `Permissions-Policy` allows same-origin
   camera/mic.
-- 1-to-1 only (no group calls, no SFU); both people must have the chat open to
-  receive a call; no simultaneous-call resolution (second caller gets *busy*).
+- 1-to-1 only (no group calls, no SFU). A call rings on any screen while the app
+  is open; a closed app does not ring (there are no push notifications). One call
+  at a time: a second caller gets *busy* and a missed call is logged in the chat.
 
 ## License
 

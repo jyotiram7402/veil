@@ -28,12 +28,18 @@ function turnFromEnv(): RTCIceServer[] {
   return [{ urls, ...(username ? { username } : {}), ...(credential ? { credential } : {}) }];
 }
 
-/** The RTCConfiguration handed to every RTCPeerConnection in the app. */
+/**
+ * The RTCConfiguration handed to every RTCPeerConnection in the app.
+ *
+ * No `iceCandidatePoolSize` on purpose. A pool starts gathering before the
+ * offer exists, and in Chromium the pooled candidates can then go out under a
+ * username fragment that is not the one in the offer. Seen right after a
+ * cancelled call: the next call's answering side stayed on "Connecting…" in
+ * half the attempts with a pool of 4, and in none without a pool.
+ */
 export function getRtcConfig(): RTCConfiguration {
   return {
     iceServers: [...STUN_SERVERS, ...turnFromEnv()],
-    // A slightly larger candidate pool warms ICE gathering for faster connects.
-    iceCandidatePoolSize: 4,
   };
 }
 

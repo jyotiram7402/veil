@@ -12,7 +12,6 @@ import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { ChatInfoDrawer } from "@/components/chat/chat-info-drawer";
-import { CallProvider } from "@/components/call/call-provider";
 import { CallButton } from "@/components/call/call-button";
 import { usePresenceStore } from "@/store/presence-store";
 import { lastSeen } from "@/lib/format";
@@ -99,7 +98,7 @@ export function ChatThread({
     onMessageVisible();
   }, [messages.length, onMessageVisible]);
 
-  const body = (
+  return (
     <div className="flex h-full flex-col chat-bg">
       <header className="flex h-16 shrink-0 items-center gap-1 border-b border-border/70 bg-header px-2 text-header-foreground sm:px-4">
         <Button
@@ -143,10 +142,12 @@ export function ChatThread({
             </span>
           </span>
         </button>
+        {/* 1-to-1 chats can call; groups cannot. The calls themselves live in
+            CallProvider, above every screen (app-shell.tsx). */}
         {chatType === "direct" && other && (
           <>
-            <CallButton mode="video" className="[&_svg]:size-5" />
-            <CallButton mode="voice" className="[&_svg]:size-5" />
+            <CallButton chatId={chatId} mode="video" className="[&_svg]:size-5" />
+            <CallButton chatId={chatId} mode="voice" className="[&_svg]:size-5" />
           </>
         )}
         <Button
@@ -175,14 +176,4 @@ export function ChatThread({
       />
     </div>
   );
-
-  // 1-to-1 chats get voice calling; group chats do not.
-  if (chatType === "direct" && other) {
-    return (
-      <CallProvider me={me} other={other} chatId={chatId}>
-        {body}
-      </CallProvider>
-    );
-  }
-  return body;
 }
