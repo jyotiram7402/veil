@@ -161,6 +161,16 @@ export function CallScreen({
     return () => clearTimeout(t);
   }, [call.outputDeviceId]);
 
+  // "Call details": tapping the timer shows how large the pictures really are.
+  // For the day someone says the video looks soft: these two numbers tell why.
+  const [showDetails, setShowDetails] = useState(false);
+  useEffect(() => {
+    if (!open) setShowDetails(false);
+  }, [open]);
+  const numbers = (v: { width: number; height: number; fps: number } | null) =>
+    v ? `${v.width}×${v.height} at ${v.fps} fps` : "no video";
+  const details = `Sending ${numbers(call.sentVideo)} · receiving ${numbers(call.receivedVideo)}`;
+
   // Full screen for the picture (tablet and up).
   const screenRef = useRef<HTMLDivElement | null>(null);
   const [fullscreenOn, setFullscreenOn] = useState(false);
@@ -342,9 +352,15 @@ export function CallScreen({
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
             )}
             {state === "connected" && (
-              <span role="timer" className="tabular-nums">
-                {duration}
-              </span>
+              <button
+                type="button"
+                onClick={() => setShowDetails((on) => !on)}
+                aria-expanded={showDetails}
+                className="rounded-full px-1.5 tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="sr-only">Call details, </span>
+                <span role="timer">{duration}</span>
+              </button>
             )}
             {state === "connected" && status && (
               <>
@@ -371,7 +387,7 @@ export function CallScreen({
               call.cameraError ? "text-destructive" : "text-muted-foreground",
             )}
           >
-            {over ? "" : (call.cameraError ?? soundNote ?? "")}
+            {over ? "" : (call.cameraError ?? soundNote ?? (showDetails ? details : ""))}
           </p>
 
           {incoming ? (

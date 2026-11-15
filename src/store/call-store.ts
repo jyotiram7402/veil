@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import type { CallState, MediaState, PeerInfo } from "@/lib/webrtc/types";
-import type { Quality } from "@/lib/webrtc/stats";
+import type { Quality, VideoNumbers } from "@/lib/webrtc/stats";
 
 type CallStore = {
   state: CallState;
@@ -31,6 +31,9 @@ type CallStore = {
   localStream: MediaStream | null; // local camera preview (video only)
   remoteStream: MediaStream | null; // remote audio+video
   minimized: boolean; // call collapsed to a pill so chat is usable underneath
+  // The pictures as they really travel (size, frames per second), for "call details".
+  sentVideo: VideoNumbers | null;
+  receivedVideo: VideoNumbers | null;
 
   startOutgoing: (callId: string, chatId: string, peer: PeerInfo) => void;
   /** `media` is what the caller has on: its camera makes this a video call. */
@@ -49,6 +52,7 @@ type CallStore = {
   setLocalStream: (stream: MediaStream | null) => void;
   setRemoteStream: (stream: MediaStream | null) => void;
   setMinimized: (minimized: boolean) => void;
+  setVideoNumbers: (sent: VideoNumbers | null, received: VideoNumbers | null) => void;
   /** Move to a closing state, with the text its screen should show (if any). */
   close: (state: CallState, message?: string | null) => void;
   reset: () => void;
@@ -75,7 +79,14 @@ const initial = {
   localStream: null,
   remoteStream: null,
   minimized: false,
+  sentVideo: null,
+  receivedVideo: null,
 };
+
+function sameNumbers(a: VideoNumbers | null, b: VideoNumbers | null): boolean {
+  if (!a || !b) return a === b;
+  return a.width === b.width && a.height === b.height && a.fps === b.fps;
+}
 
 export const useCallStore = create<CallStore>((set) => ({
   ...initial,
@@ -110,6 +121,16 @@ export const useCallStore = create<CallStore>((set) => ({
   setLocalStream: (localStream) => set({ localStream }),
   setRemoteStream: (remoteStream) => set({ remoteStream }),
   setMinimized: (minimized) => set({ minimized }),
+  // Sampled every few seconds: only tell the screen when something changed.
+  setVideoNumbers: (sent, received) =>
+    set((s) =>
+      sameNumbers(s.sentVideo, sent) && sameNumbers(s.receivedVideo, received)
+        ? s
+        : {
+            sentVideo: sent ? { width: sent.width, height: sent.height, fps: sent.fps } : null,
+            receivedVideo: received,
+          },
+    ),
   close: (state, message = null) => set({ state, errorMessage: message }),
   reset: () => set({ ...initial }),
 }));

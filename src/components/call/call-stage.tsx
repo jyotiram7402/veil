@@ -37,6 +37,11 @@ function isPale(hex: string): boolean {
   return luminance > 0.45;
 }
 
+// Filling the stage cuts off part of a picture. Up to a quarter is fine (a
+// phone's picture on a phone loses about a fifth); beyond that the picture is
+// shown whole instead.
+const MAX_CUT = 0.25;
+
 /** A front camera is shown mirrored, like a mirror; a back camera is not. */
 function isSelfie(stream: MediaStream): boolean {
   return stream.getVideoTracks()[0]?.getSettings().facingMode !== "environment";
@@ -102,7 +107,7 @@ export function CallStage({
       </div>
 
       {remoteVideo ? (
-        <StreamVideo key="theirs" stream={remoteVideo} label={`${peer.name}, camera`} fit />
+        <StreamVideo key="theirs" stream={remoteVideo} label={`${peer.name}, camera`} wholeIfCut />
       ) : (
         previewSelf &&
         localVideo && (
@@ -176,19 +181,20 @@ function StreamVideo({
   stream,
   label,
   mirrored,
-  fit,
+  wholeIfCut,
   onShape,
 }: {
   stream: MediaStream;
   label: string;
   mirrored?: boolean;
-  /** Show the whole picture on wide screens instead of filling the stage. */
-  fit?: boolean;
+  /** Show the picture whole when filling the stage would cut too much of it off. */
+  wholeIfCut?: boolean;
   /** Reports whether the picture is wider than tall, once it is known. */
   onShape?: (wide: boolean) => void;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [ready, setReady] = useState(false);
+  const [whole, setWhole] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -197,18 +203,30 @@ function StreamVideo({
     void el.play().catch(() => undefined);
 
     const check = () => {
-      if (el.videoWidth === 0 || el.videoHeight === 0) return;
+      const { videoWidth, videoHeight, clientWidth, clientHeight } = el;
+      if (videoWidth === 0 || videoHeight === 0) return;
       setReady(true);
-      onShape?.(el.videoWidth >= el.videoHeight);
+      onShape?.(videoWidth >= videoHeight);
+      if (wholeIfCut && clientWidth > 0 && clientHeight > 0) {
+        // How much of the picture filling the box would cut off, 0 to 1.
+        const picture = videoWidth / videoHeight;
+        const box = clientWidth / clientHeight;
+        setWhole(1 - Math.min(picture / box, box / picture) > MAX_CUT);
+      }
     };
     check();
+    // The picture changes shape when the other phone is turned, the box when
+    // ours is (or the window is resized).
     el.addEventListener("loadeddata", check);
     el.addEventListener("resize", check);
+    const boxWatch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);
+    boxWatch?.observe(el);
     return () => {
       el.removeEventListener("loadeddata", check);
       el.removeEventListener("resize", check);
+      boxWatch?.disconnect();
     };
-  }, [stream, onShape]);
+  }, [stream, onShape, wholeIfCut]);
 
   return (
     <video
@@ -221,7 +239,7 @@ function StreamVideo({
         styles.video,
         ready && styles.videoOn,
         mirrored && styles.mirror,
-        fit && styles.videoFit,
+        whole && styles.videoFit,
       )}
     />
   );

@@ -8,14 +8,41 @@
 
 export type Quality = "excellent" | "fair" | "poor" | "unknown";
 
+/** One picture stream as it really travels: its size and frames per second. */
+export type VideoNumbers = { width: number; height: number; fps: number };
+
+export type VideoSample = {
+  /** What we send. `limited`: the encoder is holding back (slow link or busy processor). */
+  sent: (VideoNumbers & { limited: boolean }) | null;
+  /** Frames per second our camera delivers. */
+  cameraFps: number | null;
+  /** What arrives from the other side. */
+  received: VideoNumbers | null;
+};
+
 export type QualitySample = {
   quality: Quality;
   rttMs: number | null;
   lossPct: number | null;
   jitterMs: number | null;
+  video: VideoSample;
 };
 
 type LossTracker = { lastReceived: number; lastLost: number };
+
+const NO_VIDEO: VideoSample = { sent: null, cameraFps: null, received: null };
+
+function num(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** The size and frame rate of one outbound-rtp / inbound-rtp video report, if it has a picture. */
+function videoNumbers(report: Record<string, unknown>): VideoNumbers | null {
+  const width = num(report.frameWidth);
+  const height = num(report.frameHeight);
+  if (!width || !height) return null;
+  return { width, height, fps: Math.round(num(report.framesPerSecond) ?? 0) };
+}
 
 /** Stateful sampler: call sample() on an interval; it computes deltas itself. */
 export function createQualitySampler() {
@@ -25,6 +52,7 @@ export function createQualitySampler() {
     let rttMs: number | null = null;
     let jitterMs: number | null = null;
     let lossPct: number | null = null;
+    const video: VideoSample = { sent: null, cameraFps: null, received: null };
 
     try {
       const stats = await pc.getStats();
@@ -44,6 +72,19 @@ export function createQualitySampler() {
           if (typeof report.packetsReceived === "number") received = report.packetsReceived;
           if (typeof report.packetsLost === "number") lost = report.packetsLost;
         }
+        if (report.type === "outbound-rtp" && report.kind === "video") {
+          const numbers = videoNumbers(report);
+          const reason = report.qualityLimitationReason;
+          if (numbers) {
+            video.sent = { ...numbers, limited: typeof reason === "string" && reason !== "none" };
+          }
+        }
+        if (report.type === "media-source" && report.kind === "video") {
+          video.cameraFps = num(report.framesPerSecond);
+        }
+        if (report.type === "inbound-rtp" && report.kind === "video") {
+          video.received = videoNumbers(report);
+        }
       });
 
       const dReceived = received - loss.lastReceived;
@@ -54,10 +95,10 @@ export function createQualitySampler() {
         lossPct = Math.max(0, Math.min(100, (dLost / (dReceived + dLost)) * 100));
       }
     } catch {
-      return { quality: "unknown", rttMs: null, lossPct: null, jitterMs: null };
+      return { quality: "unknown", rttMs: null, lossPct: null, jitterMs: null, video: NO_VIDEO };
     }
 
-    return { quality: computeQuality(rttMs, lossPct, jitterMs), rttMs, lossPct, jitterMs };
+    return { quality: computeQuality(rttMs, lossPct, jitterMs), rttMs, lossPct, jitterMs, video };
   };
 }
 
