@@ -204,6 +204,31 @@ Open the site's permissions in the browser (usually the icon next to the
 address), set Microphone and Camera to Allow, and call again. A blocked camera
 never ends a call: it carries on as a voice call.
 
+## Messages do not disappear
+
+Disappearing messages are off until the admin switches them on: Admin page → **Defaults** →
+"Disappearing messages" (everyone), or **Users** → a person's menu → "Per-user settings"
+(one person). After that:
+
+- The chat has to be opened once after the switch was changed (an open chat keeps the
+  setting it was loaded with).
+- Only a message that has been read goes, and only when its reader leaves the chat: back to
+  the chat list, another chat, another app or tab, a locked phone. A message nobody has read
+  yet stays.
+- Your own messages go when the *other* person has read them and left. If your app is open
+  that shows within a few seconds; otherwise when you come back.
+- With the screen lock: a message that arrived while the lock was closed has not been read.
+  It goes after the chat was unlocked and then left.
+- No connection at the moment of leaving: the messages are hidden on that screen at once,
+  and the app tells the server again when the connection is back. If the app was closed
+  before that, they show once more the next time the chat is opened, and go when it is left.
+
+## A message was gone before I could read it
+
+Every message in an open chat counts as read, also one that arrives while you are scrolled
+up in the history or have a call on top of the chat. Leave the chat after that and it is
+deleted. There is no way to get it back: ask the other person to send it again.
+
 ---
 
 Still stuck? Open an issue on the repo with:

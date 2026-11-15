@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowDown, Loader2 } from "lucide-react";
+import { ArrowDown, Loader2, Timer } from "lucide-react";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { useChatStore } from "@/store/chat-store";
@@ -27,12 +27,15 @@ export function MessageList({
   me,
   memberProfiles,
   showTyping = true,
+  disappearing = false,
 }: {
   chatId: string;
   me: Profile;
   memberProfiles: Record<string, Pick<Profile, "id" | "username" | "display_name" | "avatar_url">>;
   /** Show the "is typing" bubble under the newest message. */
   showTyping?: boolean;
+  /** Disappearing messages are on for this chat: say so, under the newest message. */
+  disappearing?: boolean;
 }) {
   const messages = useChatStore((s) => s.messagesByChat[chatId] ?? []);
   const hasMore = useChatStore((s) => s.hasMore[chatId] ?? false);
@@ -150,9 +153,13 @@ export function MessageList({
 
         {messages.length === 0 && !loadingOlder && (
           <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
-            <p className="text-base font-bold">No messages yet</p>
+            <p className="text-base font-bold">
+              {disappearing ? "Nothing here right now" : "No messages yet"}
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Say hello to start the conversation.
+              {disappearing
+                ? "Messages in this chat disappear once they have been read."
+                : "Say hello to start the conversation."}
             </p>
           </div>
         )}
@@ -198,6 +205,17 @@ export function MessageList({
             );
           })}
         </div>
+        {/* Disappearing messages: one quiet line under the newest message, so
+            nobody is surprised when the chat is empty later. */}
+        {disappearing && messages.length > 0 && (
+          <div className="mt-3 flex justify-center">
+            {/* One line on a 320px phone; the corners still look right if it ever wraps. */}
+            <span className="inline-flex items-center gap-1.5 rounded-2xl bg-card px-3 py-1 text-center text-xs font-medium text-muted-foreground shadow-sm">
+              <Timer className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Seen messages disappear when you leave
+            </span>
+          </div>
+        )}
         {/* Slot for the typing bubble. Always the same height, so nothing
             moves when the bubble comes and goes. */}
         <div className="mt-2 flex h-9 items-end" role="status" aria-live="polite">

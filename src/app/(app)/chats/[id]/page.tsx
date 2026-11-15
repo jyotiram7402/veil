@@ -3,6 +3,7 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { supabaseServer } from "@/lib/supabase/server";
 import { loadMessagesPage } from "@/lib/queries";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
+import { chatIsDisappearing } from "@/lib/vanish";
 import { ChatThread } from "@/components/chat/chat-thread";
 import type { Profile } from "@/types/chat";
 
@@ -29,7 +30,11 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
 
   if (error || !chat) notFound();
 
-  const initialMessages = await loadMessagesPage(supabase, id, { limit: MESSAGE_PAGE_SIZE });
+  // Loaded together: the messages, and whether they disappear in this chat.
+  const [initialMessages, disappearing] = await Promise.all([
+    loadMessagesPage(supabase, id, { limit: MESSAGE_PAGE_SIZE }),
+    chat.type === "direct" ? chatIsDisappearing(chat.id) : Promise.resolve(false),
+  ]);
 
   // mark as read for the opening user
   await supabase
@@ -52,6 +57,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
       members={members}
       initialMessages={initialMessages}
       initialHasMore={initialMessages.length === MESSAGE_PAGE_SIZE}
+      disappearing={disappearing}
     />
   );
 }

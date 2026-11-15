@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/store/chat-store";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
+import { useVanishOnLeave } from "@/hooks/use-vanish-on-leave";
 import { LiveIndicator } from "@/components/chat/live-indicator";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
@@ -16,7 +17,7 @@ import { CallButton } from "@/components/call/call-button";
 import { usePresenceStore } from "@/store/presence-store";
 import { lastSeen } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { MessageWithSender, Profile } from "@/types/chat";
+import type { ChatSummary, MessageWithSender, Profile } from "@/types/chat";
 
 type Props = {
   me: Profile;
@@ -27,6 +28,8 @@ type Props = {
   members: Profile[];
   initialMessages: MessageWithSender[];
   initialHasMore: boolean;
+  /** Disappearing messages are switched on for the person in this chat. */
+  disappearing?: boolean;
 };
 
 export function ChatThread({
@@ -38,6 +41,7 @@ export function ChatThread({
   members,
   initialMessages,
   initialHasMore,
+  disappearing = false,
 }: Props) {
   const setInitial = useChatStore((s) => s.setInitialMessages);
   const messages = useChatStore((s) => s.messagesByChat[chatId] ?? []);
@@ -66,7 +70,20 @@ export function ChatThread({
   }, [members]);
 
   useChatRealtime({ chatId, me, memberProfiles });
-  useResumeSync(chatId, me);
+  // With disappearing messages the screen is kept exactly like the server: a
+  // message may also have gone while this page was not listening.
+  useResumeSync(chatId, me, disappearing);
+  // Disappearing messages: what the admin had read here is deleted when they
+  // leave this chat. The chat list is then loaded again, so no row goes on
+  // showing a message that no longer exists.
+  const setChats = useChatStore((s) => s.setChats);
+  const reloadChatList = useCallback(async () => {
+    const res = await fetch("/api/chats", { cache: "no-store" }).catch(() => null);
+    if (!res?.ok) return;
+    const body = (await res.json()) as { chats: ChatSummary[] };
+    setChats(body.chats);
+  }, [setChats]);
+  useVanishOnLeave({ chatId, myId: me.id, enabled: disappearing, onGone: reloadChatList });
 
   const other = chatType === "direct" ? members.find((m) => m.id !== me.id) : null;
   const titleName = chatType === "group" ? (chatName ?? "Group") : (other?.display_name ?? other?.username ?? "Direct message");
@@ -161,7 +178,12 @@ export function ChatThread({
         </Button>
       </header>
 
-      <MessageList chatId={chatId} me={me} memberProfiles={memberProfiles} />
+      <MessageList
+        chatId={chatId}
+        me={me}
+        memberProfiles={memberProfiles}
+        disappearing={disappearing}
+      />
       <Composer chatId={chatId} me={me} />
 
       <ChatInfoDrawer

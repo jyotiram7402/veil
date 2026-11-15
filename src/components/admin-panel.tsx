@@ -769,6 +769,7 @@ function UserSettingsDialog({
         { key: "uploads_enabled", label: "Allow file uploads" },
         { key: "typing_indicator", label: "Show typing indicators" },
         { key: "screen_guard", label: "Lock screen on blur" },
+        { key: "disappearing_messages", label: "Disappearing messages" },
       ]
     : [];
 
@@ -809,7 +810,13 @@ function UserSettingsDialog({
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={effective}
-                      onCheckedChange={(v) => save({ [row.key]: v })}
+                      onCheckedChange={(v) => {
+                        // Switching this one on deletes messages for good: ask first.
+                        if (row.key === "disappearing_messages" && v && !confirm(DISAPPEARING_WARNING)) {
+                          return;
+                        }
+                        save({ [row.key]: v });
+                      }}
                     />
                     {hasOverride && (
                       <Button
@@ -862,6 +869,14 @@ function UserSettingsDialog({
     </Dialog>
   );
 }
+
+// Asked before disappearing messages are switched on, for everyone or for one person.
+const DISAPPEARING_WARNING =
+  "Turn on disappearing messages?\n\n" +
+  "A message will be deleted for both people once the person it was sent to has read it and " +
+  "leaves the chat. Messages that were read before now go too, the next time each person " +
+  "leaves.\n\n" +
+  "Deleted messages, photos and files cannot be brought back, not even by you.";
 
 function SettingsTab() {
   const [settings, setSettings] = useState<Record<string, unknown>>({});
@@ -933,6 +948,16 @@ function SettingsTab() {
         description="Hide the chat behind a password prompt whenever the user looks away."
         value={Boolean(settings.screen_guard)}
         onChange={(v) => save({ screen_guard: v })}
+        disabled={saving}
+      />
+      <ToggleRow
+        title="Disappearing messages"
+        description="A message is deleted for both people, for good, once the person it was sent to has read it and leaves the chat. Photos and files go too. Nobody can bring them back, not even you."
+        value={Boolean(settings.disappearing_messages)}
+        onChange={(v) => {
+          if (v && !confirm(DISAPPEARING_WARNING)) return;
+          save({ disappearing_messages: v });
+        }}
         disabled={saving}
       />
 

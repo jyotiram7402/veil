@@ -2,14 +2,10 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
+import { SETTING_KEYS } from "@/lib/settings";
 
-const KNOWN_KEYS = new Set([
-  "uploads_enabled",
-  "max_message_length",
-  "screen_guard",
-  "typing_indicator",
-  "user_session_ephemeral",
-]);
+// Every setting the app knows (the same list the per-person route accepts).
+const KNOWN_KEYS = new Set<string>(SETTING_KEYS);
 
 export async function GET() {
   const session = await getSessionUser();

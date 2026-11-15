@@ -63,6 +63,14 @@ export const messageInputSchema = z
     path: ["content"],
   });
 
+/** Disappearing messages: "I had read everything up to this moment". */
+export const vanishSchema = z.object({
+  upTo: z
+    .string()
+    .max(40)
+    .refine((value) => !Number.isNaN(Date.parse(value)), "Not a time"),
+});
+
 export const createDirectChatSchema = z.object({
   kind: z.literal("direct"),
   otherUserId: z.string().uuid(),
