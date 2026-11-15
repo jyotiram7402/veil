@@ -158,9 +158,9 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   (so must `blackfoxx-presence`). Dashboard channels (`admin-rooms:`, `admin-room:`) add a random
   suffix: newer supabase-js reuses a same-named channel and a second `subscribe()` throws.
 - Calls only exist in 1:1 direct chats (room call icons are placeholders); the other person must
-  have the app open (any screen; a closed app does not ring); different networks need TURN. The
-  side that answers must reuse the caller's video line (`adoptOfferedVideo` in `use-call.ts`). No
-  `iceCandidatePoolSize` (`ice.ts` says why). The admin joins one `call:` channel per person.
+  have the app open (any screen; a closed app does not ring); different networks need TURN. Read
+  `docs/ARCHITECTURE.md` → Calling before changing `use-call.ts`: each rule there (reuse the
+  caller's video line, no candidate pool, one camera at a time) was learnt from a bug.
 - Rate limiting (`src/lib/api.ts`) is in-memory per serverless instance — a speed bump only.
 - `error.tsx` shows `Ref: <digest>` — search that digest in Vercel → Logs.
 
@@ -173,8 +173,8 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
   animated first screen, the log-in and invite-link screens, the chat home and the chat
   screen, copy buttons that copy, sign-up with a code (`/signup`, admin tab "Sign-up codes"),
   and the new call screen (the last two not yet confirmed by the owner). Rooms are on hold.
-  On `feature/call-anywhere` (not merged): calls ring on every screen. Next: the relay for
-  other networks, then the admin/settings pages. Proposed: the route guard.
+  Not merged, stacked in this order: `feature/call-anywhere` (calls ring on every screen),
+  `fix/flip-camera`. Next: the relay, then the admin/settings pages. Proposed: the route guard.
 - What the assistant can check itself: public pages on the live site (built-in Browser pane),
   and calls, by running the real call code in that pane as simulated phones (the admin's shell
   and two members; no real camera, network or Supabase). The owner checks previews and logins.

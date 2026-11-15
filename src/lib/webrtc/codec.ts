@@ -28,29 +28,39 @@ export function audioConstraints(deviceId?: string): MediaStreamConstraints {
  * its own, and the hook retries with a relaxed constraint if the exact request
  * can't be satisfied, so a call never fails just because 720p is unavailable.
  */
-export function videoConstraints(opts?: {
-  deviceId?: string;
-  facingMode?: "user" | "environment";
-}): MediaStreamConstraints {
+export function videoConstraints(camera?: CameraChoice): MediaStreamConstraints {
   const video: MediaTrackConstraints = {
     width: { ideal: 1280, max: 1280 },
     height: { ideal: 720, max: 720 },
     frameRate: { ideal: 30, max: 30 },
+    ...whichCamera(camera),
   };
-  if (opts?.deviceId) video.deviceId = { exact: opts.deviceId };
-  else if (opts?.facingMode) video.facingMode = opts.facingMode;
   return { audio: false, video };
 }
 
 /** Minimal fallback used when the 720p request is rejected. */
-export function relaxedVideoConstraints(opts?: {
-  deviceId?: string;
-  facingMode?: "user" | "environment";
-}): MediaStreamConstraints {
-  const video: MediaTrackConstraints = {};
-  if (opts?.deviceId) video.deviceId = { exact: opts.deviceId };
-  else if (opts?.facingMode) video.facingMode = opts.facingMode;
+export function relaxedVideoConstraints(camera?: CameraChoice): MediaStreamConstraints {
+  const video = whichCamera(camera);
   return { audio: false, video: Object.keys(video).length ? video : true };
+}
+
+/**
+ * Which camera to open: one exact device (a computer with several), or a side
+ * (a phone: "user" is the front camera, "environment" the back).
+ */
+export type CameraChoice = {
+  deviceId?: string;
+  facing?: "user" | "environment";
+  /** Only that side will do: fail instead of quietly opening another camera. */
+  exactFacing?: boolean;
+};
+
+function whichCamera(camera?: CameraChoice): MediaTrackConstraints {
+  if (camera?.deviceId) return { deviceId: { exact: camera.deviceId } };
+  if (camera?.facing) {
+    return { facingMode: camera.exactFacing ? { exact: camera.facing } : camera.facing };
+  }
+  return {};
 }
 
 /**

@@ -10,6 +10,8 @@ export type CallErrorCode =
   | "CAMERA_PERMISSION_DENIED"
   | "CAMERA_UNAVAILABLE"
   | "CAMERA_NOT_FOUND"
+  | "CAMERA_SWITCH_FAILED"
+  | "CAMERA_LOST"
   | "NETWORK_DISCONNECTED"
   | "ICE_FAILED"
   | "CONNECTION_FAILED"
@@ -31,6 +33,8 @@ const MESSAGES: Record<CallErrorCode, string> = {
     "The camera is blocked. Allow it for this site in your browser to use video.",
   CAMERA_UNAVAILABLE: "The camera could not be started.",
   CAMERA_NOT_FOUND: "No camera was found on this device.",
+  CAMERA_SWITCH_FAILED: "The other camera could not be started, so this one stays on.",
+  CAMERA_LOST: "The camera stopped. Tap Camera to turn it on again.",
   NETWORK_DISCONNECTED: "You appear to be offline.",
   ICE_FAILED: "Couldn't connect the call.",
   CONNECTION_FAILED: "The call connection failed.",
