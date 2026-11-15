@@ -156,6 +156,12 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
   on/off is `replaceTrack` (no renegotiation). The side that answers takes over that same
   line after reading the offer (`adoptOfferedVideo`); a transceiver it added itself would
   never be negotiated and its camera would not be sent. Caller-only ICE restart with backoff.
+- Camera (`startCamera` / `switchCamera` in `use-call.ts`): a phone can have one camera open
+  at a time, so the one in use is let go before another is opened, and comes back if the other
+  does not start. "Flip" asks a phone for the other *side* (front / back) and lets the browser
+  pick the lens; stepping through device ids lands on the wide or the zoom lens. A computer's
+  cameras do not report a side: there Flip takes the next device. Camera changes run one at a
+  time, and a camera that opens after it was switched off (or after the call ended) is let go.
 - UI: `components/call/call-screen.tsx` (+ `call-stage`, `call-controls`, `call.module.css`)
   only reads `call-store` and calls the actions `use-call` returns. A closing state
   (`isCallOver`) keeps the screen up for 2.5 s; an error stays until closed (`dismiss`).

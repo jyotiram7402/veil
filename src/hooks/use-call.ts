@@ -9,6 +9,7 @@ import {
   preferOpus,
   relaxedVideoConstraints,
   videoConstraints,
+  type CameraChoice,
 } from "@/lib/webrtc/codec";
 import { createQualitySampler, STATS_INTERVAL_MS } from "@/lib/webrtc/stats";
 import { monitorAudioLevel, type AudioLevelMonitor } from "@/lib/webrtc/audio-level";
@@ -51,6 +52,38 @@ const DISCONNECT_GRACE_MS = 2000;
 // call UI goes away by itself. An error does not go by itself: it says what to
 // do, so it stays until it is closed.
 const ENDED_LINGER_MS = 2500;
+
+// A phone needs a moment to let go of a camera before it can open the other one.
+const CAMERA_RELEASE_MS = 400;
+
+function cameraIsBusy(err: unknown): boolean {
+  return (
+    err instanceof DOMException && (err.name === "NotReadableError" || err.name === "AbortError")
+  );
+}
+
+/**
+ * Opens one camera: the good picture first, then whatever that camera gives.
+ * If it is still busy (a phone that just let go of its other camera), wait a
+ * moment and try once more.
+ */
+async function openCamera(camera: CameraChoice): Promise<MediaStream> {
+  const open = async () => {
+    try {
+      return await navigator.mediaDevices.getUserMedia(videoConstraints(camera));
+    } catch {
+      // 720p (or that frame rate) unavailable → take what the camera has.
+      return navigator.mediaDevices.getUserMedia(relaxedVideoConstraints(camera));
+    }
+  };
+  try {
+    return await open();
+  } catch (err) {
+    if (!cameraIsBusy(err)) throw err;
+    await new Promise((resolve) => setTimeout(resolve, CAMERA_RELEASE_MS));
+    return open();
+  }
+}
 
 function peerInfo(p: Person): PeerInfo {
   return { id: p.id, name: p.display_name ?? p.username, avatarUrl: p.avatar_url };
@@ -109,8 +142,12 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const authTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stopCameraRef = useRef<((reason?: CallErrorCode) => void) | null>(null);
   const startCameraRef = useRef<
-    ((deviceId?: string, preAuthorized?: boolean) => Promise<void>) | null
+    ((cameras?: CameraChoice[], preAuthorized?: boolean) => Promise<void>) | null
   >(null);
+  // Camera changes run one at a time: the connection one is at work for, and a
+  // count that goes up each time the camera is told to stop.
+  const cameraBusyRef = useRef<RTCRtpSender | null>(null);
+  const cameraStopsRef = useRef(0);
   const samplerRef = useRef<ReturnType<typeof createQualitySampler> | null>(null);
   const audioMonitorRef = useRef<AudioLevelMonitor | null>(null);
 
@@ -245,9 +282,15 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       localStreamRef.current = null;
     }
     if (videoStreamRef.current) {
-      for (const track of videoStreamRef.current.getTracks()) track.stop();
+      for (const track of videoStreamRef.current.getTracks()) {
+        track.onended = null;
+        track.stop();
+      }
       videoStreamRef.current = null;
     }
+    // The next call starts on the front camera again, whichever was used last.
+    facingRef.current = "user";
+    cameraStopsRef.current++;
     remoteStreamRef.current = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     incomingOfferRef.current = null;
@@ -662,73 +705,129 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
 
   // ---- Camera (video) -------------------------------------------------------
 
+  /** Lets go of the camera in use, and says which one it was. */
+  const releaseCamera = useCallback((): CameraChoice | null => {
+    const stream = videoStreamRef.current;
+    if (!stream) return null;
+    const was = stream.getVideoTracks()[0]?.getSettings();
+    for (const t of stream.getTracks()) {
+      t.onended = null; // we are stopping it ourselves: that is not a lost camera
+      t.stop();
+    }
+    videoStreamRef.current = null;
+    if (was?.deviceId) return { deviceId: was.deviceId };
+    return { facing: was?.facingMode === "environment" ? "environment" : "user" };
+  }, []);
+
+  /**
+   * Turns the camera on, or changes to another one. `cameras` are tried in
+   * order; without any, the side used last (the front camera at first).
+   * `preAuthorized`: the caller of this function has just checked "video" itself.
+   */
   const startCamera = useCallback(
-    // `preAuthorized`: the caller of this function has just checked "video" itself.
-    async (deviceId?: string, preAuthorized = false) => {
+    async (cameras?: CameraChoice[], preAuthorized = false) => {
       const sender = videoSenderRef.current;
       if (!sender) return; // not set up yet (the store's `mediaReady` is still false)
-      // Video authorization is checked server-side too (never trust the client).
-      if (!preAuthorized) {
-        const auth = await authorize("video");
-        if (!auth.ok) {
-          store.getState().setCameraError(callErrorMessage(reasonToCode(auth.reason)));
-          return;
-        }
-      }
-      // True while this is still the same call on the same connection.
-      const stillOurs = () => videoSenderRef.current === sender;
-      const opts = deviceId ? { deviceId } : { facingMode: facingRef.current };
-      let stream: MediaStream;
+      // One camera change at a time. A tap that lands while one is at work is
+      // dropped: two of them racing could leave a camera on behind a screen
+      // that says it is off.
+      if (cameraBusyRef.current === sender) return;
+      cameraBusyRef.current = sender;
+      const stops = cameraStopsRef.current;
+      // True while this is still the same call and nobody has switched the
+      // camera off in the meantime.
+      const stillWanted = () =>
+        videoSenderRef.current === sender && cameraStopsRef.current === stops;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(videoConstraints(opts));
-      } catch {
-        // 720p (or the exact device) unavailable → relax rather than fail.
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(relaxedVideoConstraints(opts));
-        } catch (err) {
-          if (stillOurs()) store.getState().setCameraError(callErrorMessage(classifyCameraError(err)));
+        // Video authorization is checked server-side too (never trust the client).
+        if (!preAuthorized) {
+          const auth = await authorize("video");
+          if (!stillWanted()) return;
+          if (!auth.ok) {
+            store.getState().setCameraError(callErrorMessage(reasonToCode(auth.reason)));
+            return;
+          }
+        }
+        const wanted = cameras?.length ? cameras : [{ facing: facingRef.current }];
+
+        // Most phones cannot have two cameras open at once, so the one in use
+        // is let go first. If none of the wanted ones opens, we go back to it.
+        const previous = releaseCamera();
+        let stream: MediaStream | null = null;
+        let failure: unknown = null;
+        for (const camera of wanted) {
+          try {
+            stream = await openCamera(camera);
+            break;
+          } catch (err) {
+            failure = failure ?? err;
+          }
+          if (!stillWanted()) return;
+        }
+        const changed = stream !== null;
+        if (!stream && previous) {
+          try {
+            stream = await openCamera(previous);
+          } catch {
+            /* reported below */
+          }
+        }
+        // The call may have ended, or the camera been switched off, while the
+        // browser was opening it: let it go again instead of leaving it running.
+        if (!stillWanted()) {
+          for (const t of stream?.getTracks() ?? []) t.stop();
           return;
         }
+        const track = stream?.getVideoTracks()[0];
+        if (!stream || !track) {
+          // No camera any more. The call itself goes on as a voice call.
+          void sender.replaceTrack(null).catch(() => undefined);
+          store.getState().setVideoEnabled(false);
+          store.getState().setLocalStream(null);
+          store
+            .getState()
+            .setCameraError(
+              callErrorMessage(failure ? classifyCameraError(failure) : "CAMERA_UNAVAILABLE"),
+            );
+          broadcastMediaState();
+          return;
+        }
+        // Camera lost mid-call (unplugged, taken by the system) → keep the call
+        // and say so. Only while it is the camera in use.
+        const opened = stream;
+        track.onended = () => {
+          if (videoStreamRef.current === opened) stopCameraRef.current?.("CAMERA_LOST");
+        };
+        videoStreamRef.current = stream;
+        await sender.replaceTrack(track); // no renegotiation (transceiver exists)
+        if (!stillWanted()) return; // stopped meanwhile; whoever stopped it let the camera go
+        const facing = track.getSettings().facingMode;
+        if (facing === "user" || facing === "environment") facingRef.current = facing;
+        usedVideoRef.current = true;
+        // Back on the camera we came from: the other one did not start.
+        store.getState().setCameraError(changed ? null : callErrorMessage("CAMERA_SWITCH_FAILED"));
+        store.getState().setVideoEnabled(true);
+        store.getState().setLocalStream(stream);
+        broadcastMediaState();
+      } finally {
+        if (cameraBusyRef.current === sender) cameraBusyRef.current = null;
       }
-      // The call may have ended while the browser was asking for the camera:
-      // switch it off again instead of leaving it running with no call.
-      if (!stillOurs()) {
-        for (const t of stream.getTracks()) t.stop();
-        return;
-      }
-      const [track] = stream.getVideoTracks();
-      if (!track) {
-        store.getState().setCameraError(callErrorMessage("CAMERA_UNAVAILABLE"));
-        return;
-      }
-      // Camera lost mid-call (unplugged / OS revoked) → keep voice, surface it.
-      track.onended = () => stopCameraRef.current?.("CAMERA_UNAVAILABLE");
-      await sender.replaceTrack(track); // no renegotiation (transceiver exists)
-      if (videoStreamRef.current) for (const t of videoStreamRef.current.getTracks()) t.stop();
-      videoStreamRef.current = stream;
-      usedVideoRef.current = true;
-      store.getState().setCameraError(null);
-      store.getState().setVideoEnabled(true);
-      store.getState().setLocalStream(stream);
-      broadcastMediaState();
     },
-    [authorize, store, broadcastMediaState],
+    [authorize, store, broadcastMediaState, releaseCamera],
   );
 
   const stopCamera = useCallback(
     (reason?: CallErrorCode) => {
       const sender = videoSenderRef.current;
+      cameraStopsRef.current++; // a camera that is still being opened is let go when it arrives
       if (sender) void sender.replaceTrack(null).catch(() => undefined);
-      if (videoStreamRef.current) {
-        for (const t of videoStreamRef.current.getTracks()) t.stop();
-        videoStreamRef.current = null;
-      }
+      releaseCamera();
       store.getState().setVideoEnabled(false);
       store.getState().setLocalStream(null);
       if (reason) store.getState().setCameraError(callErrorMessage(reason));
       broadcastMediaState();
     },
-    [store, broadcastMediaState],
+    [store, broadcastMediaState, releaseCamera],
   );
   // expose to earlier-defined callers (periodic auth timer, startCall)
   stopCameraRef.current = stopCamera;
@@ -739,24 +838,41 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     else await startCamera();
   }, [store, stopCamera, startCamera]);
 
+  /** "Flip": the other side on a phone, the next camera on a computer. */
   const switchCamera = useCallback(async () => {
-    if (!store.getState().videoEnabled) return;
-    if (!videoSenderRef.current) return;
-    let deviceId: string | undefined;
+    const sender = videoSenderRef.current;
+    if (!store.getState().videoEnabled || !sender) return;
+    if (cameraBusyRef.current === sender) return; // a tap while a change is still at work
+    const current = videoStreamRef.current?.getVideoTracks()[0]?.getSettings();
+
+    let others: MediaDeviceInfo[] = [];
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const cams = devices.filter((d) => d.kind === "videoinput");
-      if (cams.length >= 2) {
-        const current = videoStreamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
-        const idx = cams.findIndex((c) => c.deviceId === current);
-        deviceId = cams[(idx + 1) % cams.length]?.deviceId;
-      } else {
-        facingRef.current = facingRef.current === "user" ? "environment" : "user";
-      }
+      others = devices.filter(
+        (d) => d.kind === "videoinput" && d.deviceId && d.deviceId !== current?.deviceId,
+      );
     } catch {
-      facingRef.current = facingRef.current === "user" ? "environment" : "user";
+      /* no list: a phone can still be asked for its other side */
     }
-    await startCamera(deviceId);
+
+    const cameras: CameraChoice[] = [];
+    if (current?.facingMode === "user" || current?.facingMode === "environment") {
+      // A phone. Ask for the other side and let the browser pick the camera: a
+      // phone often has several on the back, and stepping through them one by
+      // one lands on the wide or the zoom lens. Should the phone not know its
+      // sides, fall back on the cameras whose name says so, then on any other.
+      const side = current.facingMode === "user" ? "environment" : "user";
+      const named = side === "environment" ? /back|rear|environment/i : /front|user|face/i;
+      cameras.push({ facing: side, exactFacing: true });
+      for (const d of others) if (named.test(d.label)) cameras.push({ deviceId: d.deviceId });
+      for (const d of others) if (!named.test(d.label)) cameras.push({ deviceId: d.deviceId });
+    } else {
+      // A computer: its cameras do not say which way they face. Take the next one.
+      const next = others[0];
+      if (next) cameras.push({ deviceId: next.deviceId });
+    }
+    if (cameras.length === 0) return;
+    await startCamera(cameras, true);
   }, [store, startCamera]);
 
   /** Cycle to the next available audio output device (setSinkId), if supported. */
