@@ -11,15 +11,6 @@ import { hashPassword, verifyPassword } from "@/lib/password";
  * re-deriving access rules.
  */
 
-export type RoomStatus = "active" | "ended" | "expired" | "locked";
-
-export const ROOM_STATUS = {
-  ACTIVE: "active",
-  ENDED: "ended",
-  EXPIRED: "expired",
-  LOCKED: "locked",
-} as const;
-
 /** Generic message shown for every join failure — never leaks room existence. */
 export const JOIN_FAILURE = "Invalid or expired invitation.";
 

@@ -27,9 +27,6 @@ const config: NextConfig = {
   // remaining warnings (e.g. blob-URL <img> previews) are non-issues.
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
-  experimental: {
-    optimizePackageImports: ["lucide-react", "date-fns", "framer-motion"],
-  },
   async headers() {
     // Content-Security-Policy. Conservative but strictly tighter than
     // "no CSP": it locks down framing, base-uri, objects, and forms, and pins

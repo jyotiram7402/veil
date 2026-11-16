@@ -10,10 +10,5 @@ export function usernameToInternalEmail(username: string): string {
   return `${normalized}@${env.INTERNAL_EMAIL_DOMAIN}`;
 }
 
-export function internalEmailToUsername(email: string): string {
-  const at = email.indexOf("@");
-  return at === -1 ? email : email.slice(0, at);
-}
-
 /** Same rule the DB CHECK constraint enforces, kept in sync. */
 export const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/;

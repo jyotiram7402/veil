@@ -21,6 +21,7 @@ function isSameDay(a: string, b: string) {
 }
 
 const NEAR_BOTTOM_PX = 240;
+const NO_MESSAGES: MessageWithSender[] = [];
 
 export function MessageList({
   chatId,
@@ -37,7 +38,7 @@ export function MessageList({
   /** Disappearing messages are on for this chat: say so, under the newest message. */
   disappearing?: boolean;
 }) {
-  const messages = useChatStore((s) => s.messagesByChat[chatId] ?? []);
+  const messages = useChatStore((s) => s.messagesByChat[chatId] ?? NO_MESSAGES);
   const hasMore = useChatStore((s) => s.hasMore[chatId] ?? false);
   const prependMessages = useChatStore((s) => s.prependMessages);
 

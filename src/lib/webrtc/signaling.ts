@@ -50,7 +50,7 @@ export class SignalingChannel {
   private closed = false;
   private readonly topic: string;
 
-  constructor(private readonly chatId: string) {
+  constructor(chatId: string) {
     this.topic = `call:${chatId}`;
   }
 

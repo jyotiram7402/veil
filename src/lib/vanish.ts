@@ -42,7 +42,11 @@ export async function chatIsDisappearing(chatId: string): Promise<boolean> {
   if (!chat || chat.type !== "direct") return false;
   const member = (chat.members ?? []).map((m) => m.user).find((u) => u && !u.is_admin);
   if (!member) return false;
-  const settings = await effectiveSettingsForUser(member.id);
+  return memberHasDisappearing(member.id);
+}
+
+export async function memberHasDisappearing(memberId: string): Promise<boolean> {
+  const settings = await effectiveSettingsForUser(memberId);
   return settings.disappearing_messages === true;
 }
 

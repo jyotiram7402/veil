@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { jsonError, parseBody } from "@/lib/api";
 
@@ -39,8 +39,8 @@ function label(kind: "voice" | "video", status: string, durationSeconds: number 
  * Only the call's caller may post. No media/metrics are stored.
  */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
   const { id } = await ctx.params;
 
   const parsed = await parseBody(req, bodySchema);
@@ -54,7 +54,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .maybeSingle();
 
   // Only the caller of this specific call may post its event.
-  if (!call || call.caller_id !== session.id) return jsonError(403, "Not allowed");
+  if (!call || call.caller_id !== userId) return jsonError(403, "Not allowed");
   if (call.event_posted) return NextResponse.json({ ok: true, duplicate: true });
 
   const now = new Date();

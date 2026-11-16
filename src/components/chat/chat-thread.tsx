@@ -44,7 +44,7 @@ export function ChatThread({
   disappearing = false,
 }: Props) {
   const setInitial = useChatStore((s) => s.setInitialMessages);
-  const messages = useChatStore((s) => s.messagesByChat[chatId] ?? []);
+  const messageCount = useChatStore((s) => s.messagesByChat[chatId]?.length ?? 0);
   const markChatRead = useChatStore((s) => s.markChatRead);
   const [infoOpen, setInfoOpen] = useState(false);
 
@@ -111,9 +111,9 @@ export function ChatThread({
   }, [chatId, markChatRead]);
 
   useEffect(() => {
-    if (messages.length === 0) return;
+    if (messageCount === 0) return;
     onMessageVisible();
-  }, [messages.length, onMessageVisible]);
+  }, [messageCount, onMessageVisible]);
 
   return (
     <div className="flex h-full flex-col chat-bg">

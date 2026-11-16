@@ -21,7 +21,8 @@ in the database (RLS), never from client-supplied role/permission/identity.
   (`/join/<selector.verifier>`), pass a gate/verifier, and the server mints an
   ephemeral Supabase session. No email/phone/PII.
 - Middleware refreshes the session and gates route prefixes; suspended/archived
-  users are signed out. `getSessionUser()` is the server-side source of identity.
+  users are signed out. `getAuthUserId()` and `getSessionUser()` are the server-side source
+  of identity: both ask Supabase Auth to verify the session on every request.
 
 ## Authorization
 

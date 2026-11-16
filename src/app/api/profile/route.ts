@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId } from "@/lib/auth/session";
 import { profileUpdateSchema } from "@/lib/validations";
 import { jsonError, parseBody } from "@/lib/api";
 
 export async function PATCH(req: Request) {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
 
   const parsed = await parseBody(req, profileUpdateSchema);
   if (!parsed.ok) return parsed.response;
@@ -25,7 +25,7 @@ export async function PATCH(req: Request) {
   const { data, error } = await supabase
     .from("profiles")
     .update(update)
-    .eq("id", session.id)
+    .eq("id", userId)
     .select()
     .single();
 

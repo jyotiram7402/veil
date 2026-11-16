@@ -1,50 +1,44 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId } from "@/lib/auth/session";
 import { messageInputSchema } from "@/lib/validations";
 import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
 import { loadMessagesAfter, loadMessagesPage } from "@/lib/queries";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
   const { id } = await ctx.params;
 
   const url = new URL(req.url);
   const before = url.searchParams.get("before") ?? undefined;
   const after = url.searchParams.get("after") ?? undefined;
+  const limit = Math.min(
+    Math.max(
+      parseInt(url.searchParams.get("limit") ?? `${MESSAGE_PAGE_SIZE}`, 10) ||
+        MESSAGE_PAGE_SIZE,
+      1,
+    ),
+    100,
+  );
 
   const supabase = await supabaseServer();
-  try {
-    // Resume-sync path: fetch every message strictly newer than `after`,
-    // ascending. Capped at 200 so a long absence can't blow up memory.
-    if (after) {
-      const messages = await loadMessagesAfter(supabase, id, after, 200);
-      return NextResponse.json({ messages, mode: "after" });
-    }
+  const query = after
+    ? loadMessagesAfter(supabase, id, after, 200)
+    : loadMessagesPage(supabase, id, { before, limit });
+  const [userId, messages] = await Promise.all([getAuthUserId(), query.catch(() => null)]);
 
-    const limit = Math.min(
-      Math.max(
-        parseInt(url.searchParams.get("limit") ?? `${MESSAGE_PAGE_SIZE}`, 10) ||
-          MESSAGE_PAGE_SIZE,
-        1,
-      ),
-      100,
-    );
-    const messages = await loadMessagesPage(supabase, id, { before, limit });
-    return NextResponse.json({ messages, hasMore: messages.length === limit });
-  } catch (err) {
-    return jsonError(500, err instanceof Error ? err.message : "Failed");
-  }
+  if (!userId) return jsonError(401, "Sign in required");
+  if (!messages) return jsonError(500, "Something went wrong");
+  if (after) return NextResponse.json({ messages, mode: "after" });
+  return NextResponse.json({ messages, hasMore: messages.length === limit });
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
   const { id } = await ctx.params;
 
-  if (!rateLimit(`msg:${session.id}:${clientKey(req)}`, 60, 60_000)) {
+  if (!rateLimit(`msg:${userId}:${clientKey(req)}`, 60, 60_000)) {
     return jsonError(429, "Sending too fast");
   }
 
@@ -57,7 +51,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .from("messages")
     .insert({
       chat_id: id,
-      sender_id: session.id,
+      sender_id: userId,
       content: parsed.data.content ?? null,
       type: parsed.data.type,
       attachment_url: parsed.data.attachmentUrl ?? null,

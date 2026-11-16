@@ -28,6 +28,26 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
               └─ supabaseBrowser() for Realtime (postgres_changes, broadcast, presence)
 ```
 
+### Speed
+
+Measured on the live site (2026-11-16, from India through `bom1` to the function in `sin1`):
+a request that touches no database takes about 150 ms, every database call adds a round
+trip of 20–60 ms, and a function that has been idle adds about 0.6 s once (a cold start).
+So what a page or route costs is mostly how many calls it makes *one after another*.
+
+- Calls that do not need each other's answer start together (`Promise.all`). A chat page is
+  two steps deep (it was six), the member's page three (was six), the admin shell three.
+- `getAuthUserId()` checks the session with Supabase Auth and stops there. Routes that only
+  need to know who is asking use it (messages, read, heartbeat, vanish, upload, calls, the
+  chat list). `getSessionUser()` adds the `profiles` row: for pages, and for anything that
+  checks `is_admin`. Both are verified by Supabase on every request; nothing trusts the cookie.
+- A read that row-level security already guards runs alongside the session check (the 5 s
+  message poll is one step instead of three). A write waits for the session check.
+- In the browser: the log-in and sign-up forms check their fields with `entry-checks.ts`
+  (no validation library is shipped to them; the server still validates with zod), dates are
+  formatted by `format.ts` without a library, the image viewer animates with CSS, and the
+  image compressor is fetched only when a large photo is attached.
+
 ## Route groups (`src/app`)
 
 | Path | Who | What |
@@ -49,8 +69,8 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 
 ## API routes (`src/app/api`)
 
-- `auth/` — `login`, `logout`, `end-session` (beacon logout), `session`, `signup` (public;
-  an invite code + username + password → a member account, signed in).
+- `auth/` — `login`, `logout`, `signup` (public; an invite code + username + password → a
+  member account, signed in).
 - `admin/signup-codes` — list / create (the code is returned once), `[id]` DELETE switches one off.
 - `admin/` — `users` (list; create — bootstrap-token path when `profiles` is empty),
   `users/[id]` (archive / `?hard=1` delete), `.../suspend`, `.../restore`, `.../invite`
@@ -64,7 +84,7 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 - `lock` — unlock `SessionLock` with the gate password.
 - `rooms/` — list/create, `[id]` (detail / patch status+flags), `[id]/invites`,
   `[id]/invites/[inviteId]` (revoke), `[id]/participants/[userId]` (perms/block/remove),
-  `[id]/me` (caller's effective permissions), `join` (public; access code → guest session).
+  `join` (public; access code → guest session).
 - `calls/authorize?chatId=&feature=voice|video` — server-side call authorization.
 - `calls/[id]/event` — caller posts one call-outcome system message (idempotent).
 - `profile`, `profile/heartbeat` (last_seen), `users/search` (admin picker), `health`.
@@ -75,8 +95,10 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
   reads elsewhere: `next.config.ts`, `webrtc/ice.ts`, `app/api/health`.
 - `supabase/client.ts` (browser), `server.ts` (cookies, RLS), `admin.ts` (service role),
   `middleware.ts` (route gating).
-- `auth/session.ts` (`getSessionUser`, `requireSessionUser`), `auth/username.ts`
-  (`<username>@INTERNAL_EMAIL_DOMAIN`).
+- `auth/session.ts` (`getAuthUserId`, `getSessionUser`, `requireSessionUser`,
+  `redirectIfSignedIn`), `auth/username.ts` (`<username>@INTERNAL_EMAIL_DOMAIN`).
+- `entry-checks.ts` (field checks for the log-in and sign-up forms), `format.ts` (times and
+  dates as the chat shows them).
 - `api.ts` — `jsonError`, `parseBody(req, zodSchema)`, in-memory `rateLimit`, `clientKey`.
 - `validations.ts` — all zod schemas (login, users, messages, rooms, invites, join, display name).
 - `queries.ts` — chat list + message paging queries.
@@ -113,8 +135,7 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
   An empty chat asks for the newest page; `exact` mode (disappearing chats) also takes off
   the screen what the server no longer has.
 - `use-vanish-on-leave` — disappearing messages, the screen's half (see below).
-- `use-heartbeat` — `last_seen_at` every 30 s. `use-ephemeral-session` — exists but is not
-  mounted anywhere (V2_NOTES describes it as active; that's outdated).
+- `use-heartbeat` — `last_seen_at` every 30 s.
 - `use-call` — the WebRTC engine (see below). `use-media-devices` — the device list for the
   call screen.
 

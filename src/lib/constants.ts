@@ -21,5 +21,4 @@ export const ALLOWED_ATTACHMENT_MIME = [
   "text/csv",
 ];
 
-export const TYPING_TIMEOUT_MS = 4000;
 export const PRESENCE_HEARTBEAT_MS = 30_000;

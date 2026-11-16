@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
 import {
   ALLOWED_ATTACHMENT_MIME,
@@ -16,8 +16,8 @@ export const runtime = "nodejs";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 export async function POST(req: Request) {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
 
   let form: FormData;
   try {
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     if (!IMAGE_MIME_TYPES.includes(file.type)) return jsonError(415, "Unsupported image type");
 
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
-    const path = `${session.id}/avatar-${Date.now()}.${ext}`;
+    const path = `${userId}/avatar-${Date.now()}.${ext}`;
     const bytes = new Uint8Array(await file.arrayBuffer());
 
     const { error } = await supabase.storage.from("avatars").upload(path, bytes, {

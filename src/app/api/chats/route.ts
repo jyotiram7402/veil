@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId, getSessionUser } from "@/lib/auth/session";
 import { createChatSchema } from "@/lib/validations";
 import { jsonError, parseBody } from "@/lib/api";
 import { loadChatsForUser } from "@/lib/queries";
 
 export async function GET() {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
 
   const supabase = await supabaseServer();
-  const chats = await loadChatsForUser(supabase, session.id);
+  const chats = await loadChatsForUser(supabase, userId);
   return NextResponse.json({ chats });
 }
 

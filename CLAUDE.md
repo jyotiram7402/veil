@@ -61,13 +61,14 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - `supabase/*.sql` migrations; `src/types/database.ts` is a **hand-written** mirror of them.
 - Flow: Server Component (`getSessionUser` + RLS client; does its own redirects) → client component →
   `fetch('/api/…')` → handler auth check → `supabaseServer` (RLS) or `supabaseAdmin` (service role).
-- Docs: `DEPLOYMENT.md`, `PRODUCTION_RUNBOOK.md` (ops); `docs/SECURITY.md` (security model);
-  `docs/TROUBLESHOOTING.md`; `docs/V2_NOTES.md` is historical.
+- Docs: `DEPLOYMENT.md`, `PRODUCTION_RUNBOOK.md` (ops); `docs/SECURITY.md`; `docs/TROUBLESHOOTING.md`.
 
 ## Where to start for common tasks
 - New API endpoint: `src/app/api/<area>/route.ts`, copy `src/app/api/rooms/route.ts`:
   `getSessionUser()` → 401 / `is_admin` → 403 → `parseBody(req, schema)` (schema in
-  `src/lib/validations.ts`) → query → `NextResponse.json` / `jsonError`.
+  `src/lib/validations.ts`) → query → `NextResponse.json` / `jsonError`. A route that does not
+  need the profile uses `getAuthUserId()`; start independent database calls together
+  (`Promise.all`): each one is a 20–60 ms trip (`docs/ARCHITECTURE.md` → Speed).
 - Schema change: new idempotent `supabase/vNN.sql` (+ RLS), add it to `supabase/README.md`,
   mirror columns in `src/types/database.ts`, run it in prod SQL Editor before deploying code.
 - New page: put it in the right route group; public pages → `isPublic()`, admin pages →
@@ -169,16 +170,16 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - Live on Vercel; Supabase migrated through v9 with grants restored. `v10.sql` (sign-up codes):
   whether the owner has run it in production is unverified. Confirmed working by the owner:
   admin login, chat, a video call on the same Wi-Fi.
-- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PRs #4–#8) and
+- UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PRs #4–#12) and
   live: the rename to BlackFoxx, new tokens/fonts, moji avatars and the avatar picker, the
   animated first screen, the log-in and invite-link screens, the chat home and the chat
   screen, copy buttons that copy, sign-up with a code (`/signup`, admin tab "Sign-up codes"),
-  and the new call screen (the last two not yet confirmed by the owner). Rooms are on hold.
-  Not merged, stacked in this order: `feature/call-anywhere`, `fix/flip-camera`,
-  `fix/video-quality`, `feature/disappearing-messages`. Next: the relay, then the
-  admin/settings pages. Proposed: the route guard.
-- Disappearing messages (off until the admin switches them on; no migration): tested with
-  simulated phones and a pretend server only, nothing of it has run on the live site yet.
+  the new call screen, calls that ring on every screen, the flip-camera and video-quality
+  fixes, and disappearing messages (off until the admin switches them on). None of the last
+  six is confirmed by the owner on real phones yet. Rooms are on hold.
+- Not merged: `chore/cleanup-and-speed` (unused code removed, fewer database trips per page
+  and request, less JavaScript, comments removed). Next: the relay, then the admin/settings
+  pages. Proposed: the route guard.
 - What the assistant can check itself: public pages on the live site (built-in Browser pane),
   and calls and disappearing messages, by running the real code in that pane as simulated
   phones (no real camera, network or Supabase). The owner checks previews and logins.
@@ -190,10 +191,9 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - Calls: the owner saw a video call work on one Wi-Fi (2026-11-14). Two-way video (PR #8) and
   ring-anywhere are tested with simulated phones only. Other networks need a TURN relay:
   `feature/calls-turn` (Cloudflare) is parked locally, needs a rebase, the owner has not decided.
-- Performance: functions run in `sin1`, next to the database (`vercel.json`). Checked on the live
-  site 2026-11-14: `x-vercel-id` reads `bom1::sin1`, one database round trip takes 20–60 ms.
-- Known gaps: `user_session_ephemeral` has no effect (its hook is not mounted); admin-only routes
-  echo raw DB errors; small blue text is under 4.5:1 in dark mode on the old screens; more in
-  `docs/SECURITY.md` (rate limit, plaintext `invite_tokens`, CSP, public chat channels). No TODO/FIXME in the code.
+- Performance: functions run in `sin1`, next to the database. Live site 2026-11-16, from India
+  (`bom1::sin1`): a request with no database work ≈ 150 ms, each database trip adds 20–60 ms.
+- Known gaps: admin-only routes echo raw DB errors; small blue text is under 4.5:1 in dark mode on
+  the old screens; more in `docs/SECURITY.md` (rate limit, plaintext `invite_tokens`, CSP, public chat channels).
 
 When you change commands, structure, env vars or conventions, update this file in the same commit.

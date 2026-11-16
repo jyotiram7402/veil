@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
 
 /**
@@ -9,8 +9,8 @@ import { jsonError } from "@/lib/api";
  * Returns 403 if the caller isn't allowed.
  */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
 
   const { id } = await ctx.params;
   const supabase = await supabaseServer();

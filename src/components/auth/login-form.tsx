@@ -8,8 +8,8 @@ import { PasswordInput } from "@/components/auth/password-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { passwordProblem, usernameProblem } from "@/lib/entry-checks";
 import { apiErrorMessage, normalizeUsernameInput } from "@/lib/utils";
-import { loginSchema } from "@/lib/validations";
 
 type Errors = { username?: string; password?: string; form?: string };
 
@@ -27,13 +27,16 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
     // Read the fields themselves, not only our state: a browser can autofill
     // them without firing the change events React listens for.
     const data = new FormData(e.currentTarget);
-    const parsed = loginSchema.safeParse({
+    const credentials = {
       username: normalizeUsernameInput(String(data.get("username") ?? username)),
       password: String(data.get("password") ?? password),
-    });
-    if (!parsed.success) {
-      const fields = parsed.error.flatten().fieldErrors;
-      setErrors({ username: fields.username?.[0], password: fields.password?.[0] });
+    };
+    const problems = {
+      username: usernameProblem(credentials.username),
+      password: passwordProblem(credentials.password),
+    };
+    if (problems.username || problems.password) {
+      setErrors(problems);
       return;
     }
 
@@ -43,7 +46,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify(credentials),
       });
       if (!res.ok) {
         const body: unknown = await res.json().catch(() => null);

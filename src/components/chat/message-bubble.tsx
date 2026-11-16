@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { Check, CheckCheck, Download, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,7 +27,7 @@ type Props = {
   canDeleteAny?: boolean;
 };
 
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   message,
   sender,
   fromMe,
@@ -246,4 +246,4 @@ export function MessageBubble({
       )}
     </div>
   );
-}
+});

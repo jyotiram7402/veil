@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, LogOut, Mic, Users, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -228,21 +228,25 @@ function CallControl({ kind, allowed }: { kind: "voice" | "video"; allowed: bool
   const Icon = kind === "voice" ? Mic : Video;
   const label = kind === "voice" ? "Voice" : "Video";
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span>
-          <Button
-            size="icon"
-            variant="ghost"
-            disabled
-            aria-label={allowed ? `${label} (coming soon)` : `${label} unavailable`}
-            className={cn("text-current", !allowed && "opacity-30")}
-          >
-            <Icon className="h-5 w-5" />
-          </Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{allowed ? `${label} — coming soon` : `${label} unavailable`}</TooltipContent>
-    </Tooltip>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled
+              aria-label={allowed ? `${label} (coming soon)` : `${label} unavailable`}
+              className={cn("text-current", !allowed && "opacity-30")}
+            >
+              <Icon className="h-5 w-5" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          {allowed ? `${label} — coming soon` : `${label} unavailable`}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

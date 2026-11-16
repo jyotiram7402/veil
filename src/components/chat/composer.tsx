@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, FileText, Loader2, Paperclip, X } from "lucide-react";
-import imageCompression from "browser-image-compression";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -65,6 +64,7 @@ export function Composer({
     let finalFile = file;
     if (isImage && file.size > 800 * 1024) {
       try {
+        const { default: imageCompression } = await import("browser-image-compression");
         finalFile = await imageCompression(file, {
           maxSizeMB: 0.8,
           maxWidthOrHeight: 1920,

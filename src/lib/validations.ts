@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { USERNAME_REGEX } from "@/lib/auth/username";
+import { DISPLAY_NAME_RE } from "@/lib/entry-checks";
 import { isMojiValue } from "@/lib/moji";
 import { isCompleteSignupCode } from "@/lib/signup-code";
 
@@ -18,7 +19,6 @@ export const loginSchema = z.object({
   username: usernameSchema,
   password: passwordSchema,
 });
-export type LoginInput = z.infer<typeof loginSchema>;
 
 // Looser policy for non-admin (invite-gate) passwords so admins can set
 // something short and memorable to share over the phone. Admin passwords
@@ -35,7 +35,6 @@ export const createUserSchema = z.object({
   displayName: z.string().trim().max(60).optional(),
   isAdmin: z.boolean().optional(),
 });
-export type CreateUserInput = z.infer<typeof createUserSchema>;
 
 export const profileUpdateSchema = z.object({
   displayName: z.string().trim().max(60).optional(),
@@ -99,7 +98,6 @@ export const createRoomSchema = z.object({
   maxParticipants: z.number().int().min(2).max(500).optional(),
   expiresInMinutes: z.number().int().min(1).max(60 * 24 * 30).optional(),
 });
-export type CreateRoomInput = z.infer<typeof createRoomSchema>;
 
 export const updateRoomSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
@@ -110,7 +108,6 @@ export const updateRoomSchema = z.object({
   // Admins may end or (re)lock a room; they can't force 'expired' by hand.
   status: z.enum(["active", "ended", "locked"]).optional(),
 });
-export type UpdateRoomInput = z.infer<typeof updateRoomSchema>;
 
 export const createInviteSchema = z.object({
   label: z.string().trim().max(60).optional(),
@@ -118,13 +115,11 @@ export const createInviteSchema = z.object({
   expiresInMinutes: z.number().int().min(1).max(60 * 24 * 30).nullable().optional(),
   maxUses: z.number().int().min(1).max(1000).nullable().optional(),
 });
-export type CreateInviteInput = z.infer<typeof createInviteSchema>;
 
 // Temporary display name: optional, short, no control characters and no angle
 // brackets. React escapes on render (so this is defense-in-depth, not the only
 // XSS guard). Empty/whitespace-only normalizes to undefined. Unicode letters
 // (e.g. non-Latin names) are allowed.
-const DISPLAY_NAME_RE = new RegExp("^[^\\u0000-\\u001F\\u007F-\\u009F<>]+$", "u");
 export const displayNameSchema = z
   .string()
   .trim()
@@ -140,7 +135,6 @@ export const joinRoomSchema = z.object({
     .optional()
     .transform((v) => (v ? v : undefined)),
 });
-export type JoinRoomInput = z.infer<typeof joinRoomSchema>;
 
 export const updateParticipantSchema = z
   .object({
@@ -150,7 +144,6 @@ export const updateParticipantSchema = z
     canVideo: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
-export type UpdateParticipantInput = z.infer<typeof updateParticipantSchema>;
 
 // ---------------------------------------------------------------------------
 // Sign-up with an invite code
@@ -172,7 +165,6 @@ export const signupSchema = z.object({
     .transform((v) => (v ? v : undefined)),
   avatar: z.string().max(60).refine(isMojiValue, "Pick an avatar from the list").optional(),
 });
-export type SignupInput = z.infer<typeof signupSchema>;
 
 // Admin: make a new sign-up code.
 export const createSignupCodeSchema = z.object({
@@ -181,4 +173,3 @@ export const createSignupCodeSchema = z.object({
   // number = expires in N days; null = never; left out = 7 days
   expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
 });
-export type CreateSignupCodeInput = z.infer<typeof createSignupCodeSchema>;

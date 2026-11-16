@@ -98,5 +98,3 @@ export function createVideoGovernor() {
     },
   };
 }
-
-export type VideoGovernor = ReturnType<typeof createVideoGovernor>;

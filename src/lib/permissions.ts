@@ -17,8 +17,6 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
  * for voice/video?" — no caller should re-derive these rules.
  */
 
-export type Feature = "chat" | "voice" | "video";
-
 export type EffectivePermissions = {
   chat: boolean;
   voice: boolean;
@@ -90,17 +88,4 @@ export async function getEffectivePermissions(
 
   if (!room || !member) return null;
   return computeEffective(room, member);
-}
-
-/**
- * Single boolean authorization check for one feature.
- * e.g. `await authorizeParticipant(roomId, userId, "voice")`.
- */
-export async function authorizeParticipant(
-  roomId: string,
-  userId: string,
-  feature: Feature,
-): Promise<boolean> {
-  const perms = await getEffectivePermissions(roomId, userId);
-  return perms ? perms[feature] : false;
 }

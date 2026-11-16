@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeScript } from "@/components/theme-script";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import "./globals.css";
@@ -46,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
       <body className="min-h-screen font-sans antialiased">
-        <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+        {children}
         <Toaster />
       </body>
     </html>

@@ -26,8 +26,8 @@ deployable to Vercel's free tier in about ten minutes.
 - **Supabase** for Postgres, Auth, Realtime, Storage — all on the free tier
 - **WebRTC** peer-to-peer for call media; Supabase Realtime for signaling
 - **Tailwind CSS** + a hand-picked subset of shadcn/ui primitives
-- **Zustand** for client state, **Zod** for validation,
-  **Framer Motion** for animation, **Lucide** for icons, **Sonner** for toasts
+- **Zustand** for client state, **Zod** for validation, **Lucide** for icons,
+  **Sonner** for toasts
 
 No separate backend, no Docker, no Redis, no paid APIs.
 
