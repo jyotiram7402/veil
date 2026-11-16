@@ -4,12 +4,6 @@ import { useCallback, useEffect, useRef } from "react";
 import { getChatChannel } from "@/lib/realtime-registry";
 import type { Profile } from "@/types/chat";
 
-/**
- * Returns a `notify()` function that throttles "typing" broadcasts to once
- * per ~2 seconds. It piggybacks on the channel created by
- * `useChatRealtime`, because broadcasts only deliver from a subscribed
- * channel.
- */
 export function useTypingBroadcast(chatId: string | null, me: Profile | null) {
   const lastSentRef = useRef(0);
 

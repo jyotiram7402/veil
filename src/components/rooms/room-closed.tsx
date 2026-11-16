@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { DoorClosed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-/** Terminal state shown when a room has ended, expired, or access was removed. */
 export function RoomClosed({ title, message }: { title: string; message: string }) {
   const router = useRouter();
 

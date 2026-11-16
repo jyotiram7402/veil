@@ -11,7 +11,6 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/admin/users",
 ];
-// Entry screens: a signed-in visitor is sent on to the app instead.
 const ENTRY_PATHS = ["/", "/login", "/signup"];
 const ADMIN_ONLY_PREFIXES = ["/chats", "/settings", "/admin", "/archive", "/rooms"];
 const USER_ONLY_PREFIXES = ["/chat"];
@@ -22,9 +21,7 @@ function startsWithAny(pathname: string, prefixes: string[]): boolean {
 
 function isPublic(pathname: string) {
   if (PUBLIC_PATHS.includes(pathname)) return true;
-  // invite links and auth API are always reachable
   if (pathname.startsWith("/i/")) return true;
-  // room join flow (public — the access code is the credential)
   if (pathname === "/join" || pathname.startsWith("/join/")) return true;
   if (pathname === "/api/rooms/join") return true;
   if (pathname.startsWith("/api/auth/")) return true;
@@ -35,10 +32,6 @@ function isPublic(pathname: string) {
   return false;
 }
 
-/**
- * Refreshes the Supabase auth cookie, gates protected routes, and routes
- * users to /chat vs admins to /chats automatically.
- */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -66,7 +59,6 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!user) {
-    // "/" is the first screen (Log in / Sign up); it is public like the rest.
     if (isPublic(pathname)) return response;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -74,14 +66,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // signed in — check whether this user is admin
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_admin, suspended, archived")
     .eq("id", user.id)
     .maybeSingle();
 
-  // Suspended / archived → kick out
   if (!profile || profile.suspended || profile.archived) {
     await supabase.auth.signOut();
     const url = request.nextUrl.clone();
@@ -97,7 +87,6 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Admin-only routes
   if (startsWithAny(pathname, ADMIN_ONLY_PREFIXES) && !profile.is_admin) {
     const url = request.nextUrl.clone();
     url.pathname = "/chat";
@@ -105,7 +94,6 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // The /chat user view should not be reachable by admins (they have /chats)
   if (startsWithAny(pathname, USER_ONLY_PREFIXES) && profile.is_admin) {
     const url = request.nextUrl.clone();
     url.pathname = "/chats";

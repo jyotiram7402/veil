@@ -32,7 +32,6 @@ function firstWord(name: string): string {
   return name.trim().split(/\s+/)[0] || name;
 }
 
-/** One-line summary of the newest message in a chat. */
 function Preview({ chat, meId }: { chat: ChatSummary; meId: string }) {
   const m = chat.last_message;
   if (!m) return <>No messages yet</>;
@@ -68,8 +67,6 @@ export function ChatList({
   const [searching, setSearching] = useState(false);
   const [q, setQ] = useState("");
 
-  // People you can reach in one tap: everyone you have a 1:1 chat with,
-  // whoever is online first, otherwise most recent first.
   const people = useMemo(() => {
     const list: { chatId: string; userId: string; name: string; avatarUrl: string | null }[] = [];
     for (const c of chats) {
@@ -78,7 +75,6 @@ export function ChatList({
       if (!d.otherUserId) continue;
       list.push({ chatId: c.id, userId: d.otherUserId, name: d.name, avatarUrl: d.avatarUrl });
     }
-    // Stable sort: online people move to the front, the rest keep their order.
     return list.sort((a, b) => Number(online.has(b.userId)) - Number(online.has(a.userId)));
   }, [chats, me.id, online]);
 

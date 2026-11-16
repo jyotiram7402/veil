@@ -1,7 +1,8 @@
 # Architecture
 
-Module-by-module map. Read this when a task touches more than one area; for
-setup and day-to-day rules see `CLAUDE.md`. Security model: `docs/SECURITY.md`.
+Module-by-module map. Read this when a task touches more than one area. Setup is in
+`docs/SETUP.md`, the security model in `docs/SECURITY.md`; the rules to follow when changing
+the code are at the end of this file (Conventions, Things that bite).
 
 ## Request / data flow
 
@@ -113,7 +114,7 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `password.ts` (PBKDF2), `invite-token.ts`, `url.ts` (app origin for links), `clipboard.ts`
   (`copyText`: copy buttons copy, they never open the share sheet), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
-- `webrtc/` — `ice.ts` (STUN + env TURN; no candidate pool, the file says why),
+- `webrtc/` — `ice.ts` (STUN + env TURN; no candidate pool, see Things that bite),
   `signaling.ts` (private broadcast channel; a message sent while it is joining waits),
   `codec.ts` (audio/video constraints, Opus preference), `stats.ts` (quality from getStats),
   `video-governor.ts` (how large a picture to send), `audio-level.ts`,
@@ -258,3 +259,61 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   counts as on screen. `matchServer` judges only the newest page (40 messages). Not yet seen
   on the live site: the broadcast request and the change feed's DELETE events (both only make
   it faster; the 5 s check covers for them).
+
+## Conventions
+
+- Never trust a role or an id sent by the browser. Every route checks the session again;
+  admin means `profiles.is_admin`; room actions also call `assertRoomAdmin()`.
+  `supabaseAdmin()` (service role) only after those checks, and only on the server.
+- Server-only modules start with `import "server-only"` (`rooms`, `permissions`, `queries`,
+  `settings`, `invite-token`, `signup-codes`, `vanish`).
+- Environment variables are read through `src/lib/env.ts`. The exceptions: `next.config.ts`
+  (the Supabase host), `src/lib/webrtc/ice.ts` (TURN variables in the browser) and
+  `src/app/api/health` (booleans only).
+- A new route: copy `src/app/api/rooms/route.ts`. Session check → 401, `is_admin` → 403,
+  `parseBody(req, schema)` with a schema from `src/lib/validations.ts`, the query, then
+  `NextResponse.json` or `jsonError`. Routes that members can reach answer with general
+  error text; screens show `apiErrorMessage(body, fallback)`.
+- Every change goes through `fetch` → an API route. Realtime is only listened to
+  (postgres_changes, broadcast, presence).
+- A message that is being sent has a `local-` id until the server's row replaces it.
+- Usernames match `^[a-z0-9_]{3,24}$`; the auth email is `<username>@INTERNAL_EMAIL_DOMAIN`.
+- A schema change is a new idempotent `supabase/vNN.sql` (never edit one that has run in
+  production), listed in `supabase/README.md`, mirrored in `src/types/database.ts`, and run
+  in the production SQL editor before the code that needs it is deployed.
+- Phones first: `h-screen-mobile`, `env(safe-area-inset-*)`, 16px inputs on phones (iOS zooms
+  into anything smaller), 40px icon buttons. The look is in `DESIGN.md`.
+- Styling: never set one property from both a CSS module class and a Tailwind utility; which
+  one wins depends on the order the stylesheets load.
+- The code carries no comments. The reasons for the way something is built are written down
+  in this file, next to the part they belong to.
+
+## Things that bite
+
+- Builds do not run the type check or the linter (`next.config.ts`): the hand-written
+  `src/types/database.ts` makes supabase-js infer `never` for some `.update()` arguments. So a
+  missing column never fails a build. There is no lockfile either: every build installs the
+  newest versions `package.json` allows.
+- `src/lib/env.ts` stops a build ("Collecting page data") when a required variable is missing
+  in that Vercel environment. Preview builds need the variables ticked for Preview as well.
+- Two kinds of member. One who came through an invite link has a throwaway auth password
+  (every visit to the link sets a new one). One who signed up with a code logs in at
+  `/login` with their own. Giving a sign-up member an invite link, or suspending them,
+  destroys that password.
+- Supabase keys: the app uses the legacy `anon` and `service_role` keys, and the JWT signing
+  key is HS256. The newer publishable / secret keys and asymmetric signing keys have not
+  been tried with `@supabase/ssr` 0.5 (unverified).
+- Channel names: `chat:<chatId>`, `call:<chatId>` and `blackfoxx-presence` must be spelled the
+  same on both sides. The room dashboards (`admin-rooms:`, `admin-room:`) add a random
+  suffix, because newer supabase-js hands back an existing channel of the same name and a
+  second `subscribe()` on it throws.
+- `profiles.avatar_url` is either a photo URL or a moji choice (`moji:fox:sky`). Never use
+  it as an image source: render people with `UserAvatar`.
+- The screen lock closes on `visibilitychange` / `pagehide`, not on `blur`: on a phone `blur`
+  fires for the address bar and the keyboard, which locked the chat all the time.
+- No candidate pool in `webrtc/ice.ts`: a pool kept candidates from a cancelled call and
+  handed them to the next one, and the side that answered stayed on "Connecting…".
+- `<img>` is used on purpose for previews, call pictures and the image viewer (blob and
+  signed links, which the image optimiser cannot fetch); the linter rule is off for it.
+- Old names that must stay: `INTERNAL_EMAIL_DOMAIN=rooms.local` is part of every login, and
+  the GitHub repository and the Vercel address are still called `veil`.

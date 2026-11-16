@@ -15,10 +15,6 @@ function apply(next: Theme) {
   html.style.colorScheme = next;
 }
 
-/**
- * Current theme and a function to flip it. `theme` is null until the browser
- * has told us what is active (so server and first client render match).
- */
 export function useTheme() {
   const [theme, setTheme] = useState<Theme | null>(null);
 
@@ -32,8 +28,6 @@ export function useTheme() {
   }, []);
 
   const toggle = useCallback(() => {
-    // Read what is on the page rather than our state, so two toggles on the
-    // same screen (a button and a menu item) never disagree.
     const next: Theme = document.documentElement.classList.contains("dark") ? "light" : "dark";
     localStorage.setItem(STORAGE_KEY, next);
     apply(next);
@@ -47,7 +41,6 @@ export function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggle } = useTheme();
 
   if (!theme) {
-    // Avoid hydration mismatch; render an empty placeholder.
     return <span className="h-10 w-10 inline-block" aria-hidden />;
   }
 

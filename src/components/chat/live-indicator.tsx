@@ -4,12 +4,6 @@ import { useEffect, useState } from "react";
 import { useSyncStore } from "@/store/sync-store";
 import { cn } from "@/lib/utils";
 
-/**
- * Tiny dot in the chat header that pulses green when sync is healthy
- * (last successful resync within the last few seconds), amber while a
- * sync is in-flight, and red when the last attempt errored. Gives the
- * user something to look at when they're wondering if the chat is alive.
- */
 export function LiveIndicator() {
   const syncing = useSyncStore((s) => s.syncing);
   const online = useSyncStore((s) => s.online);

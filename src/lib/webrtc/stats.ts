@@ -1,22 +1,10 @@
-/**
- * Lightweight, local-only WebRTC quality sampling via getStats().
- *
- * Nothing is sent to the backend. We derive a coarse quality tier from several
- * signals (RTT, packet loss, jitter) so no single metric dominates. All field
- * access is defensive because stats shapes differ across browsers.
- */
-
 export type Quality = "excellent" | "fair" | "poor" | "unknown";
 
-/** One picture stream as it really travels: its size and frames per second. */
 export type VideoNumbers = { width: number; height: number; fps: number };
 
 export type VideoSample = {
-  /** What we send. `limited`: the encoder is holding back (slow link or busy processor). */
   sent: (VideoNumbers & { limited: boolean }) | null;
-  /** Frames per second our camera delivers. */
   cameraFps: number | null;
-  /** What arrives from the other side. */
   received: VideoNumbers | null;
 };
 
@@ -36,7 +24,6 @@ function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** The size and frame rate of one outbound-rtp / inbound-rtp video report, if it has a picture. */
 function videoNumbers(report: Record<string, unknown>): VideoNumbers | null {
   const width = num(report.frameWidth);
   const height = num(report.frameHeight);
@@ -44,7 +31,6 @@ function videoNumbers(report: Record<string, unknown>): VideoNumbers | null {
   return { width, height, fps: Math.round(num(report.framesPerSecond) ?? 0) };
 }
 
-/** Stateful sampler: call sample() on an interval; it computes deltas itself. */
 export function createQualitySampler() {
   const loss: LossTracker = { lastReceived: 0, lastLost: 0 };
 
@@ -60,7 +46,6 @@ export function createQualitySampler() {
       let lost = 0;
 
       stats.forEach((raw) => {
-        // Browser stats shapes vary and aren't fully typed in lib.dom.
         const report = raw as Record<string, unknown> & { type: string };
         if (report.type === "candidate-pair" && report.state === "succeeded") {
           if (typeof report.currentRoundTripTime === "number") {

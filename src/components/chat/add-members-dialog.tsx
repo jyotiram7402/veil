@@ -54,9 +54,7 @@ export function AddMembersDialog({
         if (!res.ok) return;
         const body = (await res.json()) as { users: Profile[] };
         setUsers(body.users.filter((u) => !existingIds.includes(u.id)));
-      } catch {
-        // aborted
-      } finally {
+      } catch {} finally {
         setLoading(false);
       }
     }, 180);

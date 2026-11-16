@@ -9,11 +9,9 @@ import {
   IMAGE_MIME_TYPES,
 } from "@/lib/constants";
 
-// Node runtime needed for the streaming multipart body. Default in App
-// Router is already Node, but pinning it makes the intent explicit.
 export const runtime = "nodejs";
 
-const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 export async function POST(req: Request) {
   const userId = await getAuthUserId();

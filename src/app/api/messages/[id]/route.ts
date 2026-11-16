@@ -3,11 +3,6 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { getAuthUserId } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
 
-/**
- * DELETE /api/messages/[id]
- * RLS enforces who can do this: the sender, or an admin of the chat.
- * Returns 403 if the caller isn't allowed.
- */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const userId = await getAuthUserId();
   if (!userId) return jsonError(401, "Sign in required");

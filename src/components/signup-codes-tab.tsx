@@ -43,11 +43,6 @@ function dateText(iso: string): string {
   });
 }
 
-/**
- * Admin tab for sign-up codes: make one, hand it to somebody, see who joined
- * with it, switch it off. A code is shown in full only right after it is made;
- * afterwards the list shows its last four characters.
- */
 export function SignupCodesTab() {
   const [codes, setCodes] = useState<Code[]>([]);
   const [loading, setLoading] = useState(true);

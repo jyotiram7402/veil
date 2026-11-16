@@ -2,12 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-/**
- * The cameras, microphones and speakers the browser reports, kept up to date
- * while `active` (something is plugged in or unplugged). Pass anything as
- * `refreshKey` to read the list again when it changes: names and extra cameras
- * only show up once the camera has been used.
- */
 export function useMediaDevices(active: boolean, refreshKey?: unknown): MediaDeviceInfo[] {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
 

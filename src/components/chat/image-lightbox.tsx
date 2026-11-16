@@ -25,7 +25,6 @@ export function ImageLightbox({
       className="fixed inset-0 z-50 grid place-items-center bg-black/90 p-4 backdrop-blur-md duration-200 animate-in fade-in-0"
       onClick={onClose}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
         alt={name}

@@ -432,7 +432,6 @@ function UsersTab({ archived }: { archived: boolean }) {
         onOpenChange={setCreateOpen}
         onCreated={async (invite) => {
           if (invite?.url) {
-            // Only say "copied" when it really was.
             const copied = await copyText(invite.url);
             toast.success(
               copied
@@ -811,7 +810,6 @@ function UserSettingsDialog({
                     <Switch
                       checked={effective}
                       onCheckedChange={(v) => {
-                        // Switching this one on deletes messages for good: ask first.
                         if (row.key === "disappearing_messages" && v && !confirm(DISAPPEARING_WARNING)) {
                           return;
                         }
@@ -870,7 +868,6 @@ function UserSettingsDialog({
   );
 }
 
-// Asked before disappearing messages are switched on, for everyone or for one person.
 const DISAPPEARING_WARNING =
   "Turn on disappearing messages?\n\n" +
   "A message will be deleted for both people once the person it was sent to has read it and " +

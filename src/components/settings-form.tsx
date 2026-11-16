@@ -72,7 +72,6 @@ export function SettingsForm({ me }: { me: Profile }) {
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        // Empty strings are sent on purpose: they clear the field.
         body: JSON.stringify({ displayName: displayName.trim(), bio: bio.trim() }),
       });
       if (!res.ok) {

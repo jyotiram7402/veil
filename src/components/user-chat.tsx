@@ -72,11 +72,8 @@ export function UserChat({
     return m;
   }, [me, adminProfile]);
 
-  // Disappearing messages (only where the admin has switched them on).
   const disappearing = settings.disappearing_messages === true;
   useChatRealtime({ chatId, me, memberProfiles });
-  // With disappearing messages the screen is kept exactly like the server: a
-  // message may also have gone while this page was not listening.
   useResumeSync(chatId, me, disappearing);
   useVanishOnLeave({ chatId, myId: me.id, enabled: disappearing });
 
@@ -86,7 +83,6 @@ export function UserChat({
   const subtitle = adminOnline ? "Online" : `Last seen ${lastSeen(adminProfile.last_seen_at)}`;
   const { theme, toggle: toggleTheme } = useTheme();
   const [pickerOpen, setPickerOpen] = useState(false);
-  // The store has the freshest copy of my own profile (it changes when I pick an avatar).
   const myProfile = useSessionStore((s) => s.profile) ?? me;
 
   async function signOut() {
@@ -96,7 +92,6 @@ export function UserChat({
 
   const chat = (
     <div className="flex h-screen-mobile flex-col chat-bg">
-      {/* The page body already keeps clear of the notch (see globals.css). */}
       <header className="flex h-16 shrink-0 items-center gap-1 border-b border-border/70 bg-header pl-3 pr-2 text-header-foreground sm:px-4">
         <UserAvatar
           userId={adminProfile.id}
@@ -161,12 +156,6 @@ export function UserChat({
     </div>
   );
 
-  // The screen guard is now the SessionLock itself — opaque cover, password
-  // to unlock. We keep the old screen_guard setting as a no-op kill-switch
-  // (off = no lock at all, on = lock as designed).
-  // CallProvider wraps everything so the WebRTC signaling channel + call
-  // screen live for the whole time the app is open. A member has one chat to
-  // be called in: this one, with the admin.
   const inner = settings.screen_guard ? <SessionLock me={me}>{chat}</SessionLock> : chat;
   return (
     <CallProvider me={me} chats={callChats}>

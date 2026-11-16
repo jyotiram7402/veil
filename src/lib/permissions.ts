@@ -1,22 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-/**
- * Effective-permission model.
- *
- * A feature (chat / voice / video) is authorized for a participant only when
- * EVERY layer agrees:
- *
- *   room status is 'active'
- *   AND participant is not blocked and not removed
- *   AND the room-level feature flag is on
- *   AND the participant-level feature flag is on
- *
- * This is the single source of truth that chat authorization uses today and
- * that the calling layer uses to answer "is this participant authorized
- * for voice/video?" — no caller should re-derive these rules.
- */
-
 export type EffectivePermissions = {
   chat: boolean;
   voice: boolean;
@@ -45,8 +29,6 @@ export function computeEffective(room: RoomFlags, member: MemberFlags): Effectiv
   const roomActive = room.status === "active";
   const blocked = member.blocked;
   const removed = member.removed_at != null;
-  // A LOCKED room keeps its EXISTING participants fully functional (only new
-  // joins are refused). ENDED / EXPIRED revoke everything.
   const roomUsable = room.status === "active" || room.status === "locked";
   const usable = roomUsable && !blocked && !removed;
   return {
@@ -59,12 +41,6 @@ export function computeEffective(room: RoomFlags, member: MemberFlags): Effectiv
   };
 }
 
-/**
- * Server-side authoritative lookup of a participant's effective permissions in
- * a room. Uses the service-role client so the answer never depends on the
- * caller's RLS context. Returns null when the room isn't a room or the user is
- * not a member of it.
- */
 export async function getEffectivePermissions(
   roomId: string,
   userId: string,

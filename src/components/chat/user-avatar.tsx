@@ -10,14 +10,11 @@ type Props = {
   username: string;
   displayName?: string | null;
   avatarUrl?: string | null;
-  /** sm 32px, md 40px, lg 48px, story 56px (the people row), xl 64px */
   size?: "sm" | "md" | "lg" | "story" | "xl";
-  /** Show a green dot while this person is online. */
   showPresence?: boolean;
   className?: string;
 };
 
-// Box size, plus the emoji size for the moji fallback (a bit over half the box).
 const SIZE: Record<NonNullable<Props["size"]>, string> = {
   sm: "h-8 w-8 text-[17px]",
   md: "h-10 w-10 text-[21px]",
@@ -36,9 +33,6 @@ export function UserAvatar({
   className,
 }: Props) {
   const online = usePresenceStore((s) => (userId ? s.online.has(userId) : false));
-  // avatar_url holds either a photo URL or a chosen moji ("moji:fox:sky").
-  // Without either, pick one from the id, so a person keeps the same moji
-  // wherever they show up (the name can differ from screen to screen).
   const chosen = parseMojiValue(avatarUrl);
   const moji = chosen ?? mojiFor(userId ?? username);
   const photoUrl = chosen ? null : avatarUrl;

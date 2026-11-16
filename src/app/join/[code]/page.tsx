@@ -4,7 +4,6 @@ import { JoinForm } from "@/components/rooms/join-form";
 export const metadata: Metadata = {
   title: "Join a room",
   robots: { index: false, follow: false },
-  // The access code is in the URL path; never leak it via the Referer header.
   referrer: "no-referrer",
 };
 

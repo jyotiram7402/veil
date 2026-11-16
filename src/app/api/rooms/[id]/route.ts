@@ -27,7 +27,6 @@ function inviteView(row: {
       : exhausted
         ? "used"
         : "active";
-  // Note: the raw token/selector is intentionally never returned here.
   return {
     id: row.id,
     label: row.label,
@@ -41,7 +40,6 @@ function inviteView(row: {
   };
 }
 
-/** GET — room detail with participants and invitations. */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -84,7 +82,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   });
 }
 
-/** PATCH — update permissions / rename / change status (end, lock, reopen). */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -114,7 +111,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const { error } = await admin.from("chats").update(patch).eq("id", id).eq("type", "room");
   if (error) return jsonError(500, error.message);
 
-  // Ending a room invalidates every outstanding invitation immediately.
   if (body.status === "ended") {
     await admin
       .from("room_invites")

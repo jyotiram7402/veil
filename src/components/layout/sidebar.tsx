@@ -20,11 +20,6 @@ import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
 import type { Profile } from "@/types/chat";
 
-/**
- * The chat home: greeting, new-chat button, account menu, then the chat list.
- * Full screen on phones, the left column from tablet up.
- * (Rooms are on hold, so there is no entry point to them here.)
- */
 export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: string }) {
   const router = useRouter();
   const profile = useSessionStore((s) => s.profile) ?? me;

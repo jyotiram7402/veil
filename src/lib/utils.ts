@@ -14,17 +14,10 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / BYTES_MB).toFixed(1)} MB`;
 }
 
-/** Stable, sortable, monotonically-increasing-ish id for optimistic messages. */
 export function clientMessageId(): string {
   return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/**
- * Best human-readable message from an API error body. Validation errors come
- * back as { error: "Validation failed", issues: { fieldErrors: {...} } } — this
- * surfaces the first specific field message (e.g. "Username: At least 3
- * characters") instead of the generic wrapper text.
- */
 export function apiErrorMessage(body: unknown, fallback: string): string {
   if (!body || typeof body !== "object") return fallback;
   const b = body as {
@@ -49,7 +42,6 @@ export function apiErrorMessage(body: unknown, fallback: string): string {
   return fallback;
 }
 
-/** Usernames are lowercase letters, numbers and underscores, max 24 chars. */
 export function normalizeUsernameInput(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 24);
 }

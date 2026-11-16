@@ -6,7 +6,6 @@ import { assertRoomAdmin, recordAudit } from "@/lib/rooms";
 
 export const runtime = "nodejs";
 
-/** DELETE — revoke an invitation. Revocation is enforced server-side on join. */
 export async function DELETE(
   _req: Request,
   ctx: { params: Promise<{ id: string; inviteId: string }> },

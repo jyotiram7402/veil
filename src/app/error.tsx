@@ -11,13 +11,9 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Always log — in production this is the only place the real message shows.
     console.error(error);
   }, [error]);
 
-  // In production Next.js already strips server-side messages (leaving only an
-  // opaque digest), so what's shown here is either that digest or a client-side
-  // message the browser could already see in devtools. Nothing sensitive leaks.
   const detail = error.digest ? `Ref: ${error.digest}` : error.message;
 
   return (

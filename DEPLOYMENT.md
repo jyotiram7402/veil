@@ -77,7 +77,7 @@ is missing when a server route needs it.
 ## 5. Vercel configuration
 
 - Framework: **Next.js** (auto-detected). Build: `npm run build`. Install:
-  `npm install` (repo uses **npm** + `package-lock.json`). Output: default.
+  `npm install` (the repo uses **npm**; no lockfile is committed yet). Output: default.
 - Node: `engines.node >= 18.18` in `package.json` — select Node 18 or 20 LTS.
 - Production branch: **`main`** (or a dedicated `production` branch — deploy only
   from the intended branch).

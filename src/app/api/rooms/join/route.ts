@@ -14,16 +14,6 @@ import {
 
 export const runtime = "nodejs";
 
-/**
- * Public join endpoint. Anyone can call it, so it is the most exposed surface:
- *
- *  - IP throttled to blunt brute-forcing of access codes.
- *  - Every failure returns the SAME generic error (never reveals whether a
- *    room/invite exists) with a 401.
- *  - On success it mints a fresh ephemeral Supabase user (no email/phone/PII),
- *    atomically claims a seat (race-safe capacity), consumes one invitation
- *    use, and signs the browser in — reusing the app's ephemeral-session model.
- */
 export async function POST(req: Request) {
   if (!rateLimit(`room-join:${clientKey(req)}`, 10, 60_000)) {
     return jsonError(429, "Too many attempts. Try again in a minute.");
@@ -38,8 +28,6 @@ export async function POST(req: Request) {
 
   const admin = supabaseAdmin();
 
-  // 1. Mint an ephemeral guest identity (a real Supabase auth user so RLS +
-  //    realtime work exactly like every other participant).
   const ephemeralPassword = generateEphemeralPassword();
   let username = generateGuestUsername();
   let created: { id: string } | null = null;
@@ -77,9 +65,6 @@ export async function POST(req: Request) {
     await admin.auth.admin.deleteUser(created!.id).catch(() => undefined);
   };
 
-  // 2. Atomically claim a seat. The RPC serializes concurrent joins per room
-  //    (advisory lock) so the participant limit can't be exceeded by a race,
-  //    and refuses non-active (locked/ended) rooms.
   const { data: seat, error: seatErr } = await admin.rpc("claim_room_seat", {
     p_room: result.roomId,
     p_user: created.id,
@@ -89,8 +74,6 @@ export async function POST(req: Request) {
     return jsonError(401, JOIN_FAILURE);
   }
 
-  // 3. Consume exactly one invitation use (compare-and-set guards one-time /
-  //    limited-use invites against concurrent claims).
   const { data: consumed, error: consumeErr } = await admin
     .from("room_invites")
     .update({
@@ -107,7 +90,6 @@ export async function POST(req: Request) {
     return jsonError(401, JOIN_FAILURE);
   }
 
-  // 4. Sign the browser in as the guest (writes the Supabase session cookie).
   const supabase = await supabaseServer();
   const signIn = await supabase.auth.signInWithPassword({
     email: usernameToInternalEmail(username),

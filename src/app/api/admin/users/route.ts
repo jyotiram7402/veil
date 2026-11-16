@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   if (!session.profile.is_admin) return jsonError(403, "Admin only");
 
   const url = new URL(req.url);
-  const archivedParam = url.searchParams.get("archived"); // "true" | "false" | null
+  const archivedParam = url.searchParams.get("archived");
   const wantArchived =
     archivedParam === "true" ? true : archivedParam === "false" ? false : null;
 
@@ -70,15 +70,6 @@ export async function GET(req: Request) {
   return NextResponse.json({ users: withInvite });
 }
 
-/**
- * Create a user.
- *
- * Admin users:    require `password` (used to log in at /login).
- * Regular users:  require `password` (used to gate the invite link).
- *
- * For the very first profile, we accept `x-admin-token` instead of an admin
- * session and the new user is auto-promoted to admin.
- */
 export async function POST(req: Request) {
   if (!rateLimit(`admin-users:${clientKey(req)}`, 20, 60_000)) {
     return jsonError(429, "Slow down");
@@ -121,9 +112,6 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (existing) return jsonError(409, "Username already taken");
 
-  // Auth user: admin uses the password to log in. For regular users we never
-  // need it to be valid for /login — we rotate it to junk on every invite
-  // visit anyway. We seed with the same value just to satisfy the API.
   const seedPassword = finalIsAdmin ? password : generateEphemeralPassword();
 
   const { data: created, error: createErr } = await admin.auth.admin.createUser({

@@ -11,8 +11,6 @@ export async function PATCH(req: Request) {
   const parsed = await parseBody(req, profileUpdateSchema);
   if (!parsed.ok) return parsed.response;
 
-  // Only the fields that were sent are changed; an empty string clears one.
-  // (Before, saving the name wiped the avatar and the other way round.)
   const { displayName, bio, avatarUrl } = parsed.data;
   const update: { display_name?: string | null; bio?: string | null; avatar_url?: string | null } =
     {};

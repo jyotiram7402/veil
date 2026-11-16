@@ -24,8 +24,6 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
     e.preventDefault();
     if (submitting) return;
 
-    // Read the fields themselves, not only our state: a browser can autofill
-    // them without firing the change events React listens for.
     const data = new FormData(e.currentTarget);
     const credentials = {
       username: normalizeUsernameInput(String(data.get("username") ?? username)),
@@ -65,10 +63,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       return;
     }
 
-    // Open-redirect guard: only same-origin absolute paths. Reject "//host",
-    // "/\\host", and anything that isn't a plain "/path".
     const safeNext = nextPath && /^\/(?!\/|\\)/.test(nextPath) ? nextPath : "/chats";
-    // The button keeps spinning until the next page takes over.
     router.replace(safeNext);
     router.refresh();
   }

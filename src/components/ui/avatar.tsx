@@ -24,8 +24,6 @@ const AvatarImage = React.forwardRef<
 ));
 AvatarImage.displayName = AvatarPrimitive.Image.displayName;
 
-// The fallback is a moji (an emoji on a coloured ground, see src/lib/moji.ts).
-// It inherits its font size from the Avatar root so the emoji scales with it.
 const AvatarFallback = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Fallback>,
   React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>

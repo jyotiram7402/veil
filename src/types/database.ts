@@ -1,12 +1,5 @@
-// Hand-maintained mirror of supabase/schema.sql. Each table's Row/Insert/Update
-// is defined as a standalone type up front so the Database interface below
-// doesn't self-reference — supabase-js v2 resolves the inline
-// `Partial<Database["public"]["Tables"]["x"]["Insert"]>` form to `never` in
-// strict mode.
-
 export type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
 
-// -------- profiles --------
 type ProfileRow = {
   id: string;
   username: string;
@@ -39,7 +32,6 @@ type ProfileInsert = {
 };
 type ProfileUpdate = Partial<ProfileInsert>;
 
-// -------- chats --------
 type ChatRow = {
   id: string;
   type: "direct" | "group" | "room";
@@ -74,7 +66,6 @@ type ChatInsert = {
 };
 type ChatUpdate = Partial<ChatInsert>;
 
-// -------- chat_members --------
 type ChatMemberRow = {
   chat_id: string;
   user_id: string;
@@ -101,7 +92,6 @@ type ChatMemberInsert = {
 };
 type ChatMemberUpdate = Partial<ChatMemberInsert>;
 
-// -------- messages --------
 type MessageRow = {
   id: string;
   chat_id: string;
@@ -134,7 +124,6 @@ type MessageInsert = {
 };
 type MessageUpdate = Partial<MessageInsert>;
 
-// -------- invite_tokens --------
 type InviteTokenRow = {
   token: string;
   user_id: string;
@@ -157,7 +146,6 @@ type InviteTokenInsert = {
 };
 type InviteTokenUpdate = Partial<InviteTokenInsert>;
 
-// -------- app_settings --------
 type AppSettingRow = {
   key: string;
   value: Json;
@@ -172,7 +160,6 @@ type AppSettingInsert = {
 };
 type AppSettingUpdate = Partial<AppSettingInsert>;
 
-// -------- room_invites --------
 type RoomInviteRow = {
   id: string;
   room_id: string;
@@ -205,7 +192,6 @@ type RoomInviteInsert = {
 };
 type RoomInviteUpdate = Partial<RoomInviteInsert>;
 
-// -------- room_audit_log --------
 type RoomAuditRow = {
   id: string;
   room_id: string | null;
@@ -226,7 +212,6 @@ type RoomAuditInsert = {
 };
 type RoomAuditUpdate = Partial<RoomAuditInsert>;
 
-// -------- call_sessions --------
 type CallSessionRow = {
   id: string;
   chat_id: string;
@@ -257,7 +242,6 @@ type CallSessionInsert = {
 };
 type CallSessionUpdate = Partial<CallSessionInsert>;
 
-// -------- signup_codes (v10) --------
 type SignupCodeRow = {
   id: string;
   code_hash: string;

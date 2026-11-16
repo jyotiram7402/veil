@@ -20,10 +20,6 @@ export const loginSchema = z.object({
   password: passwordSchema,
 });
 
-// Looser policy for non-admin (invite-gate) passwords so admins can set
-// something short and memorable to share over the phone. Admin passwords
-// still use the strict passwordSchema (>= 8 chars) — enforced at the
-// route level.
 export const gatePasswordSchema = z
   .string()
   .min(4, "At least 4 characters")
@@ -39,7 +35,6 @@ export const createUserSchema = z.object({
 export const profileUpdateSchema = z.object({
   displayName: z.string().trim().max(60).optional(),
   bio: z.string().trim().max(280).optional(),
-  // "" clears it. Otherwise an https photo URL or a chosen moji ("moji:fox:sky").
   avatarUrl: z
     .string()
     .max(500)
@@ -62,7 +57,6 @@ export const messageInputSchema = z
     path: ["content"],
   });
 
-/** Disappearing messages: "I had read everything up to this moment". */
 export const vanishSchema = z.object({
   upTo: z
     .string()
@@ -86,10 +80,6 @@ export const createChatSchema = z.discriminatedUnion("kind", [
   createGroupChatSchema,
 ]);
 
-// ---------------------------------------------------------------------------
-// Rooms & invitations
-// ---------------------------------------------------------------------------
-
 export const createRoomSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(80),
   chatEnabled: z.boolean().optional(),
@@ -105,21 +95,15 @@ export const updateRoomSchema = z.object({
   voiceEnabled: z.boolean().optional(),
   videoEnabled: z.boolean().optional(),
   maxParticipants: z.number().int().min(2).max(500).nullable().optional(),
-  // Admins may end or (re)lock a room; they can't force 'expired' by hand.
   status: z.enum(["active", "ended", "locked"]).optional(),
 });
 
 export const createInviteSchema = z.object({
   label: z.string().trim().max(60).optional(),
-  // number = expires in N minutes; null = never; omitted = server default (24h)
   expiresInMinutes: z.number().int().min(1).max(60 * 24 * 30).nullable().optional(),
   maxUses: z.number().int().min(1).max(1000).nullable().optional(),
 });
 
-// Temporary display name: optional, short, no control characters and no angle
-// brackets. React escapes on render (so this is defense-in-depth, not the only
-// XSS guard). Empty/whitespace-only normalizes to undefined. Unicode letters
-// (e.g. non-Latin names) are allowed.
 export const displayNameSchema = z
   .string()
   .trim()
@@ -127,7 +111,6 @@ export const displayNameSchema = z
   .regex(DISPLAY_NAME_RE, "Please use a simpler name")
   .transform((s) => s.replace(/\s+/g, " "));
 
-// The access code is a "<selector>.<verifier>" split token, not a UUID.
 export const joinRoomSchema = z.object({
   code: z.string().trim().min(8).max(200),
   displayName: z
@@ -145,12 +128,6 @@ export const updateParticipantSchema = z
   })
   .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
 
-// ---------------------------------------------------------------------------
-// Sign-up with an invite code
-// ---------------------------------------------------------------------------
-
-// The public sign-up form. The code may be typed with or without the dash and
-// in any case; the server normalises it before looking it up.
 export const signupSchema = z.object({
   code: z
     .string()
@@ -166,10 +143,8 @@ export const signupSchema = z.object({
   avatar: z.string().max(60).refine(isMojiValue, "Pick an avatar from the list").optional(),
 });
 
-// Admin: make a new sign-up code.
 export const createSignupCodeSchema = z.object({
   label: z.string().trim().max(60).optional(),
   maxUses: z.number().int().min(1).max(100).optional(),
-  // number = expires in N days; null = never; left out = 7 days
   expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
 });

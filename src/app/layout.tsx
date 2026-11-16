@@ -16,7 +16,6 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Match the page ground so the browser chrome blends into the app.
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#0f1015" },
     { media: "(prefers-color-scheme: light)", color: "#f3f4f7" },
@@ -24,12 +23,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  // Cover the iOS safe areas so the chat extends edge-to-edge under the
-  // notch / home indicator instead of leaving white strips.
   viewportFit: "cover",
-  // When the on-screen keyboard opens, resize the layout viewport instead of
-  // overlaying it — keeps the chat composer visible above the keyboard on
-  // Android/Chromium without JS. iOS Safari falls back to its default behavior.
   interactiveWidget: "resizes-content",
 };
 
@@ -38,7 +32,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={sans.variable} suppressHydrationWarning>
       <head>
         <ThemeScript />
-        {/* iOS "Add to Home Screen" hints */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content={APP_NAME} />

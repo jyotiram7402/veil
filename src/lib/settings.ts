@@ -5,10 +5,6 @@ export type SettingsShape = {
   uploads_enabled: boolean;
   typing_indicator: boolean;
   screen_guard: boolean;
-  /**
-   * Disappearing messages: a message is deleted for good once the person it
-   * was sent to has read it and leaves the chat (see src/lib/vanish.ts).
-   */
   disappearing_messages: boolean;
   max_message_length: number;
 };
@@ -17,7 +13,6 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   uploads_enabled: true,
   typing_indicator: true,
   screen_guard: true,
-  // Off unless the admin switches it on: it deletes messages for good.
   disappearing_messages: false,
   max_message_length: 4000,
 };
@@ -40,7 +35,6 @@ export function mergeSettings(
   return out as SettingsShape;
 }
 
-/** Server-side: resolve the effective settings for one user. */
 export async function effectiveSettingsForUser(userId: string): Promise<SettingsShape> {
   const admin = supabaseAdmin();
   const [globalRows, profile] = await Promise.all([

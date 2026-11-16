@@ -40,7 +40,6 @@ export function Composer({
   const bumpChatPreview = useChatStore((s) => s.bumpChatPreview);
   const notifyTyping = useTypingBroadcast(chatId, me);
 
-  // auto-grow textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -71,9 +70,7 @@ export function Composer({
           useWebWorker: true,
           fileType: file.type,
         });
-      } catch {
-        // fall back to original
-      }
+      } catch {}
     }
 
     setStaged({
@@ -165,7 +162,6 @@ export function Composer({
       appendMessage(chatId, optimistic);
       bumpChatPreview(chatId, optimistic, true);
 
-      // clear UI immediately
       setText("");
       setStaged(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -212,14 +208,10 @@ export function Composer({
       className="px-3 pt-1 sm:px-6"
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
-      {/* One floating pill: attach, type, send. Files can also be dropped on it. */}
       <div className="rounded-[1.75rem] border border-border/70 bg-card p-1.5 shadow-[0_10px_30px_-18px_rgb(15_18_30/0.45)] transition-shadow focus-within:ring-2 focus-within:ring-ring/40">
         {staged && (
           <div className="mb-1.5 flex items-center gap-3 rounded-[1.25rem] bg-muted p-2">
             {staged.isImage && staged.previewUrl ? (
-              // next/image can't optimize a blob: URL — this is a tiny local
-              // preview only, so a plain img is the right call.
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={staged.previewUrl}
                 alt="Preview of the image you are about to send"

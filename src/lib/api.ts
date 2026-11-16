@@ -28,7 +28,6 @@ export async function parseBody<T>(req: Request, schema: ZodSchema<T>): Promise<
   }
 }
 
-/** Crude in-memory token bucket for soft rate-limiting per route + key. */
 const buckets = new Map<string, { tokens: number; updated: number }>();
 
 export function rateLimit(key: string, limit = 30, perMs = 60_000): boolean {

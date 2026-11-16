@@ -7,7 +7,6 @@ import { APP_NAME } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Sign up" };
 
-// The invite code can arrive in the link the admin shares: /signup?code=XXXXX-XXXXX
 export default async function SignupPage({
   searchParams,
 }: {

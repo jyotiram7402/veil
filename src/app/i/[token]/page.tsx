@@ -5,11 +5,6 @@ import { GateForm } from "@/components/gate-form";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Invite-link landing. Validates the token (admin client, bypasses RLS),
- * checks the user is active, and renders the password gate. Submission
- * goes to /api/i/[token] which mints the session on success.
- */
 export default async function InviteGatePage({
   params,
   searchParams,

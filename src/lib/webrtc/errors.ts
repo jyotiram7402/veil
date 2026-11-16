@@ -1,8 +1,3 @@
-/**
- * Centralized call error classification. Internal categories never reach the
- * user directly — they are mapped to short, friendly messages.
- */
-
 export type CallErrorCode =
   | "MIC_PERMISSION_DENIED"
   | "MIC_UNAVAILABLE"
@@ -52,7 +47,6 @@ export function callErrorMessage(code: CallErrorCode): string {
   return MESSAGES[code] ?? MESSAGES.UNKNOWN;
 }
 
-/** Map a getUserMedia / DOMException to a mic error code. */
 export function classifyMediaError(err: unknown): CallErrorCode {
   if (err instanceof DOMException) {
     switch (err.name) {
@@ -70,7 +64,6 @@ export function classifyMediaError(err: unknown): CallErrorCode {
   return "MIC_UNAVAILABLE";
 }
 
-/** Map a getUserMedia / DOMException to a camera error code. */
 export function classifyCameraError(err: unknown): CallErrorCode {
   if (err instanceof DOMException) {
     switch (err.name) {

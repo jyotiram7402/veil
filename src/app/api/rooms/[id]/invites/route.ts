@@ -13,12 +13,6 @@ import { appOrigin } from "@/lib/url";
 
 export const runtime = "nodejs";
 
-/**
- * POST — mint a new invitation for the room.
- *
- * The raw access code (and its join URL) is returned here EXACTLY ONCE. Only
- * the PBKDF2 hash of the verifier is stored; it can never be recovered later.
- */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -46,8 +40,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       verifier_hash: verifierHash,
       label: label ?? null,
       created_by: session.id,
-      // number → N minutes; null → never; omitted → 24h default so invites are
-      // never accidentally permanent.
       expires_at: expiryFromMinutes(expiresInMinutes === undefined ? 60 * 24 : expiresInMinutes),
       max_uses: maxUses ?? null,
     })
@@ -67,7 +59,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   return NextResponse.json({
     invite: {
       id: invite.id,
-      code, // shown once
+      code,
       url: `${origin}/join/${encodeURIComponent(code)}`,
       expires_at: invite.expires_at,
       max_uses: invite.max_uses,

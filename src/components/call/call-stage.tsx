@@ -10,10 +10,6 @@ import styles from "./call.module.css";
 const CHIP =
   "inline-flex h-10 items-center gap-1.5 rounded-full bg-card pl-3 pr-3.5 text-sm font-semibold text-card-foreground shadow-[0_10px_22px_-14px_rgb(15_18_30/0.6)]";
 
-/**
- * How the other person looks on the stage: their moji on its own colour. With a
- * photo, the photo sits on the colour their automatic moji would have.
- */
 function stageLook(peer: PeerInfo) {
   const chosen = parseMojiValue(peer.avatarUrl);
   const moji = chosen ?? mojiFor(peer.id || peer.name);
@@ -25,7 +21,6 @@ function stageLook(peer: PeerInfo) {
   };
 }
 
-/** True for a ground light enough that white lines would not show on it. */
 function isPale(hex: string): boolean {
   const n = Number.parseInt(hex.slice(1), 16);
   const lin = (v: number) => {
@@ -37,12 +32,8 @@ function isPale(hex: string): boolean {
   return luminance > 0.45;
 }
 
-// Filling the stage cuts off part of a picture. Up to a quarter is fine (a
-// phone's picture on a phone loses about a fifth); beyond that the picture is
-// shown whole instead.
 const MAX_CUT = 0.25;
 
-/** A front camera is shown mirrored, like a mirror; a back camera is not. */
 function isSelfie(stream: MediaStream): boolean {
   return stream.getVideoTracks()[0]?.getSettings().facingMode !== "environment";
 }
@@ -58,22 +49,15 @@ export function CallStage({
   fullscreen,
 }: {
   peer: PeerInfo;
-  /** Ringing or calling: the stage moves to show that something is happening. */
   alive: boolean;
-  /** Their camera, while it is on and the call is connected. */
   remoteVideo: MediaStream | null;
-  /** Our camera, while it is on. */
   localVideo: MediaStream | null;
-  /** Before the other side has answered, our own camera fills the stage. */
   previewSelf: boolean;
   remoteMuted: boolean;
-  /** Goes back to the chat with the call still running. Null hides the button. */
   onMinimize: (() => void) | null;
-  /** Full screen for a wide picture. Null where it is not on offer. */
   fullscreen: { on: boolean; toggle: () => void } | null;
 }) {
   const look = stageLook(peer);
-  // A photo that does not load falls back to the moji.
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
   const [selfWide, setSelfWide] = useState(false);
   const showPhoto = !!look.photoUrl && look.photoUrl !== brokenPhoto;
@@ -93,7 +77,6 @@ export function CallStage({
           <span className={styles.ripple} />
           <span className={styles.ripple} />
           {showPhoto ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               className={styles.photo}
               src={look.photoUrl ?? undefined}
@@ -173,10 +156,6 @@ export function CallStage({
   );
 }
 
-/**
- * A live camera picture. Always silent: call audio plays through the hidden
- * <audio> element in CallProvider. Stays invisible until its first frame.
- */
 function StreamVideo({
   stream,
   label,
@@ -187,9 +166,7 @@ function StreamVideo({
   stream: MediaStream;
   label: string;
   mirrored?: boolean;
-  /** Show the picture whole when filling the stage would cut too much of it off. */
   wholeIfCut?: boolean;
-  /** Reports whether the picture is wider than tall, once it is known. */
   onShape?: (wide: boolean) => void;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
@@ -208,15 +185,12 @@ function StreamVideo({
       setReady(true);
       onShape?.(videoWidth >= videoHeight);
       if (wholeIfCut && clientWidth > 0 && clientHeight > 0) {
-        // How much of the picture filling the box would cut off, 0 to 1.
         const picture = videoWidth / videoHeight;
         const box = clientWidth / clientHeight;
         setWhole(1 - Math.min(picture / box, box / picture) > MAX_CUT);
       }
     };
     check();
-    // The picture changes shape when the other phone is turned, the box when
-    // ours is (or the window is resized).
     el.addEventListener("loadeddata", check);
     el.addEventListener("resize", check);
     const boxWatch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);

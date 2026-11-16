@@ -1,7 +1,5 @@
 import { MOJI_COLORS } from "@/lib/moji";
 
-// What the right-hand side shows on tablets and laptops before a chat is
-// picked. Phones never see it: there the chat list fills the screen.
 export default function ChatsIndexPage() {
   return (
     <div className="chat-bg hidden h-full w-full flex-col items-center justify-center px-6 text-center md:flex">

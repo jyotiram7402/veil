@@ -31,7 +31,6 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
-  // Until they choose one themselves, the avatar follows the username.
   const [picked, setPicked] = useState<MojiChoice | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
@@ -76,7 +75,6 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
       const body: unknown = await res.json().catch(() => null);
       if (!res.ok) {
         const message = apiErrorMessage(body, "Couldn't create your account. Try again in a moment.");
-        // Put the message next to the field it is about.
         if (res.status === 400) setErrors({ code: message });
         else if (res.status === 409) setErrors({ username: message });
         else setErrors({ form: message });
@@ -90,7 +88,6 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
       return;
     }
 
-    // The button keeps spinning until the next page takes over.
     router.replace(signedIn ? "/chat" : "/login");
     router.refresh();
   }
