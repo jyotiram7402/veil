@@ -275,6 +275,14 @@ Disappearing messages are off until the admin switches them on: Admin page → *
   and the app tells the server again when the connection is back. If the app was closed
   before that, they show once more the next time the chat is opened, and go when it is left.
 
+## The ticks stay grey
+
+Two grey ticks mean sent, two blue ticks mean the other person has seen it. A message only
+counts as seen while their chat is on screen: the app in front, not in the background, and
+not behind the screen lock. Once they open the chat, it turns blue within about 2 seconds
+(5 seconds if your live connection was asleep). In a group, it turns blue when everyone has
+seen it. A message sent before this version may need the other person to open the chat once.
+
 ## A message was gone before I could read it
 
 Every message in an open chat counts as read, also one that arrives while you are scrolled

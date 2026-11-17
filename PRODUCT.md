@@ -31,7 +31,8 @@ on a laptop. The owner manages members from the same app.
 ## Capabilities and Constraints
 
 - One-to-one chat between the owner and each member: text, images, files,
-  typing and online indicators, read receipts.
+  typing and online indicators, read receipts (two blue ticks once the other person has
+  seen a message; a chat only counts as seen while it is on screen and not locked).
 - One-to-one voice and video calls. A call rings on any screen while the app is
   open; a closed app shows an "Incoming call" notification, and tapping it opens the app
   on the ringing call. Calls between two different networks pass through

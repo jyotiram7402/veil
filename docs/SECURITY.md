@@ -116,6 +116,11 @@ for participants. Identities are temporary. No call recording/storage, no
 analytics on invite URLs, `Referrer-Policy` limits leakage and join pages send
 `referrer: no-referrer`.
 
+Read receipts: the other people in a chat see how far you have read it (blue ticks). The
+time comes from `chat_members.last_read_at`, which members of the chat could always read; it
+is now shown. A chat counts as read only while it is on screen and not behind the screen lock.
+Nobody can switch read receipts off.
+
 ## Disappearing messages
 
 Off by default. Only an admin can switch it on: `/api/admin/settings` (everyone) and

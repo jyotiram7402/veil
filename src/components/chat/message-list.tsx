@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, Loader2, Timer } from "lucide-react";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
@@ -39,6 +39,16 @@ export function MessageList({
   const messages = useChatStore((s) => s.messagesByChat[chatId] ?? NO_MESSAGES);
   const hasMore = useChatStore((s) => s.hasMore[chatId] ?? false);
   const prependMessages = useChatStore((s) => s.prependMessages);
+  const readers = useChatStore((s) => s.readAt[chatId]);
+  const othersReadUpTo = useMemo(() => {
+    let upTo = Infinity;
+    for (const id of Object.keys(memberProfiles)) {
+      if (id === me.id) continue;
+      const at = readers?.[id];
+      upTo = Math.min(upTo, at ? Date.parse(at) : 0);
+    }
+    return Number.isFinite(upTo) ? upTo : 0;
+  }, [readers, memberProfiles, me.id]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -192,7 +202,7 @@ export function MessageList({
                   showAvatar={isGroup}
                   groupedTop={prevFromSame}
                   groupedBottom={nextFromSame}
-                  readByOther={false}
+                  readByOther={fromMe && Date.parse(m.created_at) <= othersReadUpTo}
                   canDeleteAny={me.is_admin}
                 />
               </div>

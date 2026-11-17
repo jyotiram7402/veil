@@ -118,7 +118,9 @@ One screen for the admin (`chat-thread.tsx`), the member (`user-chat.tsx`) and r
   notifications and Sign out.
 - Bubbles: 20px corners. Outgoing is `--bubble-out` blue with white text, incoming is white
   (slate in dark mode). The last bubble of a run gets one tight corner and the time under it,
-  with ticks for your own messages. No names or avatars in a 1:1 chat; groups show both.
+  with ticks for your own messages: one grey tick while it is sending, two grey ticks once it
+  is sent, two blue ticks (`--tick`) once the other person has seen it (in a group: everyone).
+  No names or avatars in a 1:1 chat; groups show both.
 - A photo fills its bubble. A file is a row with a round icon, its name and size.
 - Call results and other notes are a small centred pill.
 - The typing bubble sits in a slot of fixed height under the newest message, so nothing moves
