@@ -10,7 +10,7 @@ type Props = {
   username: string;
   displayName?: string | null;
   avatarUrl?: string | null;
-  size?: "sm" | "md" | "lg" | "story" | "xl";
+  size?: "sm" | "md" | "lg" | "story" | "xl" | "2xl";
   showPresence?: boolean;
   className?: string;
 };
@@ -21,6 +21,7 @@ const SIZE: Record<NonNullable<Props["size"]>, string> = {
   lg: "h-12 w-12 text-[26px]",
   story: "h-14 w-14 text-[30px]",
   xl: "h-16 w-16 text-[34px]",
+  "2xl": "h-24 w-24 text-[52px]",
 };
 
 export function UserAvatar({

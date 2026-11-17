@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PANEL } from "@/components/form-styles";
 import { checkRelay, type RelayCheckResult } from "@/lib/webrtc/relay-check";
 import { cn } from "@/lib/utils";
 
@@ -45,16 +46,24 @@ export function CallRelayCheck() {
   const Icon = shown?.good ? CheckCircle2 : AlertTriangle;
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/40 p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="text-sm font-medium">Call relay</div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+    <section aria-labelledby="relayTitle" className={cn(PANEL, "px-4 py-3.5")}>
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 id="relayTitle" className="text-[15px] font-semibold leading-snug">
+            Call relay
+          </h2>
+          <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
             Calls between two different networks pass through a relay. Check that it is set up
             and that this device can reach it.
           </p>
         </div>
-        <Button type="button" variant="outline" onClick={run} disabled={busy} className="shrink-0">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={run}
+          disabled={busy}
+          className="shrink-0 shadow-none"
+        >
           {busy && <Loader2 className="animate-spin" aria-hidden="true" />}
           {busy ? "Checking…" : "Check"}
         </Button>
@@ -62,18 +71,18 @@ export function CallRelayCheck() {
       <p
         aria-live="polite"
         className={cn(
-          "flex items-start gap-2 text-[13px] font-medium",
-          shown ? "mt-3" : "sr-only",
-          shown?.good ? "text-online-ink" : "text-destructive",
+          "flex items-start gap-2 rounded-2xl text-[13px] font-medium leading-snug",
+          shown ? "mt-3 px-3 py-2.5" : "sr-only",
+          shown?.good ? "bg-online/10 text-online-ink" : "bg-destructive/10 text-destructive",
         )}
       >
         {shown && (
           <>
-            <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <Icon className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{shown.text}</span>
           </>
         )}
       </p>
-    </div>
+    </section>
   );
 }
