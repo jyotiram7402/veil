@@ -78,9 +78,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   (rotate/enable/revoke invite link), `.../settings` (per-user overrides), `.../chat`
   (open admin↔member chat), `settings` (global `app_settings`), `me` (own username/password).
 - `chats/` — list/create (admin), `[id]` (rename/delete), `[id]/messages` (page via
-  `before=`, resync via `after=`; a sent message is announced to closed apps after the
-  answer has gone out), `[id]/read`, `[id]/members`, `[id]/vanish` (disappearing
-  messages: "I am leaving, and had read up to this time").
+  `before=`, resync via `after=`; every answer also carries `readers`, each member's
+  `last_read_at`; a sent message is announced to closed apps after the answer has gone
+  out), `[id]/read` (I have seen this chat up to now), `[id]/members`, `[id]/vanish`
+  (disappearing messages: "I am leaving, and had read up to this time").
 - `messages/[id]` — delete. `upload` — avatars (public) / attachments (signed URLs).
 - `i/[token]` — gate password check → rotate the member's auth password → sign in.
 - `lock` — unlock `SessionLock` with the gate password.
@@ -141,12 +142,14 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 ## Client state & hooks
 
 - Zustand stores (`src/store`): `session-store` (current profile; `locked` while the screen
-  lock covers the chat), `chat-store` (chats, messages by chat, optimistic `local-` ids; for
+  lock covers the chat), `chat-store` (chats, messages by chat, optimistic `local-` ids;
+  `readAt`: how far each member has read, only ever moving forward (`noteReads`); for
   disappearing messages `dropReadMessages`, `leftBehind`, `matchServer`), `presence-store`
   (online set, typing), `sync-store`, `call-store` (call + media state), `push-store`
   (notifications on this device: status, the help sheet, whether the pill was dismissed).
-- `use-chat-realtime` — channel `chat:<chatId>`: message INSERT/DELETE, typing broadcast,
-  and the server's `vanished` broadcast.
+- `use-chat-realtime` — channel `chat:<chatId>`: message INSERT/DELETE, `chat_members`
+  UPDATE (someone read the chat: the ticks), typing broadcast, and the server's `vanished`
+  broadcast.
 - `use-chat-list-realtime` — channel `chats:<userId>`: previews, unread, new memberships; a
   deleted message makes it load the list again. Joined once, not again on every message.
 - `use-presence` — channel `blackfoxx-presence` (online dots only; never used for auth).
@@ -154,6 +157,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   An empty chat asks for the newest page; `exact` mode (disappearing chats) also takes off
   the screen what the server no longer has.
 - `use-vanish-on-leave` — disappearing messages, the screen's half (see below).
+- `use-mark-read` — tells the server "I have seen this chat" (`[id]/read`), only while the
+  chat is on screen: the page visible and the screen lock not covering it. It sends when a
+  message from someone else is newer than the last one it reported, at most every 1.5 s,
+  and again on coming back. Used by the admin's chat screen and the member's.
 - `use-heartbeat` — every 30 s while the app is in front: `last_seen_at`, and for a device
   with notifications on, "do not notify this device". Says "away" when the app is left.
   Runs for the admin and for members.
@@ -284,6 +291,23 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - Media is end-to-end between the two browsers, direct or through the relay (the relay only
   passes encrypted packets on); nothing is recorded or stored. "Call details" (tap the
   timer) ends with "direct" or "via relay".
+
+## Read ticks
+
+- A message of mine is read when every other member's `chat_members.last_read_at` is at or
+  after its `created_at` (`message-list.tsx`, compared in milliseconds). Unknown counts as
+  not read.
+- The other side's read time arrives three ways: with the page (both chat pages pass
+  `readers`), live through the `chat_members` UPDATE the read causes (RLS: only members of
+  the chat receive it, so it cannot be faked by someone outside), and with every resync poll
+  (`readers` in the messages answer), which covers a sleeping live connection within 5 s.
+- Only `use-mark-read` marks a member's chat as read, and only while it is on screen and
+  unlocked: the member's chat page no longer marks it read on the server while it renders,
+  which counted messages as read behind the screen lock. The admin's chat page still does
+  (the admin has no lock), and the old client-side marking, which also ran in a tab in the
+  background, was replaced by the hook.
+- Groups: read when everyone else has read it. In disappearing chats a message turns blue and
+  then goes when its reader leaves.
 
 ## Disappearing messages
 

@@ -31,6 +31,9 @@ type ChatState = {
   markChatRead: (chatId: string, at: string) => void;
   removeChat: (chatId: string) => void;
 
+  readAt: Record<string, Record<string, string>>;
+  noteReads: (chatId: string, reads: Record<string, string | null | undefined>) => void;
+
   messagesByChat: Record<string, MessageWithSender[]>;
   loadedChats: Record<string, boolean>;
   hasMore: Record<string, boolean>;
@@ -55,6 +58,7 @@ export const useChatStore = create<ChatState>((set) => ({
   loadedChats: {},
   hasMore: {},
   leftBehind: {},
+  readAt: {},
 
   setChats: (chats) =>
     set({
@@ -102,6 +106,22 @@ export const useChatStore = create<ChatState>((set) => ({
 
   removeChat: (chatId) =>
     set((s) => ({ chats: s.chats.filter((c) => c.id !== chatId) })),
+
+  noteReads: (chatId, reads) =>
+    set((s) => {
+      const known = s.readAt[chatId] ?? {};
+      let next: Record<string, string> | null = null;
+      for (const [userId, at] of Object.entries(reads)) {
+        if (typeof at !== "string") continue;
+        const t = Date.parse(at);
+        if (Number.isNaN(t)) continue;
+        const before = known[userId];
+        if (before && Date.parse(before) >= t) continue;
+        next = next ?? { ...known };
+        next[userId] = at;
+      }
+      return next ? { readAt: { ...s.readAt, [chatId]: next } } : s;
+    }),
 
   setInitialMessages: (chatId, messages, hasMore) =>
     set((s) => ({

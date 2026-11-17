@@ -24,6 +24,7 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
 import { useVanishOnLeave } from "@/hooks/use-vanish-on-leave";
 import { useHeartbeat } from "@/hooks/use-heartbeat";
+import { useMarkRead } from "@/hooks/use-mark-read";
 import { usePresence } from "@/hooks/use-presence";
 import { useTypingPrune } from "@/hooks/use-typing-prune";
 import { useChatStore } from "@/store/chat-store";
@@ -41,6 +42,7 @@ export function UserChat({
   chatId,
   initialMessages,
   initialHasMore,
+  readers,
   settings,
 }: {
   me: Profile;
@@ -48,6 +50,7 @@ export function UserChat({
   chatId: string;
   initialMessages: MessageWithSender[];
   initialHasMore: boolean;
+  readers?: Record<string, string>;
   settings: SettingsShape;
 }) {
   const router = useRouter();
@@ -58,6 +61,11 @@ export function UserChat({
   useEffect(() => {
     setInitial(chatId, initialMessages, initialHasMore);
   }, [chatId, initialMessages, initialHasMore, setInitial]);
+  const noteReads = useChatStore((s) => s.noteReads);
+  useEffect(() => {
+    if (readers) noteReads(chatId, readers);
+  }, [chatId, readers, noteReads]);
+  useMarkRead(chatId, me.id);
 
   usePresence(me);
   useHeartbeat(true);

@@ -70,6 +70,9 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
   const members = (chat.members ?? [])
     .map((m) => m.user)
     .filter((u): u is Profile => !!u);
+  const readers = Object.fromEntries(
+    (chat.members ?? []).flatMap((m) => (m.user ? [[m.user.id, m.last_read_at]] : [])),
+  );
 
   return (
     <ChatThread
@@ -81,6 +84,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
       members={members}
       initialMessages={initialMessages}
       initialHasMore={initialMessages.length === MESSAGE_PAGE_SIZE}
+      readers={readers}
       disappearing={disappearing}
     />
   );

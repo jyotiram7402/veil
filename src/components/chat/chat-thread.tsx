@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { useChatStore } from "@/store/chat-store";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
 import { useVanishOnLeave } from "@/hooks/use-vanish-on-leave";
+import { useMarkRead } from "@/hooks/use-mark-read";
 import { LiveIndicator } from "@/components/chat/live-indicator";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
@@ -28,6 +29,7 @@ type Props = {
   members: Profile[];
   initialMessages: MessageWithSender[];
   initialHasMore: boolean;
+  readers?: Record<string, string>;
   disappearing?: boolean;
 };
 
@@ -40,18 +42,20 @@ export function ChatThread({
   members,
   initialMessages,
   initialHasMore,
+  readers,
   disappearing = false,
 }: Props) {
   const setInitial = useChatStore((s) => s.setInitialMessages);
-  const messageCount = useChatStore((s) => s.messagesByChat[chatId]?.length ?? 0);
-  const markChatRead = useChatStore((s) => s.markChatRead);
+  const noteReads = useChatStore((s) => s.noteReads);
   const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     setInitial(chatId, initialMessages, initialHasMore);
-    void fetch(`/api/chats/${chatId}/read`, { method: "POST" });
-    markChatRead(chatId, new Date().toISOString());
-  }, [chatId, initialMessages, initialHasMore, setInitial, markChatRead]);
+  }, [chatId, initialMessages, initialHasMore, setInitial]);
+  useEffect(() => {
+    if (readers) noteReads(chatId, readers);
+  }, [chatId, readers, noteReads]);
+  useMarkRead(chatId, me.id);
 
   const memberProfiles = useMemo(() => {
     const m: Record<string, Pick<Profile, "id" | "username" | "display_name" | "avatar_url">> = {};
@@ -92,19 +96,6 @@ export function ChatThread({
     if (onlineOther) return "Online";
     return `Last seen ${lastSeen(other.last_seen_at)}`;
   }, [chatType, members.length, other, onlineOther]);
-
-  const lastReadRef = useRef(Date.now());
-  const onMessageVisible = useCallback(() => {
-    if (Date.now() - lastReadRef.current < 1500) return;
-    lastReadRef.current = Date.now();
-    void fetch(`/api/chats/${chatId}/read`, { method: "POST" });
-    markChatRead(chatId, new Date().toISOString());
-  }, [chatId, markChatRead]);
-
-  useEffect(() => {
-    if (messageCount === 0) return;
-    onMessageVisible();
-  }, [messageCount, onMessageVisible]);
 
   return (
     <div className="flex h-full flex-col chat-bg">

@@ -19,6 +19,7 @@ export function useChatRealtime(params: {
   const removeMessage = useChatStore((s) => s.removeMessage);
   const dropReadMessages = useChatStore((s) => s.dropReadMessages);
   const bumpChatPreview = useChatStore((s) => s.bumpChatPreview);
+  const noteReads = useChatStore((s) => s.noteReads);
   const setTyping = usePresenceStore((s) => s.setTyping);
   const clearTyping = usePresenceStore((s) => s.clearTyping);
 
@@ -48,6 +49,16 @@ export function useChatRealtime(params: {
           removeMessage(chatId, old.id);
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "chat_members", filter: `chat_id=eq.${chatId}` },
+        (payload) => {
+          const row = payload.new as { user_id?: unknown; last_read_at?: unknown };
+          if (typeof row.user_id === "string" && typeof row.last_read_at === "string") {
+            noteReads(chatId, { [row.user_id]: row.last_read_at });
+          }
+        },
+      )
       .on("broadcast", { event: "vanished" }, ({ payload }) => {
         const p = payload as { reader?: unknown; upTo?: unknown };
         if (typeof p.reader === "string" && typeof p.upTo === "string") {
@@ -68,5 +79,5 @@ export function useChatRealtime(params: {
       clearChatChannel(chatId);
       supabase.removeChannel(channel);
     };
-  }, [chatId, me, memberProfiles, appendMessage, removeMessage, dropReadMessages, bumpChatPreview, setTyping, clearTyping]);
+  }, [chatId, me, memberProfiles, appendMessage, removeMessage, dropReadMessages, bumpChatPreview, noteReads, setTyping, clearTyping]);
 }

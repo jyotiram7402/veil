@@ -44,7 +44,12 @@ export function useResumeSync(chatId: string | null, me: Profile | null, exact =
             sync.markFailed();
             return;
           }
-          page = ((await res.json()) as { messages?: MessageWithSender[] }).messages ?? [];
+          const body = (await res.json()) as {
+            messages?: MessageWithSender[];
+            readers?: Record<string, string>;
+          };
+          page = body.messages ?? [];
+          if (body.readers) useChatStore.getState().noteReads(chatId, body.readers);
         }
         const pageIsFull = page !== null && page.length >= MESSAGE_PAGE_SIZE;
         const latestId = latest?.id;
@@ -64,8 +69,12 @@ export function useResumeSync(chatId: string | null, me: Profile | null, exact =
             sync.markFailed();
             return;
           }
-          const body = (await res.json()) as { messages: MessageWithSender[] };
+          const body = (await res.json()) as {
+            messages: MessageWithSender[];
+            readers?: Record<string, string>;
+          };
           const incoming = body.messages ?? [];
+          if (body.readers) useChatStore.getState().noteReads(chatId, body.readers);
 
           if (incoming.length > 0) {
             const liveStore = useChatStore.getState();

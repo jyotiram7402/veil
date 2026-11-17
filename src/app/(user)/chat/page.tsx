@@ -26,6 +26,7 @@ export default async function UserChatPage() {
         chat:chats(
           id, type, name, avatar_url, created_at, updated_at,
           members:chat_members(
+            last_read_at,
             user:profiles(id, username, display_name, avatar_url, last_seen_at, is_admin)
           )
         )
@@ -68,7 +69,7 @@ export default async function UserChatPage() {
       avatar_url: string | null;
       created_at: string;
       updated_at: string;
-      members: Array<{ user: Profile | null }> | null;
+      members: Array<{ last_read_at: string; user: Profile | null }> | null;
     } | null;
   };
 
@@ -79,6 +80,11 @@ export default async function UserChatPage() {
   );
 
   let chatId: string | undefined = directWithAdmin?.chat?.id;
+  const readers: Record<string, string> = Object.fromEntries(
+    (directWithAdmin?.chat?.members ?? []).flatMap((m) =>
+      m.user ? [[m.user.id, m.last_read_at]] : [],
+    ),
+  );
   let adminProfile: Profile | null = directWithAdmin
     ? (directWithAdmin.chat?.members ?? [])
         .map((m) => m.user)
@@ -111,14 +117,7 @@ export default async function UserChatPage() {
     chatId = newChat.id;
   }
 
-  const [initialMessages] = await Promise.all([
-    loadMessagesPage(supabase, chatId!, { limit: MESSAGE_PAGE_SIZE }),
-    supabase
-      .from("chat_members")
-      .update({ last_read_at: new Date().toISOString() })
-      .eq("chat_id", chatId!)
-      .eq("user_id", session.id),
-  ]);
+  const initialMessages = await loadMessagesPage(supabase, chatId!, { limit: MESSAGE_PAGE_SIZE });
 
   return (
     <UserChat
@@ -127,6 +126,7 @@ export default async function UserChatPage() {
       chatId={chatId!}
       initialMessages={initialMessages}
       initialHasMore={initialMessages.length === MESSAGE_PAGE_SIZE}
+      readers={readers}
       settings={settings}
     />
   );

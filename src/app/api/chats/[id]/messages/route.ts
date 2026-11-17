@@ -26,12 +26,22 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const query = after
     ? loadMessagesAfter(supabase, id, after, 200)
     : loadMessagesPage(supabase, id, { before, limit });
-  const [userId, messages] = await Promise.all([getAuthUserId(), query.catch(() => null)]);
+  const readersQuery = Promise.resolve(
+    supabase.from("chat_members").select("user_id, last_read_at").eq("chat_id", id),
+  ).then(
+    ({ data }) => Object.fromEntries((data ?? []).map((r) => [r.user_id, r.last_read_at])),
+    () => ({}),
+  );
+  const [userId, messages, readers] = await Promise.all([
+    getAuthUserId(),
+    query.catch(() => null),
+    readersQuery,
+  ]);
 
   if (!userId) return jsonError(401, "Sign in required");
   if (!messages) return jsonError(500, "Something went wrong");
-  if (after) return NextResponse.json({ messages, mode: "after" });
-  return NextResponse.json({ messages, hasMore: messages.length === limit });
+  if (after) return NextResponse.json({ messages, mode: "after", readers });
+  return NextResponse.json({ messages, hasMore: messages.length === limit, readers });
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
