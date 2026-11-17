@@ -87,6 +87,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `[id]/invites/[inviteId]` (revoke), `[id]/participants/[userId]` (perms/block/remove),
   `join` (public; access code → guest session).
 - `calls/authorize?chatId=&feature=voice|video` — server-side call authorization.
+- `calls/ice?chatId=` — the relay servers for a call in that chat: short-lived Cloudflare
+  credentials, only for somebody who may be in the chat. The admin may ask without a chat
+  (the relay check). `relay: false` is a normal answer: the call is then tried without one.
 - `calls/[id]/event` — caller posts one call-outcome system message (idempotent).
 - `profile`, `profile/heartbeat` (last_seen), `users/search` (admin picker), `health`.
 
@@ -114,7 +117,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `password.ts` (PBKDF2), `invite-token.ts`, `url.ts` (app origin for links), `clipboard.ts`
   (`copyText`: copy buttons copy, they never open the share sheet), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
-- `webrtc/` — `ice.ts` (STUN + env TURN; no candidate pool, see Things that bite),
+- `turn.ts` (server only: trades the Cloudflare TURN key for short-lived relay credentials).
+- `webrtc/` — `ice.ts` (the servers a call uses: the relay from `/api/calls/ice`, else public
+  STUN; no candidate pool, see Things that bite), `relay-check.ts` (the admin's relay test),
   `signaling.ts` (private broadcast channel; a message sent while it is joining waits),
   `codec.ts` (audio/video constraints, Opus preference), `stats.ts` (quality from getStats),
   `video-governor.ts` (how large a picture to send), `audio-level.ts`,
@@ -210,7 +215,26 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   channel per person; Supabase caps channels per connection (100 by default, unverified).
 - `/api/calls/authorize` runs at start, accept, every reconnect and every 30 s.
 - Outcome → caller POSTs `/api/calls/[id]/event` → one `system` message in the chat.
-- Media is peer-to-peer; nothing is recorded or stored. TURN comes from `NEXT_PUBLIC_TURN_*`.
+- The relay (TURN, Cloudflare Realtime). Two devices on different networks usually cannot
+  reach each other directly, so the call passes through a relay. The owner's Cloudflare key
+  (`CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`) stays on the server; `turn.ts`
+  trades it for credentials that work for 12 hours (longer than any call: a relay drops a
+  call whose credentials run out), and `/api/calls/ice` hands those to a signed-in member
+  of the chat. Of Cloudflare's addresses three are passed on: UDP 3478, TCP 80 and TLS 443
+  (more only make the browser open more connections; port 53 is blocked by browsers).
+  The browser asks for them together with the permission check when a call starts, and
+  already while the phone rings on the side that answers, so the relay adds no waiting. An
+  answer with a relay is reused for 10 minutes; an answer without one is asked again. The
+  browser never waits longer than 4 seconds: without an answer the call uses public STUN
+  only, which is enough on one network. Not set up yet in production, so not yet seen
+  working with real credentials (unverified).
+- A call that has not connected 30 seconds after it was answered ends on both sides with
+  "Couldn't connect the call…" (`expectConnection`). Before, it said "Connecting…" for
+  ever. A call that never connected keeps saying "Connecting…" while it retries;
+  "Reconnecting…" is for a call that was connected.
+- Media is end-to-end between the two browsers, direct or through the relay (the relay only
+  passes encrypted packets on); nothing is recorded or stored. "Call details" (tap the
+  timer) ends with "direct" or "via relay".
 
 ## Disappearing messages
 
@@ -268,8 +292,7 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - Server-only modules start with `import "server-only"` (`rooms`, `permissions`, `queries`,
   `settings`, `invite-token`, `signup-codes`, `vanish`).
 - Environment variables are read through `src/lib/env.ts`. The exceptions: `next.config.ts`
-  (the Supabase host), `src/lib/webrtc/ice.ts` (TURN variables in the browser) and
-  `src/app/api/health` (booleans only).
+  (the Supabase host) and `src/app/api/health` (booleans only).
 - A new route: copy `src/app/api/rooms/route.ts`. Session check → 401, `is_admin` → 403,
   `parseBody(req, schema)` with a schema from `src/lib/validations.ts`, the query, then
   `NextResponse.json` or `jsonError`. Routes that members can reach answer with general

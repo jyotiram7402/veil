@@ -120,13 +120,14 @@ Media is peer-to-peer WebRTC; Supabase Realtime carries only signaling
   call to a pill so you can keep chatting; completed/missed/failed calls leave
   one small event in the timeline.
 
-### STUN / TURN
+### STUN and the relay
 
-STUN (Google's public servers) is built in and handles most networks. TURN is
-optional and env-driven (`NEXT_PUBLIC_TURN_URL` / `_USERNAME` / `_CREDENTIAL`);
-without it, calls across strict/symmetric NATs may fail. ICE config lives in
-`src/lib/webrtc/ice.ts` so a relay can be added without touching call logic. Do
-not commit TURN secrets — prefer a provider's short-lived credentials.
+STUN (public servers) is built in and is enough when both people are on the same
+network. Between two different networks a call passes through a relay (TURN):
+Cloudflare Realtime, set up with two server-only values, `CLOUDFLARE_TURN_KEY_ID`
+and `CLOUDFLARE_TURN_API_TOKEN` (see `DEPLOYMENT.md` §6). The server hands signed-in
+callers credentials that expire; the key never reaches a browser. Without the two
+values the app works, but calls between different networks cannot connect.
 
 ### Requirements & limits
 

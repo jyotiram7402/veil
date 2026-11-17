@@ -136,8 +136,12 @@ Off by default. Only an admin can switch it on: `/api/admin/settings` (everyone)
 
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only (never `NEXT_PUBLIC_`), used by
   `supabaseAdmin()` in route handlers/server components only.
-- TURN is **not configured**; if added, use short-lived credentials — never
-  commit provider master secrets. `.env.example` holds placeholders only.
+- The call relay key (`CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`) is server-only.
+  Browsers get credentials that expire after 12 hours, from `/api/calls/ice`, and only when
+  the caller is signed in and may be in that chat (30 requests a minute per user). Such
+  credentials let their holder pass traffic through the owner's relay until they expire:
+  they are only ever given to invited members. Only the status code of a Cloudflare answer
+  is logged, never the request or the body. `.env.example` holds placeholders only.
 - Secrets must never be logged. Errors returned to clients are generic.
 
 ## Security headers
