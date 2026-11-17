@@ -148,7 +148,8 @@ export function CallScreen({
   }, [open]);
   const numbers = (v: { width: number; height: number; fps: number } | null) =>
     v ? `${v.width}×${v.height} at ${v.fps} fps` : "no video";
-  const details = `Sending ${numbers(call.sentVideo)} · receiving ${numbers(call.receivedVideo)}`;
+  const route = call.relayed === null ? "" : call.relayed ? " · via relay" : " · direct";
+  const details = `Sending ${numbers(call.sentVideo)} · receiving ${numbers(call.receivedVideo)}${route}`;
 
   const screenRef = useRef<HTMLDivElement | null>(null);
   const [fullscreenOn, setFullscreenOn] = useState(false);

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCallStore } from "@/store/call-store";
-import { getRtcConfig, isWebRtcSupported } from "@/lib/webrtc/ice";
+import { basicRtcConfig, getRtcConfig, isWebRtcSupported } from "@/lib/webrtc/ice";
 import {
   audioConstraints,
   keepResolution,
@@ -45,6 +45,7 @@ type UseCallArgs = {
 const RECONNECT_DELAYS = [1500, 3000, 6000];
 const MAX_RECONNECT = RECONNECT_DELAYS.length;
 const DISCONNECT_GRACE_MS = 2000;
+const CONNECT_TIMEOUT_MS = 30_000;
 const ENDED_LINGER_MS = 2500;
 
 const CAMERA_RELEASE_MS = 400;
@@ -109,6 +110,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
   const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -216,6 +218,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         if (pcRef.current !== pc) return;
         const now = store.getState();
         now.setQuality(s.quality);
+        now.setRelayed(s.relayed);
         const sent = now.videoEnabled ? s.video.sent : null;
         now.setVideoNumbers(sent, now.remoteVideoOn ? s.video.received : null);
         const scale = governorRef.current.next(
@@ -241,6 +244,8 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const teardown = useCallback(() => {
     if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
     ringTimeoutRef.current = null;
+    if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+    connectTimeoutRef.current = null;
     clearReconnect();
     stopMonitors();
     reconnectAttemptRef.current = 0;
@@ -300,8 +305,22 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     [finish],
   );
 
+  const expectConnection = useCallback(() => {
+    if (connectTimeoutRef.current) return;
+    const callId = callIdRef.current;
+    connectTimeoutRef.current = setTimeout(() => {
+      connectTimeoutRef.current = null;
+      if (callIdRef.current !== callId || store.getState().connectedAt !== null) return;
+      send("call_ended", { reason: "unreachable" });
+      postOutcome("failed");
+      finishWithError("ICE_FAILED");
+    }, CONNECT_TIMEOUT_MS);
+  }, [store, send, postOutcome, finishWithError]);
+
   const handleConnUp = useCallback(() => {
     clearReconnect();
+    if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+    connectTimeoutRef.current = null;
     reconnectAttemptRef.current = 0;
     store.getState().setReconnectAttempt(0);
     store.getState().setConnected();
@@ -345,8 +364,9 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     if (reconnectTimerRef.current) return;
     const attempt = reconnectAttemptRef.current;
     if (attempt >= MAX_RECONNECT) {
-      postOutcome();
-      finishWithError("RECONNECT_FAILED");
+      const everConnected = store.getState().connectedAt !== null;
+      postOutcome(everConnected ? undefined : "failed");
+      finishWithError(everConnected ? "RECONNECT_FAILED" : "ICE_FAILED");
       return;
     }
     const delay = RECONNECT_DELAYS[attempt] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1]!;
@@ -374,7 +394,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const enterReconnecting = useCallback(() => {
     const s = store.getState().state;
     if (s === "idle" || s === "ended" || s === "failed" || s === "rejected" || s === "busy") return;
-    store.getState().setState("reconnecting");
+    if (store.getState().connectedAt !== null) store.getState().setState("reconnecting");
     scheduleReconnect();
   }, [store, scheduleReconnect]);
 
@@ -386,8 +406,13 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     }
   }, [remoteAudioRef, store]);
 
-  const createPeer = useCallback(() => {
-    const pc = new RTCPeerConnection(getRtcConfig());
+  const createPeer = useCallback((config: RTCConfiguration) => {
+    let pc: RTCPeerConnection;
+    try {
+      pc = new RTCPeerConnection(config);
+    } catch {
+      pc = new RTCPeerConnection(basicRtcConfig());
+    }
 
     pc.onicecandidate = (e) => {
       if (e.candidate) send("ice_candidate", { candidate: e.candidate.toJSON() });
@@ -504,7 +529,10 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         finishWithError("UNSUPPORTED");
         return;
       }
-      const auth = await authorize(withVideo ? "video" : "voice");
+      const [auth, rtcConfig] = await Promise.all([
+        authorize(withVideo ? "video" : "voice"),
+        getRtcConfig(chatId),
+      ]);
       if (!stillOurs()) return;
       if (!auth.ok) {
         finishWithError(reasonToCode(auth.reason));
@@ -512,7 +540,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
 
       try {
-        const pc = createPeer();
+        const pc = createPeer(rtcConfig);
         if (!(await attachLocalMedia(pc, "caller"))) return;
         if (withVideo) await startCameraRef.current?.(undefined, true);
         if (!stillOurs()) return;
@@ -560,11 +588,15 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     async (withVideo = false) => {
       const offer = incomingOfferRef.current;
       const callId = callIdRef.current;
-      if (!offer || !callId || store.getState().state !== "ringing") return;
+      const chatId = activeChatRef.current;
+      if (!offer || !callId || !chatId || store.getState().state !== "ringing") return;
       const stillOurs = () => callIdRef.current === callId;
 
       store.getState().setState("connecting");
-      const auth = await authorize(withVideo ? "video" : "voice");
+      const [auth, rtcConfig] = await Promise.all([
+        authorize(withVideo ? "video" : "voice"),
+        getRtcConfig(chatId),
+      ]);
       if (!stillOurs()) return;
       if (!auth.ok) {
         send("call_rejected", { reason: "unauthorized" });
@@ -573,7 +605,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
 
       try {
-        const pc = createPeer();
+        const pc = createPeer(rtcConfig);
         if (!(await attachLocalMedia(pc, "callee"))) return;
         await pc.setRemoteDescription(offer);
         adoptOfferedVideo(pc);
@@ -583,6 +615,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         if (!stillOurs()) return;
         send("call_accepted", {});
         send("answer", { sdp: answer });
+        expectConnection();
         if (withVideo) void startCameraRef.current?.(undefined, true);
       } catch (err) {
         if (!stillOurs()) return;
@@ -590,7 +623,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         finishWithError(classifyMediaError(err));
       }
     },
-    [store, authorize, createPeer, attachLocalMedia, adoptOfferedVideo, drainCandidates, send, finishWithError],
+    [store, authorize, createPeer, attachLocalMedia, adoptOfferedVideo, drainCandidates, send, finishWithError, expectConnection],
   );
 
   const reject = useCallback(() => {
@@ -821,6 +854,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       activeChatRef.current = chatId;
       incomingOfferRef.current = payload.sdp;
       store.getState().startIncoming(payload.callId, chatId, peerInfo(caller), payload.media);
+      void getRtcConfig(chatId);
       return;
     }
 
@@ -846,11 +880,13 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
           await pc.setRemoteDescription(payload.sdp);
           await drainCandidates();
           if (store.getState().state === "calling") store.getState().setState("connecting");
+          expectConnection();
         } catch {}
         break;
       }
       case "call_accepted":
         if (current.state === "calling") store.getState().setState("connecting");
+        expectConnection();
         break;
       case "ice_candidate": {
         if (!payload.candidate) return;
@@ -876,6 +912,11 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         finish("ended", current.state === "ringing" ? "Missed call" : undefined);
         break;
       case "call_ended":
+        if (payload.reason === "unreachable" && current.connectedAt === null) {
+          postOutcome("failed");
+          finishWithError("ICE_FAILED");
+          break;
+        }
         postOutcome();
         finish("ended");
         break;

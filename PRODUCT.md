@@ -33,8 +33,8 @@ on a laptop. The owner manages members from the same app.
 - One-to-one chat between the owner and each member: text, images, files,
   typing and online indicators, read receipts.
 - One-to-one voice and video calls. A call rings on any screen while the app is
-  open; a closed app does not ring. Calls between different networks need a TURN
-  relay, which is not set up yet.
+  open; a closed app does not ring. Calls between two different networks pass through
+  a relay (Cloudflare); they work once the owner has added the two Cloudflare values.
 - Disappearing messages, off unless the owner switches them on (for everyone, or for one
   person): a message is deleted for both people once the person it was sent to has read it
   and then leaves the chat (goes back, switches app or tab, locks the phone). A message that

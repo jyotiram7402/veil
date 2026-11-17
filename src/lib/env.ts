@@ -18,9 +18,8 @@ export const env = {
   INTERNAL_EMAIL_DOMAIN: process.env.INTERNAL_EMAIL_DOMAIN ?? "rooms.local",
   ADMIN_BOOTSTRAP_TOKEN: process.env.ADMIN_BOOTSTRAP_TOKEN,
   APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  TURN_URL: process.env.NEXT_PUBLIC_TURN_URL,
-  TURN_USERNAME: process.env.NEXT_PUBLIC_TURN_USERNAME,
-  TURN_CREDENTIAL: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+  CLOUDFLARE_TURN_KEY_ID: process.env.CLOUDFLARE_TURN_KEY_ID,
+  CLOUDFLARE_TURN_API_TOKEN: process.env.CLOUDFLARE_TURN_API_TOKEN,
 };
 
 export function requireServerEnv(): {

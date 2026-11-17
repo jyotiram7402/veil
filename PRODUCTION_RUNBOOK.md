@@ -33,10 +33,11 @@ setup and `docs/SECURITY.md` for the security model.
 
 ## WebRTC / STUN / TURN
 
-- ICE config is env-driven (`src/lib/webrtc/ice.ts`). STUN is built in; TURN is
-  optional via `NEXT_PUBLIC_TURN_*`. To change relays, update env vars and
-  redeploy — no code change. Signaling is the private Supabase `call:<chatId>`
-  channel (member-only via `realtime.messages` RLS).
+- STUN is built in. The relay (TURN) is Cloudflare Realtime: `CLOUDFLARE_TURN_KEY_ID` and
+  `CLOUDFLARE_TURN_API_TOKEN` in Vercel, see `DEPLOYMENT.md` §6. To replace the key, create
+  a new one in Cloudflare, change the two values, redeploy, then delete the old key.
+  Signaling is the private Supabase `call:<chatId>` channel (member-only via
+  `realtime.messages` RLS).
 
 ## Monitoring
 
@@ -56,8 +57,9 @@ setup and `docs/SECURITY.md` for the security model.
 
 **Calls fail**
 1. Both parties have the chat open? (signaling is scoped to `call:<chatId>`)
-2. Same network works but cross-network fails → **TURN not configured / NAT** —
-   set `NEXT_PUBLIC_TURN_*`.
+2. Same network works but two different networks fail → the relay. Admin → Members →
+   Defaults → Call relay → Check says what is wrong (not set up, key refused, Cloudflare
+   not answering, or this network blocks it).
 3. Check WebRTC/ICE state in the call UI (reconnecting indicator).
 4. Signaling: Supabase Realtime up + `realtime.messages` policies present.
 5. HTTPS in use? (mic/camera require a secure context)

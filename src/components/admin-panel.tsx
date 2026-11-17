@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { SignupCodesTab } from "@/components/signup-codes-tab";
+import { CallRelayCheck } from "@/components/call-relay-check";
 import { copyText } from "@/lib/clipboard";
 import { lastSeen } from "@/lib/format";
 import { useSessionStore } from "@/store/session-store";
@@ -977,6 +978,8 @@ function SettingsTab() {
           className="max-w-[8rem]"
         />
       </div>
+
+      <CallRelayCheck />
     </div>
   );
 }

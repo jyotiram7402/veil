@@ -29,6 +29,7 @@ type CallStore = {
   minimized: boolean;
   sentVideo: VideoNumbers | null;
   receivedVideo: VideoNumbers | null;
+  relayed: boolean | null;
 
   startOutgoing: (callId: string, chatId: string, peer: PeerInfo) => void;
   startIncoming: (callId: string, chatId: string, peer: PeerInfo, media?: MediaState) => void;
@@ -47,6 +48,7 @@ type CallStore = {
   setRemoteStream: (stream: MediaStream | null) => void;
   setMinimized: (minimized: boolean) => void;
   setVideoNumbers: (sent: VideoNumbers | null, received: VideoNumbers | null) => void;
+  setRelayed: (relayed: boolean | null) => void;
   close: (state: CallState, message?: string | null) => void;
   reset: () => void;
 };
@@ -74,6 +76,7 @@ const initial = {
   minimized: false,
   sentVideo: null,
   receivedVideo: null,
+  relayed: null as boolean | null,
 };
 
 function sameNumbers(a: VideoNumbers | null, b: VideoNumbers | null): boolean {
@@ -121,6 +124,7 @@ export const useCallStore = create<CallStore>((set) => ({
             receivedVideo: received,
           },
     ),
+  setRelayed: (relayed) => set((s) => (s.relayed === relayed ? s : { relayed })),
   close: (state, message = null) => set({ state, errorMessage: message }),
   reset: () => set({ ...initial }),
 }));

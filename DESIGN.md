@@ -130,9 +130,10 @@ held sideways.
 - A picture whose shape is far from the stage's (a laptop seen on a phone, a phone seen on a
   laptop) is shown whole on a dark ground; filling the stage would cut off more than a
   quarter of it and blow the rest up.
-- Sheet: the name, one status line (Calling…, the timer, Reconnecting…, why a call ended),
-  one line kept free for a note so the controls never jump, then the controls. Tapping the
-  timer shows "call details" in that line: the size and frame rate of both pictures.
+- Sheet: the name, one status line (Calling…, Connecting…, the timer, Reconnecting…, why a
+  call ended), one line kept free for a note so the controls never jump, then the controls.
+  Tapping the timer shows "call details" in that line: the size and frame rate of both
+  pictures, and "direct" or "via relay".
 - Controls are round (56px, 52px on phones under 375px) with their name underneath. Mute and
   Camera are toggles: filled ink means the named thing is on. Flip and Speaker only appear
   when there is a second camera or sound output to switch to. End is `--destructive`.

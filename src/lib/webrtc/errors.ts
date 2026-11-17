@@ -31,7 +31,7 @@ const MESSAGES: Record<CallErrorCode, string> = {
   CAMERA_SWITCH_FAILED: "The other camera could not be started, so this one stays on.",
   CAMERA_LOST: "The camera stopped. Tap Camera to turn it on again.",
   NETWORK_DISCONNECTED: "You appear to be offline.",
-  ICE_FAILED: "Couldn't connect the call.",
+  ICE_FAILED: "Couldn't connect the call. Check your connection and try again.",
   CONNECTION_FAILED: "The call connection failed.",
   SIGNALING_FAILED: "Couldn't reach the other person.",
   RECONNECT_FAILED: "The connection was lost and could not be restored.",

@@ -59,8 +59,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 If you don't have `openssl`, any 32+ character random string works for
-`ADMIN_BOOTSTRAP_TOKEN`. It's used exactly once. The optional
-`NEXT_PUBLIC_TURN_*` variables (voice/video across networks) are explained
+`ADMIN_BOOTSTRAP_TOKEN`. It's used exactly once. The two optional
+`CLOUDFLARE_TURN_*` values (calls between different networks) are explained
 in `.env.example`.
 
 ## 5. Run

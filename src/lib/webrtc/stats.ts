@@ -13,6 +13,7 @@ export type QualitySample = {
   rttMs: number | null;
   lossPct: number | null;
   jitterMs: number | null;
+  relayed: boolean | null;
   video: VideoSample;
 };
 
@@ -38,15 +39,26 @@ export function createQualitySampler() {
     let rttMs: number | null = null;
     let jitterMs: number | null = null;
     let lossPct: number | null = null;
+    let relayed: boolean | null = null;
     const video: VideoSample = { sent: null, cameraFps: null, received: null };
 
     try {
       const stats = await pc.getStats();
       let received = 0;
       let lost = 0;
+      let selectedPair: unknown = null;
+      const pairs = new Map<unknown, Record<string, unknown>>();
+      const candidateTypes = new Map<unknown, unknown>();
 
       stats.forEach((raw) => {
         const report = raw as Record<string, unknown> & { type: string };
+        if (report.type === "transport" && report.selectedCandidatePairId) {
+          selectedPair = report.selectedCandidatePairId;
+        }
+        if (report.type === "local-candidate" || report.type === "remote-candidate") {
+          candidateTypes.set(report.id, report.candidateType);
+        }
+        if (report.type === "candidate-pair") pairs.set(report.id, report);
         if (report.type === "candidate-pair" && report.state === "succeeded") {
           if (typeof report.currentRoundTripTime === "number") {
             rttMs = Math.round(report.currentRoundTripTime * 1000);
@@ -72,6 +84,16 @@ export function createQualitySampler() {
         }
       });
 
+      const inUse =
+        pairs.get(selectedPair) ??
+        [...pairs.values()].find((p) => p.selected === true) ??
+        [...pairs.values()].find((p) => p.nominated === true && p.state === "succeeded");
+      if (inUse) {
+        relayed =
+          candidateTypes.get(inUse.localCandidateId) === "relay" ||
+          candidateTypes.get(inUse.remoteCandidateId) === "relay";
+      }
+
       const dReceived = received - loss.lastReceived;
       const dLost = lost - loss.lastLost;
       loss.lastReceived = received;
@@ -80,10 +102,24 @@ export function createQualitySampler() {
         lossPct = Math.max(0, Math.min(100, (dLost / (dReceived + dLost)) * 100));
       }
     } catch {
-      return { quality: "unknown", rttMs: null, lossPct: null, jitterMs: null, video: NO_VIDEO };
+      return {
+        quality: "unknown",
+        rttMs: null,
+        lossPct: null,
+        jitterMs: null,
+        relayed: null,
+        video: NO_VIDEO,
+      };
     }
 
-    return { quality: computeQuality(rttMs, lossPct, jitterMs), rttMs, lossPct, jitterMs, video };
+    return {
+      quality: computeQuality(rttMs, lossPct, jitterMs),
+      rttMs,
+      lossPct,
+      jitterMs,
+      relayed,
+      video,
+    };
   };
 }
 
