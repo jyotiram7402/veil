@@ -10,6 +10,7 @@ import type { Profile } from "@/types/chat";
 export const dynamic = "force-dynamic";
 
 type MemberRow = { user: Pick<Profile, "id" | "is_admin"> | null };
+type ChatMemberRow = { last_read_at: string; user: Profile | null };
 
 export default async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -64,14 +65,13 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
     markRead,
   ]);
 
-  if (error || !chat) notFound();
+  if (error || !chat || chat.type === "room") notFound();
   if (!initialMessages) throw new Error("Could not load the messages");
 
-  const members = (chat.members ?? [])
-    .map((m) => m.user)
-    .filter((u): u is Profile => !!u);
+  const chatMembers = (chat.members ?? []) as unknown as ChatMemberRow[];
+  const members = chatMembers.map((m) => m.user).filter((u): u is Profile => !!u);
   const readers = Object.fromEntries(
-    (chat.members ?? []).flatMap((m) => (m.user ? [[m.user.id, m.last_read_at]] : [])),
+    chatMembers.flatMap((m) => (m.user ? [[m.user.id, m.last_read_at]] : [])),
   );
 
   return (

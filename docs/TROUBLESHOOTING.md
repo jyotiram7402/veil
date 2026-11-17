@@ -130,6 +130,13 @@ also deleted yourself).
 A real password-reset flow would need a recovery email; BlackFoxx is
 deliberately email-less.
 
+## Build fails on Vercel: "Type error: ..."
+
+Builds check types. The build log names the file and the line. The site keeps running the
+previous deployment, so nothing is down; fix the line, or revert the merge on GitHub. If no
+code changed and the error is inside a library, a new release of that library brought it
+(there is no lockfile): pin that package in `package.json` to the version before.
+
 ## Build fails on Vercel: "Module not found: @/..."
 
 Path aliases come from `tsconfig.json`. Make sure that file made it

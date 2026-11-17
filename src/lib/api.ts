@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { ZodError, type ZodSchema } from "zod";
+import { ZodError, type ZodType, type ZodTypeDef } from "zod";
 
 export function jsonError(status: number, message: string, extra?: Record<string, unknown>) {
   return NextResponse.json({ error: message, ...extra }, { status });
 }
 
-export async function parseBody<T>(req: Request, schema: ZodSchema<T>): Promise<
+export async function parseBody<T>(req: Request, schema: ZodType<T, ZodTypeDef, unknown>): Promise<
   { ok: true; data: T } | { ok: false; response: NextResponse }
 > {
   let raw: unknown;

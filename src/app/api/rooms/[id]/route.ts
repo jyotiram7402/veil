@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { jsonError, parseBody } from "@/lib/api";
 import { updateRoomSchema } from "@/lib/validations";
 import { assertRoomAdmin, recordAudit } from "@/lib/rooms";
+import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
 
@@ -94,7 +95,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
 
-  const patch: Record<string, unknown> = {};
+  const patch: Database["public"]["Tables"]["chats"]["Update"] = {};
   if (body.name !== undefined) patch.name = body.name;
   if (body.chatEnabled !== undefined) patch.chat_enabled = body.chatEnabled;
   if (body.voiceEnabled !== undefined) patch.voice_enabled = body.voiceEnabled;

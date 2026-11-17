@@ -98,8 +98,7 @@ and password with the person privately.
 ## What now?
 
 - `npm run dev` — runs the dev server with hot reload
-- `npm run build` — production build (type errors and lint are **skipped**,
-  see `next.config.ts` — always run `npm run typecheck`)
+- `npm run build` — production build (it checks types; lint is skipped, see `next.config.ts`)
 - `npm run start` — runs the production build
 - `npm run typecheck` — `tsc --noEmit`, fastest way to catch a regression
 

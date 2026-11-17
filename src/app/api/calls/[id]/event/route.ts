@@ -61,7 +61,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .from("call_sessions")
     .update({
       event_posted: true,
-      status: parsed.data.status === "completed" ? "ended" : parsed.data.status,
+      status:
+        parsed.data.status === "completed"
+          ? "ended"
+          : parsed.data.status === "declined"
+            ? "rejected"
+            : parsed.data.status,
       ended_at: now.toISOString(),
       duration_seconds: duration,
       kind: parsed.data.kind,

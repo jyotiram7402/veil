@@ -1,4 +1,5 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 import { env } from "@/lib/env";
@@ -40,7 +41,7 @@ export async function updateSession(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(toSet) {
+      setAll(toSet: { name: string; value: string; options: CookieOptions }[]) {
         for (const { name, value } of toSet) {
           request.cookies.set(name, value);
         }
@@ -50,7 +51,7 @@ export async function updateSession(request: NextRequest) {
         }
       },
     },
-  });
+  }) as unknown as SupabaseClient<Database>;
 
   const {
     data: { user },

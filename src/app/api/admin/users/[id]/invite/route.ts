@@ -6,6 +6,7 @@ import { jsonError } from "@/lib/api";
 import { generateInviteToken } from "@/lib/invite-token";
 import { hashPassword } from "@/lib/password";
 import { inviteUrlFor } from "@/lib/url";
+import type { Database } from "@/types/database";
 
 const rotateSchema = z.object({
   password: z.string().min(4).max(128),
@@ -103,7 +104,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return jsonError(422, "Bad body");
 
-  const patch: Record<string, unknown> = {};
+  const patch: Database["public"]["Tables"]["invite_tokens"]["Update"] = {};
   if (parsed.data.enabled !== undefined) patch.enabled = parsed.data.enabled;
   if (parsed.data.password !== undefined) {
     patch.gate_password_hash = await hashPassword(parsed.data.password);
