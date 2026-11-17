@@ -17,8 +17,6 @@ const SIGNAL_EVENTS: SignalType[] = [
 
 type Handler = (type: SignalType, payload: SignalPayload) => void;
 
-// Private channels are authorized against the caller's JWT. Channels opened in
-// the same moment (the admin listens on one per person) share a single round.
 let authorizing: Promise<void> | null = null;
 
 function authorizeRealtime(): Promise<void> {
@@ -36,13 +34,6 @@ function authorizeRealtime(): Promise<void> {
   return authorizing;
 }
 
-/**
- * Thin wrapper over a Supabase Realtime PRIVATE broadcast channel used purely
- * for WebRTC signaling on `call:<chatId>`. Private + realtime.messages RLS
- * (see v7.sql) means only the two chat members can send/receive here.
- *
- * Only control data (SDP/ICE) is sent — never audio.
- */
 export class SignalingChannel {
   private channel: RealtimeChannel | null = null;
   private handler: Handler | null = null;
@@ -50,7 +41,7 @@ export class SignalingChannel {
   private closed = false;
   private readonly topic: string;
 
-  constructor(private readonly chatId: string) {
+  constructor(chatId: string) {
     this.topic = `call:${chatId}`;
   }
 
@@ -58,7 +49,6 @@ export class SignalingChannel {
     this.handler = handler;
   }
 
-  /** Joins the channel. Resolves once it is subscribed; safe to call twice. */
   connect(): Promise<void> {
     if (!this.joined) this.joined = this.join();
     return this.joined;
@@ -86,7 +76,6 @@ export class SignalingChannel {
     });
   }
 
-  /** Sends one message. One sent while the channel is still joining waits for it. */
   async send(type: SignalType, payload: SignalPayload): Promise<void> {
     if (this.closed || !this.joined) return;
     await this.joined;

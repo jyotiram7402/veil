@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MOJI, MOJI_COLORS, autoMojiChoice, mojiValue, type MojiChoice } from "@/lib/moji";
-import { formatSignupCode } from "@/lib/signup-code";
+import { displayNameProblem, passwordProblem, usernameProblem } from "@/lib/entry-checks";
+import { formatSignupCode, isCompleteSignupCode } from "@/lib/signup-code";
 import { apiErrorMessage, cn, normalizeUsernameInput } from "@/lib/utils";
-import { signupSchema } from "@/lib/validations";
 
 type Errors = {
   code?: string;
@@ -31,7 +31,6 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
-  // Until they choose one themselves, the avatar follows the username.
   const [picked, setPicked] = useState<MojiChoice | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
@@ -44,21 +43,23 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
     e.preventDefault();
     if (submitting) return;
 
-    const parsed = signupSchema.safeParse({
-      code,
+    const input = {
+      code: code.trim(),
       username,
       password,
-      displayName,
+      displayName: displayName.trim() || undefined,
       avatar: mojiValue(avatar.id, avatar.color),
-    });
-    if (!parsed.success) {
-      const f = parsed.error.flatten().fieldErrors;
-      setErrors({
-        code: f.code?.[0],
-        username: f.username?.[0],
-        displayName: f.displayName?.[0],
-        password: f.password?.[0],
-      });
+    };
+    const problems = {
+      code: isCompleteSignupCode(input.code)
+        ? undefined
+        : "Enter all 10 characters of your invite code",
+      username: usernameProblem(input.username),
+      displayName: displayNameProblem(displayName),
+      password: passwordProblem(input.password),
+    };
+    if (problems.code || problems.username || problems.displayName || problems.password) {
+      setErrors(problems);
       return;
     }
 
@@ -69,12 +70,11 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify(input),
       });
       const body: unknown = await res.json().catch(() => null);
       if (!res.ok) {
         const message = apiErrorMessage(body, "Couldn't create your account. Try again in a moment.");
-        // Put the message next to the field it is about.
         if (res.status === 400) setErrors({ code: message });
         else if (res.status === 409) setErrors({ username: message });
         else setErrors({ form: message });
@@ -88,7 +88,6 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
       return;
     }
 
-    // The button keeps spinning until the next page takes over.
     router.replace(signedIn ? "/chat" : "/login");
     router.refresh();
   }

@@ -21,6 +21,7 @@ function isSameDay(a: string, b: string) {
 }
 
 const NEAR_BOTTOM_PX = 240;
+const NO_MESSAGES: MessageWithSender[] = [];
 
 export function MessageList({
   chatId,
@@ -32,12 +33,10 @@ export function MessageList({
   chatId: string;
   me: Profile;
   memberProfiles: Record<string, Pick<Profile, "id" | "username" | "display_name" | "avatar_url">>;
-  /** Show the "is typing" bubble under the newest message. */
   showTyping?: boolean;
-  /** Disappearing messages are on for this chat: say so, under the newest message. */
   disappearing?: boolean;
 }) {
-  const messages = useChatStore((s) => s.messagesByChat[chatId] ?? []);
+  const messages = useChatStore((s) => s.messagesByChat[chatId] ?? NO_MESSAGES);
   const hasMore = useChatStore((s) => s.hasMore[chatId] ?? false);
   const prependMessages = useChatStore((s) => s.prependMessages);
 
@@ -48,7 +47,6 @@ export function MessageList({
   const [unseenCount, setUnseenCount] = useState(0);
   const prevHeightRef = useRef(0);
   const prevCountRef = useRef(0);
-  // With more than two people the bubbles need names and avatars.
   const isGroup = Object.keys(memberProfiles).length > 2;
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
@@ -70,14 +68,11 @@ export function MessageList({
     } else if (messages.length > prevCountRef.current) {
       const grew = messages.length - prevCountRef.current;
       if (grew > 1 && prevHeightRef.current > 0) {
-        // History pull: preserve viewport.
         el.scrollTop = el.scrollHeight - prevHeightRef.current;
         prevHeightRef.current = 0;
       } else if (wasNearBottom) {
-        // We were already at the bottom — keep us pinned.
         el.scrollTop = el.scrollHeight;
       } else {
-        // New message arrived while user was reading older messages — count it.
         const incoming = messages.slice(prevCountRef.current);
         const fromOthers = incoming.filter(
           (m) => m.sender_id && m.sender_id !== me.id,
@@ -89,7 +84,6 @@ export function MessageList({
     prevCountRef.current = messages.length;
   }, [messages, me.id]);
 
-  // Track whether we're near the bottom; controls visibility of the pill.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -205,26 +199,19 @@ export function MessageList({
             );
           })}
         </div>
-        {/* Disappearing messages: one quiet line under the newest message, so
-            nobody is surprised when the chat is empty later. */}
         {disappearing && messages.length > 0 && (
           <div className="mt-3 flex justify-center">
-            {/* One line on a 320px phone; the corners still look right if it ever wraps. */}
             <span className="inline-flex items-center gap-1.5 rounded-2xl bg-card px-3 py-1 text-center text-xs font-medium text-muted-foreground shadow-sm">
               <Timer className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               Seen messages disappear when you leave
             </span>
           </div>
         )}
-        {/* Slot for the typing bubble. Always the same height, so nothing
-            moves when the bubble comes and goes. */}
         <div className="mt-2 flex h-9 items-end" role="status" aria-live="polite">
           {showTyping && <TypingIndicator chatId={chatId} />}
         </div>
       </div>
 
-      {/* Jump to the newest message: visible only when scrolled up. Turns
-          blue and counts when new messages arrived meanwhile. */}
       {!nearBottom && (
         <button
           type="button"

@@ -4,12 +4,6 @@ import { Phone, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCallActions } from "@/components/call/call-provider";
 
-/**
- * Voice/video call button for the header of a 1-to-1 chat. Needs a CallProvider
- * above it that knows this chat; without one, or while a call is already in
- * progress, it is disabled. Server-side authorization still gates the actual
- * call regardless of this button.
- */
 export function CallButton({
   chatId,
   mode = "voice",

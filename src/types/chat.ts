@@ -2,7 +2,6 @@ import type { Database } from "./database";
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Chat = Database["public"]["Tables"]["chats"]["Row"];
-export type ChatMember = Database["public"]["Tables"]["chat_members"]["Row"];
 export type Message = Database["public"]["Tables"]["messages"]["Row"];
 
 export type ChatSummary = Chat & {
@@ -14,16 +13,4 @@ export type ChatSummary = Chat & {
 
 export type MessageWithSender = Message & {
   sender: Pick<Profile, "id" | "username" | "display_name" | "avatar_url"> | null;
-};
-
-export type TypingState = {
-  userId: string;
-  username: string;
-  at: number;
-};
-
-export type PresenceState = {
-  userId: string;
-  online: boolean;
-  lastSeenAt: string;
 };

@@ -43,11 +43,8 @@ export function NewChatDialog({
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) return;
         const body = (await res.json()) as { users: Profile[] };
-        // Hide other admins from the picker — admins talk to users only.
         setUsers(body.users.filter((u) => !u.is_admin));
-      } catch {
-        // aborted
-      } finally {
+      } catch {} finally {
         setLoading(false);
       }
     }, 180);

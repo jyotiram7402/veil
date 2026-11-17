@@ -28,15 +28,6 @@ const patchSchema = z
     { message: "Nothing to change" },
   );
 
-/**
- * PATCH /api/admin/me — admin updates their own username, display name, or
- * password.
- *
- *   - Username change updates BOTH profiles.username and auth.users.email
- *     (since we synthesize email from username).
- *   - Password change requires currentPassword to prove identity, then uses
- *     the SSR client's updateUser so the session cookie keeps working.
- */
 export async function PATCH(req: Request) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -57,7 +48,6 @@ export async function PATCH(req: Request) {
   const admin = supabaseAdmin();
   const supabase = await supabaseServer();
 
-  // ----- Username change -----
   if (username && username !== session.profile.username) {
     const { data: existing } = await admin
       .from("profiles")
@@ -81,7 +71,6 @@ export async function PATCH(req: Request) {
     if (profErr) return jsonError(500, profErr.message);
   }
 
-  // ----- Display name -----
   if (displayName !== undefined) {
     const { error } = await admin
       .from("profiles")
@@ -90,12 +79,9 @@ export async function PATCH(req: Request) {
     if (error) return jsonError(500, error.message);
   }
 
-  // ----- Password change -----
   if (newPassword) {
     if (!currentPassword) return jsonError(400, "Current password required");
 
-    // Verify the current password by attempting a sign-in. We use a separate
-    // admin-side validator so we don't touch the live session cookies.
     const { error: vErr } = await admin.auth.signInWithPassword({
       email: usernameToInternalEmail(session.profile.username),
       password: currentPassword,

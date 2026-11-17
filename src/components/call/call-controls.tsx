@@ -10,11 +10,6 @@ const TONES: Record<Tone, string> = {
   accept: "bg-accept text-accept-foreground group-hover:bg-accept/90",
 };
 
-/**
- * One round call control with its name underneath. A toggle (Mute, Camera)
- * passes `active`: filled means the named thing is on, the way a phone's own
- * call screen shows it.
- */
 export function CallControl({
   label,
   onClick,
@@ -28,12 +23,9 @@ export function CallControl({
   label: string;
   onClick: () => void;
   tone?: Tone;
-  /** Toggles only: whether the named thing is on right now. */
   active?: boolean;
   disabled?: boolean;
-  /** The two answer buttons are bigger than the in-call ones. */
   large?: boolean;
-  /** Mute only: the microphone is picking up sound at this moment. */
   hearing?: boolean;
   children: React.ReactNode;
 }) {

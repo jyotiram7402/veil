@@ -1,13 +1,3 @@
-/**
- * Centralized ICE server configuration.
- *
- * ships STUN only (free, sufficient for most peer-to-peer paths).
- * TURN can be added later WITHOUT touching the calling code: set the public
- * env vars below (or, preferably in a future sprint, swap `getIceServers` to
- * fetch short-lived TURN credentials from a server route). Keeping this the one
- * place ICE config lives is deliberate.
- */
-
 const STUN_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
@@ -16,8 +6,6 @@ const STUN_SERVERS: RTCIceServer[] = [
 function turnFromEnv(): RTCIceServer[] {
   const raw = process.env.NEXT_PUBLIC_TURN_URL;
   if (!raw) return [];
-  // Allow a comma-separated list so several TURN endpoints (UDP/TCP/TLS) can be
-  // tried — this dramatically improves connect success on restrictive networks.
   const urls = raw
     .split(",")
     .map((s) => s.trim())
@@ -28,22 +16,12 @@ function turnFromEnv(): RTCIceServer[] {
   return [{ urls, ...(username ? { username } : {}), ...(credential ? { credential } : {}) }];
 }
 
-/**
- * The RTCConfiguration handed to every RTCPeerConnection in the app.
- *
- * No `iceCandidatePoolSize` on purpose. A pool starts gathering before the
- * offer exists, and in Chromium the pooled candidates can then go out under a
- * username fragment that is not the one in the offer. Seen right after a
- * cancelled call: the next call's answering side stayed on "Connecting…" in
- * half the attempts with a pool of 4, and in none without a pool.
- */
 export function getRtcConfig(): RTCConfiguration {
   return {
     iceServers: [...STUN_SERVERS, ...turnFromEnv()],
   };
 }
 
-/** True when this browser can actually do WebRTC voice. */
 export function isWebRtcSupported(): boolean {
   return (
     typeof window !== "undefined" &&

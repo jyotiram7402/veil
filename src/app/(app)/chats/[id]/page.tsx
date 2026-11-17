@@ -1,47 +1,71 @@
 import { notFound } from "next/navigation";
-import { requireSessionUser } from "@/lib/auth/session";
+import { getAuthUserId, requireSessionUser } from "@/lib/auth/session";
 import { supabaseServer } from "@/lib/supabase/server";
 import { loadMessagesPage } from "@/lib/queries";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
-import { chatIsDisappearing } from "@/lib/vanish";
+import { memberHasDisappearing } from "@/lib/vanish";
 import { ChatThread } from "@/components/chat/chat-thread";
 import type { Profile } from "@/types/chat";
 
 export const dynamic = "force-dynamic";
 
+type MemberRow = { user: Pick<Profile, "id" | "is_admin"> | null };
+
 export default async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await requireSessionUser();
   const supabase = await supabaseServer();
 
-  const { data: chat, error } = await supabase
-    .from("chats")
-    .select(
-      `
+  const chatQuery = Promise.resolve(
+    supabase
+      .from("chats")
+      .select(
+        `
         id, type, name, avatar_url, created_by, created_at, updated_at,
         members:chat_members(
           role, joined_at, last_read_at,
-          user:profiles(id, username, display_name, avatar_url, last_seen_at, bio)
+          user:profiles(id, username, display_name, avatar_url, last_seen_at, bio, is_admin)
         )
       `,
-    )
-    .eq("id", id)
-    .single();
+      )
+      .eq("id", id)
+      .single(),
+  );
 
-  if (error || !chat) notFound();
+  const disappearingQuery = chatQuery
+    .then(({ data }) => {
+      if (!data || data.type !== "direct") return false;
+      const member = ((data.members ?? []) as unknown as MemberRow[])
+        .map((m) => m.user)
+        .find((u) => u && !u.is_admin);
+      return member ? memberHasDisappearing(member.id) : false;
+    })
+    .catch(() => false);
 
-  // Loaded together: the messages, and whether they disappear in this chat.
-  const [initialMessages, disappearing] = await Promise.all([
-    loadMessagesPage(supabase, id, { limit: MESSAGE_PAGE_SIZE }),
-    chat.type === "direct" ? chatIsDisappearing(chat.id) : Promise.resolve(false),
+  const messagesQuery = loadMessagesPage(supabase, id, { limit: MESSAGE_PAGE_SIZE }).catch(
+    () => null,
+  );
+
+  const markRead = getAuthUserId().then((userId) =>
+    userId
+      ? supabase
+          .from("chat_members")
+          .update({ last_read_at: new Date().toISOString() })
+          .eq("chat_id", id)
+          .eq("user_id", userId)
+          .then(() => undefined)
+      : undefined,
+  );
+
+  const [session, { data: chat, error }, initialMessages, disappearing] = await Promise.all([
+    requireSessionUser(),
+    chatQuery,
+    messagesQuery,
+    disappearingQuery,
+    markRead,
   ]);
 
-  // mark as read for the opening user
-  await supabase
-    .from("chat_members")
-    .update({ last_read_at: new Date().toISOString() })
-    .eq("chat_id", id)
-    .eq("user_id", session.id);
+  if (error || !chat) notFound();
+  if (!initialMessages) throw new Error("Could not load the messages");
 
   const members = (chat.members ?? [])
     .map((m) => m.user)

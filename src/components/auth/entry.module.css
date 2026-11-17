@@ -1,10 +1,3 @@
-/*
- * Entry screens: the first screen (a wall of floating moji tiles around the
- * wordmark) and the auth shell (blue stage over a white sheet).
- * Plain CSS on purpose: the animation runs without any JavaScript, and
- * reduced motion gets a still composition.
- */
-
 @keyframes popIn {
   from {
     opacity: 0;
@@ -37,10 +30,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  First screen                                                       */
-/* ------------------------------------------------------------------ */
-
 .screen {
   position: relative;
   display: grid;
@@ -50,8 +39,6 @@
   overflow: hidden;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  /* One design pixel of the phone layout (390 wide, 668 tall stage), scaled to
-     whichever of width or height is tighter, so tiles never crowd the name. */
   --u: clamp(0.56px, min(100vw / 390, (100vh - 11rem) / 668), 1.3px);
 }
 
@@ -61,7 +48,6 @@
   }
 }
 
-/* Wide layout is designed at 1280 wide with a 700 tall stage. */
 @media (min-width: 768px) {
   .screen {
     --u: clamp(0.6px, min(100vw / 1280, (100vh - 10rem) / 700), 1.25px);
@@ -87,8 +73,6 @@
   pointer-events: none;
 }
 
-/* One tile = a positioned, rotated box (entrance) holding a squircle that
-   drifts forever. Two elements so the two transforms never fight. */
 .tile {
   position: absolute;
   left: var(--x);
@@ -114,9 +98,6 @@
   will-change: transform;
 }
 
-/* Phone layout (portrait). x / y are relative to the stage (the area above
-   the buttons) and sizes are in design pixels times --u, so the composition
-   holds on short and tall phones alike. */
 .t1  { --x: -9%;  --y: 2%;  --s: calc(var(--u) * 133); --r: -12deg; --d: 200ms; --t: 7.6s; --fd: -1.2s; }
 .t2  { --x: 45%;  --y: 4%;  --s: calc(var(--u) * 86);  --r: 9deg;   --d: 150ms; --t: 6.4s; --fd: -3.1s; --dx: -3px; }
 .t3  { --x: 76%;  --y: 12%; --s: calc(var(--u) * 117); --r: 13deg;  --d: 220ms; --t: 8.2s; --fd: -0.4s; }
@@ -130,7 +111,6 @@
 .t11 { --x: 58%;  --y: 84%; --s: calc(var(--u) * 62);  --r: -5deg;  --d: 260ms; --t: 6.2s; --fd: -2.9s; --dy: 4px; }
 .t12 { display: none; }
 
-/* Wide layout (tablet, laptop): the same tiles spread out around the name. */
 @media (min-width: 768px) {
   .t1  { --x: -2%;  --y: -9%; --s: calc(var(--u) * 200); }
   .t2  { --x: 41%;  --y: -7%; --s: calc(var(--u) * 138); }
@@ -188,7 +168,6 @@
   background: hsl(var(--background));
 }
 
-/* Tiles that reach the bottom of the stage dissolve before the buttons. */
 .actions::before {
   content: "";
   position: absolute;
@@ -265,10 +244,6 @@
   line-height: 1.4;
   color: hsl(var(--muted-foreground));
 }
-
-/* ------------------------------------------------------------------ */
-/*  Auth shell: blue stage over a white sheet                          */
-/* ------------------------------------------------------------------ */
 
 .auth {
   display: grid;
@@ -379,7 +354,6 @@
   color: hsl(var(--card-foreground));
 }
 
-/* From tablet up the shell becomes a centred card on the porcelain ground. */
 @media (min-width: 640px) {
   .auth {
     place-items: center;

@@ -5,23 +5,19 @@ import type { ChatSummary, MessageWithSender } from "@/types/chat";
 
 type Stamped = { id: string; sender_id: string | null; created_at: string };
 
-/** Was this message sent to `readerId` (so by anyone else) no later than `cutoff`? */
 function readBy(m: Stamped, readerId: string, cutoff: number): boolean {
   return (
     m.sender_id !== readerId && !m.id.startsWith("local-") && Date.parse(m.created_at) <= cutoff
   );
 }
 
-/** What somebody left behind in a chat: all they had received up to `cutoff`. */
 type LeftBehind = { readerId: string; cutoff: number };
 
-/** A message that is being deleted on the server right now, and must not come back. */
 function leftBehindIn(s: { leftBehind: Record<string, LeftBehind> }, chatId: string, m: Stamped) {
   const left = s.leftBehind[chatId];
   return !!left && readBy(m, left.readerId, left.cutoff);
 }
 
-/** What the chat list shows for a chat whose newest message is `m`. */
 function previewOf(m: MessageWithSender | undefined): ChatSummary["last_message"] {
   if (!m) return null;
   return { id: m.id, content: m.content, type: m.type, created_at: m.created_at, sender_id: m.sender_id };
@@ -35,40 +31,16 @@ type ChatState = {
   markChatRead: (chatId: string, at: string) => void;
   removeChat: (chatId: string) => void;
 
-  /** messages keyed by chat id */
   messagesByChat: Record<string, MessageWithSender[]>;
-  /** whether we've loaded the first page for a chat */
   loadedChats: Record<string, boolean>;
-  /** whether more history exists */
   hasMore: Record<string, boolean>;
   setInitialMessages: (chatId: string, messages: MessageWithSender[], hasMore: boolean) => void;
   prependMessages: (chatId: string, older: MessageWithSender[], hasMore: boolean) => void;
   appendMessage: (chatId: string, message: MessageWithSender) => void;
   replaceMessage: (chatId: string, tempId: string, real: MessageWithSender) => void;
   removeMessage: (chatId: string, messageId: string) => void;
-  /**
-   * Disappearing messages: forget everything `readerId` had received in this
-   * chat up to `upTo`. The server has deleted it, or is about to.
-   *
-   * `remember` is for the second case (this person is leaving right now): the
-   * server needs a moment, and until then a list that is loaded again, or an
-   * answer that was already on its way, would bring the messages back.
-   */
   dropReadMessages: (chatId: string, readerId: string, upTo: string, remember?: boolean) => void;
-  /** See `dropReadMessages`: per chat, what has just been left behind. */
   leftBehind: Record<string, LeftBehind>;
-  /**
-   * Disappearing messages: make this chat's list agree with the newest page
-   * the server has just sent (oldest first, as /api/chats/[id]/messages gives it).
-   *
-   *  - A message we had when we asked (`known`) that the server no longer has
-   *    is gone: the other person read it and left while this screen was not
-   *    listening (page in the background, connection asleep).
-   *  - A message the server has and we do not is added.
-   *
-   * `partial`: the page was full, so it says nothing about anything older
-   * than its first message. Returns the messages that were added.
-   */
   matchServer: (
     chatId: string,
     page: MessageWithSender[],
@@ -104,8 +76,6 @@ export const useChatStore = create<ChatState>((set) => ({
       if (idx === -1) return s;
       if (leftBehindIn(s, chatId, message)) return s;
       const chat = s.chats[idx]!;
-      // Two realtime listeners (chat-list-wide + per-chat) can fire for the
-      // same insert. Dedupe by id so we don't double-count unread.
       if (chat.last_message && chat.last_message.id === message.id) return s;
       const updated: ChatSummary = {
         ...chat,
@@ -201,11 +171,9 @@ export const useChatStore = create<ChatState>((set) => ({
       const kept = list ? list.filter((m) => !gone(m)) : undefined;
       const listChanged = !!list && kept!.length !== list.length;
 
-      // The chat list must not go on showing a message that no longer exists.
       const chat = s.chats.find((c) => c.id === chatId);
       const previewGone = !!chat?.last_message && gone(chat.last_message);
 
-      // The later of two leaves by the same person covers the earlier one.
       const before = s.leftBehind[chatId];
       const leftBehind = remember
         ? {
@@ -236,7 +204,6 @@ export const useChatStore = create<ChatState>((set) => ({
     set((s) => {
       const list = s.messagesByChat[chatId] ?? [];
       const onServer = new Set(page.map((m) => m.id));
-      // A full page only speaks for the time after its first message.
       const floor = partial && page.length > 0 ? Date.parse(page[0]!.created_at) : -Infinity;
       const gone = new Set<string>();
       for (const m of list) {
@@ -246,7 +213,6 @@ export const useChatStore = create<ChatState>((set) => ({
       added = page.filter((m) => !have.has(m.id) && !leftBehindIn(s, chatId, m));
       if (gone.size === 0 && added.length === 0) return s;
 
-      // Sent messages in the order they were written, then the ones still on their way.
       const sent = [...list.filter((m) => !gone.has(m.id) && !m.id.startsWith("local-")), ...added].sort(
         (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at),
       );

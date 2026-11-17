@@ -15,7 +15,6 @@ const NOT_SET_UP =
 const COLUMNS =
   "id, code_hint, label, max_uses, use_count, expires_at, revoked_at, last_used_at, created_at";
 
-/** GET /api/admin/signup-codes — every code, newest first, with who used it. */
 export async function GET() {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -49,12 +48,6 @@ export async function GET() {
   });
 }
 
-/**
- * POST /api/admin/signup-codes — make a new code.
- *
- * The answer is the only place the code itself ever appears: the database
- * keeps its hash, so the admin has to copy it now.
- */
 export async function POST(req: Request) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -64,7 +57,6 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   const { label, maxUses, expiresInDays } = parsed.data;
 
-  // Left out means a week; null means it never expires.
   const days = expiresInDays === undefined ? 7 : expiresInDays;
   const expiresAt = days === null ? null : new Date(Date.now() + days * 86_400_000).toISOString();
 

@@ -49,7 +49,7 @@ export function ChatInfoDrawer({
 
   const isGroup = chatType === "group";
   const isAdmin = isGroup
-    ? members.some((m) => m.id === me.id) // simplified — admins are tracked in chat_members; UI shows action and server enforces
+    ? members.some((m) => m.id === me.id)
     : false;
 
   async function saveName() {

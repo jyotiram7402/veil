@@ -8,15 +8,6 @@ import { usePresenceStore } from "@/store/presence-store";
 import { clearChatChannel, setChatChannel } from "@/lib/realtime-registry";
 import type { Message, MessageWithSender, Profile } from "@/types/chat";
 
-/**
- * Subscribes to per-chat realtime channel for:
- *  - new/updated/deleted messages (Postgres CDC)
- *  - typing indicators (broadcast)
- *
- * The subscribed channel is registered so `useTypingBroadcast` can reuse
- * it for sending — creating a second channel with the same name would
- * be an unconnected no-op.
- */
 export function useChatRealtime(params: {
   chatId: string | null;
   me: Profile | null;
@@ -42,9 +33,6 @@ export function useChatRealtime(params: {
         { event: "INSERT", schema: "public", table: "messages", filter: `chat_id=eq.${chatId}` },
         (payload) => {
           const row = payload.new as Message;
-          // For self-sent messages, the API response already inserted the real
-          // row into our local list via replaceMessage(). Listening to the
-          // CDC echo here would duplicate if the realtime event raced ahead.
           if (row.sender_id === me.id) return;
           const sender = row.sender_id ? memberProfiles[row.sender_id] ?? null : null;
           const message: MessageWithSender = { ...row, sender };
@@ -60,8 +48,6 @@ export function useChatRealtime(params: {
           removeMessage(chatId, old.id);
         },
       )
-      // Disappearing messages: the server says what has just been deleted, as
-      // "everything `reader` had received up to `upTo`" (src/lib/vanish.ts).
       .on("broadcast", { event: "vanished" }, ({ payload }) => {
         const p = payload as { reader?: unknown; upTo?: unknown };
         if (typeof p.reader === "string" && typeof p.upTo === "string") {

@@ -6,7 +6,6 @@ import { ENTRY_FIELD } from "@/components/auth/field";
 import { Input, type InputProps } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-/** Password field with a show / hide button. */
 export const PasswordInput = React.forwardRef<HTMLInputElement, Omit<InputProps, "type">>(
   ({ className, ...props }, ref) => {
     const [visible, setVisible] = React.useState(false);

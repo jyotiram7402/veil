@@ -26,7 +26,6 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const session = await requireSessionUser();
   const supabase = await supabaseServer();
 
-  // RLS ("chats select if member") returns the row only to members.
   const { data: room } = await supabase
     .from("chats")
     .select(
@@ -51,8 +50,6 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   if (mine.blocked || mine.removed_at) {
     return <RoomClosed title="You have been removed from this room." message="You no longer have access to this room." />;
   }
-  // Locked rooms keep existing participants connected — only ended/expired
-  // rooms are closed here (new joins are refused at the join endpoint).
   if (room.status === "ended" || room.status === "expired") {
     return <RoomClosed title="This room is no longer available." message="This room has ended." />;
   }

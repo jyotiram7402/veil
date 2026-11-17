@@ -25,8 +25,6 @@ export function AppShell({
   const params = useParams<{ id?: string }>();
   const pathname = usePathname();
   const activeChatId = params?.id;
-  // On mobile we want the sidebar visible only on the empty /chats screen.
-  // Once the user opens a chat, a settings page, or admin, hide it.
   const sidebarVisibleOnMobile = pathname === "/chats" || pathname === "/chats/";
 
   const setProfile = useSessionStore((s) => s.setProfile);
@@ -56,9 +54,6 @@ export function AppShell({
     refreshChats,
   });
 
-  // Calls live here, above every screen: a call from anyone rings wherever the
-  // admin is, and keeps running while they move between screens. The store is
-  // filled after the first render, so start from what the server sent.
   const knownChats = chats.length > 0 ? chats : initialChats;
   const callChats = useMemo(
     () =>

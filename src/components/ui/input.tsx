@@ -9,8 +9,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       ref={ref}
       type={type}
       className={cn(
-        // 16px on mobile prevents iOS Safari from auto-zooming when the field
-        // is focused; 14px (text-sm) from the `sm` breakpoint up on desktop.
         "flex h-10 w-full rounded-md border border-input bg-background/60 px-3 py-2 text-base sm:text-sm shadow-sm placeholder:text-muted-foreground/70",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-50",

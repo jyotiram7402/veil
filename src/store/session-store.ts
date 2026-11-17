@@ -5,7 +5,6 @@ import type { Profile } from "@/types/chat";
 
 type SessionState = {
   profile: Profile | null;
-  /** The screen lock (session-lock.tsx) is covering the chat right now. */
   locked: boolean;
   setProfile: (p: Profile | null) => void;
   patchProfile: (p: Partial<Profile>) => void;

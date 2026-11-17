@@ -16,7 +16,6 @@ const patchSchema = z.object({
   password: z.string().min(4).max(128).optional(),
 });
 
-/** GET — current invite link state for this user. */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -47,7 +46,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   });
 }
 
-/** POST — rotate: revoke the old token and issue a new one with a new password. */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -90,7 +88,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   });
 }
 
-/** PATCH — enable/disable, or change the password without rotating the URL. */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -123,7 +120,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return NextResponse.json({ ok: true });
 }
 
-/** DELETE — revoke permanently. */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");

@@ -21,7 +21,6 @@ export async function POST(req: Request) {
   });
 
   if (error) {
-    // Don't leak which half of the credential was wrong.
     return jsonError(401, "Invalid username or password");
   }
 

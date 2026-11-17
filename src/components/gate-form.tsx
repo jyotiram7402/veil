@@ -8,7 +8,6 @@ import { UserAvatar } from "@/components/chat/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
-/** Message for the ?error= code the gate route redirects back with. */
 function errorMessage(code: string | undefined): string | undefined {
   if (code === "invalid") return "That password doesn't match. Try again.";
   if (code === "locked") return "Too many attempts. Wait a minute and try again.";

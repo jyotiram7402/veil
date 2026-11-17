@@ -1,6 +1,3 @@
-// Inlined in <head> so it runs before paint and the page never flashes
-// the wrong colors. Reads localStorage (and system preference) and stamps
-// the right class on <html>.
 const SCRIPT = `(function() {
   try {
     var stored = localStorage.getItem('blackfoxx-theme');

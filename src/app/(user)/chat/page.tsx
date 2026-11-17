@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireSessionUser } from "@/lib/auth/session";
+import { getAuthUserId, requireSessionUser } from "@/lib/auth/session";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { loadMessagesPage } from "@/lib/queries";
@@ -11,21 +11,39 @@ import type { Profile } from "@/types/chat";
 export const dynamic = "force-dynamic";
 
 export default async function UserChatPage() {
-  const session = await requireSessionUser();
+  const userId = await getAuthUserId();
+  if (!userId) redirect("/login");
 
-  // Admins should never land here
+  const supabase = await supabaseServer();
+  const [session, membershipResult, settings] = await Promise.all([
+    requireSessionUser(),
+    Promise.resolve(
+      supabase
+        .from("chat_members")
+        .select(
+          `
+        chat_id,
+        chat:chats(
+          id, type, name, avatar_url, created_at, updated_at,
+          members:chat_members(
+            user:profiles(id, username, display_name, avatar_url, last_seen_at, is_admin)
+          )
+        )
+      `,
+        )
+        .eq("user_id", userId),
+    ),
+    effectiveSettingsForUser(userId),
+  ]);
+
   if (session.profile.is_admin) redirect("/chats");
 
-  // Suspended / archived users get bounced
   if (session.profile.suspended || session.profile.archived) {
     redirect("/expired");
   }
 
-  // Room guests don't use the admin↔user DM view (and have no lock-screen
-  // password). Send them to their room, or back to the join page.
   if (session.profile.is_room_guest) {
-    const guestSb = await supabaseServer();
-    const { data: roomMember } = await guestSb
+    const { data: roomMember } = await supabase
       .from("chat_members")
       .select("chat_id, chat:chats(id, type, status)")
       .eq("user_id", session.id)
@@ -38,27 +56,7 @@ export default async function UserChatPage() {
     redirect("/join");
   }
 
-  const supabase = await supabaseServer();
-  const admin = supabaseAdmin();
-
-  // Find the one admin profile so we can locate the shared chat. There may be
-  // multiple admins in theory; the user's chat is with whichever admin
-  // created them. We find their existing direct chat.
-  const { data: memberships, error: mErr } = await supabase
-    .from("chat_members")
-    .select(
-      `
-        chat_id,
-        chat:chats(
-          id, type, name, avatar_url, created_at, updated_at,
-          members:chat_members(
-            user:profiles(id, username, display_name, avatar_url, last_seen_at, is_admin)
-          )
-        )
-      `,
-    )
-    .eq("user_id", session.id);
-
+  const { data: memberships, error: mErr } = membershipResult;
   if (mErr) throw mErr;
 
   type R = {
@@ -80,9 +78,6 @@ export default async function UserChatPage() {
       (r.chat.members ?? []).some((m) => m.user?.is_admin),
   );
 
-  // If the admin hasn't started a chat with this user yet, create a placeholder
-  // chat using the admin client (bypasses RLS). We pick any admin user to be
-  // the counterparty.
   let chatId: string | undefined = directWithAdmin?.chat?.id;
   let adminProfile: Profile | null = directWithAdmin
     ? (directWithAdmin.chat?.members ?? [])
@@ -91,13 +86,14 @@ export default async function UserChatPage() {
     : null;
 
   if (!chatId) {
+    const admin = supabaseAdmin();
     const { data: anyAdmin } = await admin
       .from("profiles")
       .select("*")
       .eq("is_admin", true)
       .limit(1)
       .maybeSingle();
-    if (!anyAdmin) redirect("/expired"); // nobody to talk to
+    if (!anyAdmin) redirect("/expired");
 
     adminProfile = anyAdmin as Profile;
 
@@ -115,17 +111,14 @@ export default async function UserChatPage() {
     chatId = newChat.id;
   }
 
-  const initialMessages = await loadMessagesPage(supabase, chatId!, {
-    limit: MESSAGE_PAGE_SIZE,
-  });
-
-  await supabase
-    .from("chat_members")
-    .update({ last_read_at: new Date().toISOString() })
-    .eq("chat_id", chatId!)
-    .eq("user_id", session.id);
-
-  const settings = await effectiveSettingsForUser(session.id);
+  const [initialMessages] = await Promise.all([
+    loadMessagesPage(supabase, chatId!, { limit: MESSAGE_PAGE_SIZE }),
+    supabase
+      .from("chat_members")
+      .update({ last_read_at: new Date().toISOString() })
+      .eq("chat_id", chatId!)
+      .eq("user_id", session.id),
+  ]);
 
   return (
     <UserChat

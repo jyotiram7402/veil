@@ -69,7 +69,6 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        // Chunky rounded face for the wordmark. Only the entry screens load it.
         display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
       },
       keyframes: {

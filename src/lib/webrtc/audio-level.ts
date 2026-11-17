@@ -1,11 +1,3 @@
-/**
- * Local-only microphone activity detection (Web Audio API).
- *
- * Used purely to show a subtle "speaking" indicator. Audio never leaves the
- * device through this path — no recording, no upload. Feature-detected; a
- * no-op monitor is returned when Web Audio is unavailable.
- */
-
 export type AudioLevelMonitor = { stop: () => void };
 
 export function monitorAudioLevel(
@@ -34,7 +26,6 @@ export function monitorAudioLevel(
 
     const tick = () => {
       analyser.getByteTimeDomainData(data);
-      // RMS around the 128 midpoint.
       let sum = 0;
       for (let i = 0; i < data.length; i++) {
         const v = (data[i]! - 128) / 128;
@@ -43,7 +34,6 @@ export function monitorAudioLevel(
       const rms = Math.sqrt(sum / data.length);
       const now = Date.now();
       const next = rms > 0.045;
-      // debounce state flips so the dot doesn't flicker
       if (next !== speaking && now - lastFlip > 180) {
         speaking = next;
         lastFlip = now;

@@ -4,7 +4,6 @@ import { getSessionUser } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
 import { SETTING_KEYS } from "@/lib/settings";
 
-// Every setting the app knows (the same list the per-person route accepts).
 const KNOWN_KEYS = new Set<string>(SETTING_KEYS);
 
 export async function GET() {

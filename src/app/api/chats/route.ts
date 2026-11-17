@@ -1,24 +1,22 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId, getSessionUser } from "@/lib/auth/session";
 import { createChatSchema } from "@/lib/validations";
 import { jsonError, parseBody } from "@/lib/api";
 import { loadChatsForUser } from "@/lib/queries";
 
 export async function GET() {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
 
   const supabase = await supabaseServer();
-  const chats = await loadChatsForUser(supabase, session.id);
+  const chats = await loadChatsForUser(supabase, userId);
   return NextResponse.json({ chats });
 }
 
 export async function POST(req: Request) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
-  // Only admins create chats (matches the v2 admin-only model). This gates the
-  // API path; the RPC and RLS enforce it independently at the DB layer too.
   if (!session.profile.is_admin) return jsonError(403, "Admin only");
 
   const parsed = await parseBody(req, createChatSchema);
@@ -34,7 +32,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ chatId: data });
   }
 
-  // group
   const { name, memberIds } = parsed.data;
   const uniqueMembers = Array.from(new Set([session.id, ...memberIds]));
 

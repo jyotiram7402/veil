@@ -170,5 +170,4 @@ held sideways.
 ## Not redesigned yet
 
 The admin pages (Members, Settings) and the room management pages still use their old
-layout with the new colours. They are being rebuilt one branch at a time; the order is in
-`CLAUDE.md` → Current status.
+layout with the new colours. They are being rebuilt one branch at a time.

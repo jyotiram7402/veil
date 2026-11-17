@@ -8,17 +8,6 @@ import { UserAvatar } from "@/components/chat/user-avatar";
 import { useSessionStore } from "@/store/session-store";
 import type { Profile } from "@/types/chat";
 
-/**
- * Hides chat content behind a full-screen password prompt whenever:
- *   - the page first mounts
- *   - the window loses focus
- *   - the document becomes hidden (tab switch, screen lock)
- *   - the user navigates back into the tab
- *
- * Does NOT end the Supabase session. Realtime stays connected so when the
- * lock opens again, every message that arrived while you were away is
- * already on screen.
- */
 export function SessionLock({
   me,
   children,
@@ -32,16 +21,11 @@ export function SessionLock({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Let the rest of the app know while the chat is covered: a message that
-  // arrives behind the lock has not been read (see use-vanish-on-leave.ts).
-  // Layout effects, so it is known before any other part of the screen starts
-  // its own work, wherever that part sits.
   useLayoutEffect(() => {
     useSessionStore.getState().setLocked(locked);
   }, [locked]);
   useLayoutEffect(() => () => useSessionStore.getState().setLocked(false), []);
 
-  // Disable common screenshot / save / print shortcuts everywhere
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -50,7 +34,6 @@ export function SessionLock({
       }
       if (k === "printscreen" || e.code === "PrintScreen") {
         e.preventDefault();
-        // Best-effort: scrub anything that landed in clipboard
         navigator.clipboard?.writeText(" ").catch(() => undefined);
       }
     };
@@ -58,15 +41,8 @@ export function SessionLock({
     return () => document.removeEventListener("keydown", onKey, true);
   }, []);
 
-  // Relock when the tab actually goes away. We deliberately do NOT listen
-  // for `window.blur` — on mobile that fires for things like tapping the
-  // address bar, the keyboard hiding, or the OS swipe-up gesture, which
-  // would lock the chat constantly and prevent the user from receiving
-  // messages while they're staring right at the screen.
   useEffect(() => {
     const relock = () => {
-      // Said at once, not when the lock has been drawn: a phone may freeze the
-      // page before that, and it must not wake up looking unlocked.
       useSessionStore.getState().setLocked(true);
       setLocked(true);
       setPassword("");
@@ -83,7 +59,6 @@ export function SessionLock({
     };
   }, []);
 
-  // Auto-focus the input each time we lock
   useEffect(() => {
     if (locked) {
       const t = window.setTimeout(() => inputRef.current?.focus(), 50);
@@ -106,8 +81,6 @@ export function SessionLock({
         if (res.ok) {
           setLocked(false);
           setPassword("");
-          // Tell the chat hooks to pull anything that landed while we were
-          // away. Realtime doesn't replay missed inserts on reconnect.
           window.dispatchEvent(new Event("blackfoxx:resume"));
           return;
         }
@@ -128,9 +101,6 @@ export function SessionLock({
 
   return (
     <div className="relative h-full w-full" onContextMenu={(e) => e.preventDefault()}>
-      {/* Render real content but hidden visibility-wise when locked.
-          We keep it in the DOM so realtime + initial scroll position
-          aren't lost, but visually it's gone. */}
       <div className={locked ? "invisible select-none pointer-events-none" : "h-full"}>
         {children}
       </div>
