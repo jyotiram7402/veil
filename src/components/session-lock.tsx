@@ -5,6 +5,7 @@ import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/chat/user-avatar";
+import { useCallStore } from "@/store/call-store";
 import { useSessionStore } from "@/store/session-store";
 import type { Profile } from "@/types/chat";
 
@@ -61,7 +62,10 @@ export function SessionLock({
 
   useEffect(() => {
     if (locked) {
-      const t = window.setTimeout(() => inputRef.current?.focus(), 50);
+      const t = window.setTimeout(() => {
+        const call = useCallStore.getState();
+        if (call.state === "idle" || call.minimized) inputRef.current?.focus();
+      }, 50);
       return () => window.clearTimeout(t);
     }
   }, [locked]);

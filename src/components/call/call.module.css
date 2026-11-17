@@ -42,7 +42,7 @@
 .screen {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 90;
   display: flex;
   background: hsl(var(--card));
   color: hsl(var(--card-foreground));
@@ -363,7 +363,7 @@
 
 .pill {
   position: fixed;
-  z-index: 70;
+  z-index: 90;
   top: calc(env(safe-area-inset-top) + 4.5rem);
   right: 0;
   left: 0;
@@ -388,6 +388,10 @@
     left: auto;
     margin: 0;
   }
+}
+
+.pillHigh {
+  top: calc(env(safe-area-inset-top) + 0.75rem);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -16,8 +16,8 @@ deployable to Vercel's free tier in about ten minutes.
 - Typing indicators, online presence, read receipts, unread counts
 - Disappearing messages (off until the admin switches them on): a read message is deleted
   for both people, for good, when its reader leaves the chat
-- Notifications when the app is closed (new message, missed call), turned on per device;
-  they never show what a message says
+- Notifications when the app is closed (new message, incoming call, missed call), turned on
+  per device; they never show what a message says
 - Mobile-first UI (light/dark), safe-area aware, works on phones and tablets
 - Admin panel: members, rooms, invitations, participant permissions
 - Strict Row-Level Security on every table; private storage with signed URLs
@@ -137,8 +137,9 @@ values the app works, but calls between different networks cannot connect.
   or `http://localhost` for dev. `Permissions-Policy` allows same-origin
   camera/mic.
 - 1-to-1 only (no group calls, no SFU). A call rings on any screen while the app
-  is open; a closed app does not ring (there are no push notifications). One call
-  at a time: a second caller gets *busy* and a missed call is logged in the chat.
+  is open; a closed app gets an "Incoming call" notification (when notifications are
+  on for that device) and rings once it is opened. One call at a time: a second caller
+  gets *busy* and a missed call is logged in the chat.
 
 ## License
 

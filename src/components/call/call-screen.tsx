@@ -19,6 +19,7 @@ import { CallStage } from "@/components/call/call-stage";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { useMediaDevices } from "@/hooks/use-media-devices";
 import { useCallStore } from "@/store/call-store";
+import { useSessionStore } from "@/store/session-store";
 import { cameraCount, canChooseAudioOutput, realAudioOutputs } from "@/lib/webrtc/devices";
 import { playRingtone } from "@/lib/webrtc/ringtone";
 import { isCallOver, type CallState } from "@/lib/webrtc/types";
@@ -55,11 +56,11 @@ function useCallClock(running: boolean, since: number | null): string {
 
 function statusText(
   state: CallState,
-  o: { message: string | null; videoCall: boolean; weak: boolean },
+  o: { message: string | null; videoCall: boolean; weak: boolean; reached: boolean },
 ): string {
   switch (state) {
     case "calling":
-      return "Calling…";
+      return o.reached ? "Ringing…" : "Calling…";
     case "ringing":
       return o.videoCall ? "Video call" : "Voice call";
     case "connecting":
@@ -99,6 +100,7 @@ export function CallScreen({
 }: CallScreenActions) {
   const call = useCallStore();
   const { state, peer, setMinimized } = call;
+  const locked = useSessionStore((s) => s.locked);
 
   const live = state === "connected" || state === "reconnecting";
   const over = isCallOver(state);
@@ -192,12 +194,17 @@ export function CallScreen({
     message: call.errorMessage,
     videoCall: call.remoteVideoOn,
     weak: call.quality === "poor",
+    reached: call.reached,
   });
 
   if (asPill) {
     const line = over ? status : state === "connected" ? duration : status;
     return (
-      <div className={styles.pill} role="region" aria-label="Call in progress">
+      <div
+        className={cn(styles.pill, locked && styles.pillHigh)}
+        role="region"
+        aria-label="Call in progress"
+      >
         <button
           type="button"
           onClick={() => setMinimized(false)}

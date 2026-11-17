@@ -33,9 +33,10 @@ on a laptop. The owner manages members from the same app.
 - One-to-one chat between the owner and each member: text, images, files,
   typing and online indicators, read receipts.
 - One-to-one voice and video calls. A call rings on any screen while the app is
-  open; a closed app does not ring. Calls between two different networks pass through
+  open; a closed app shows an "Incoming call" notification, and tapping it opens the app
+  on the ringing call. Calls between two different networks pass through
   a relay (Cloudflare); they work once the owner has added the two Cloudflare values.
-- Notifications for a closed app: a new message, and a missed call. Each person turns them
+- Notifications for a closed app: a new message, an incoming call, and a missed call. Each person turns them
   on per device. They never show what a message says, and a member's never shows a name.
   On an iPhone the app has to be added to the Home Screen first.
 - Disappearing messages, off unless the owner switches them on (for everyone, or for one

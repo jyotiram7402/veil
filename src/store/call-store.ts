@@ -9,6 +9,7 @@ type CallStore = {
   callId: string | null;
   chatId: string | null;
   isCaller: boolean;
+  reached: boolean;
   peer: PeerInfo | null;
   muted: boolean;
   connectedAt: number | null;
@@ -34,6 +35,7 @@ type CallStore = {
   startOutgoing: (callId: string, chatId: string, peer: PeerInfo) => void;
   startIncoming: (callId: string, chatId: string, peer: PeerInfo, media?: MediaState) => void;
   setState: (state: CallState) => void;
+  setReached: () => void;
   setConnected: () => void;
   setMuted: (muted: boolean) => void;
   setQuality: (quality: Quality) => void;
@@ -58,6 +60,7 @@ const initial = {
   callId: null,
   chatId: null,
   isCaller: false,
+  reached: false,
   peer: null,
   muted: false,
   connectedAt: null,
@@ -101,6 +104,7 @@ export const useCallStore = create<CallStore>((set) => ({
       remoteVideoOn: media?.video ?? false,
     }),
   setState: (state) => set({ state }),
+  setReached: () => set({ reached: true }),
   setConnected: () =>
     set((s) => ({ state: "connected", connectedAt: s.connectedAt ?? Date.now() })),
   setMuted: (muted) => set({ muted }),

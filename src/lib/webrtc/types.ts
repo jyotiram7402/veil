@@ -18,6 +18,8 @@ export function isCallOver(state: CallState): boolean {
 
 export type SignalType =
   | "call_started"
+  | "call_ring"
+  | "call_ringing"
   | "call_accepted"
   | "call_rejected"
   | "call_cancelled"
@@ -46,4 +48,8 @@ export type SignalPayload = {
 
 export type MediaState = { audio: boolean; video: boolean };
 
-export const CALL_RING_TIMEOUT_MS = 35_000;
+export const CALL_RING_TIMEOUT_MS = 45_000;
+export const RING_REPEAT_MS = 2_000;
+export const RING_AFTER_REACHED_MS = 25_000;
+export const MAX_RING_MS = 90_000;
+export const RING_SILENCE_MS = 8_000;

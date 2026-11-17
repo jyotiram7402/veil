@@ -200,11 +200,18 @@ During the call, tap the timer under the name. A line appears like
 
 ## A call does not ring on the other side
 
-The other person has to have the app open, on any screen: a closed app or a
-closed tab cannot ring, because there are no push notifications. If they were
-on another call, the caller sees "On another call" and a missed call is logged
-in the chat. Whether a locked phone or a tab in the background still rings has
-not been tested.
+- **Their app is open:** it rings on any screen. If they were on another call, the caller
+  sees "On another call" and a missed call is logged in the chat.
+- **Their app is closed or in the background:** they get an "Incoming voice call"
+  notification, if notifications are on for that device (see "No notification arrives").
+  Tapping it opens the app, and the call rings there within a couple of seconds, for as long
+  as the caller is still calling. A call rings for 45 s, and 25 s more once the other
+  phone has started ringing.
+- **The caller sees "Calling…" the whole time:** no device of the other person has started
+  ringing. Once one does, it changes to "Ringing…".
+- Not yet seen on real phones: how long a phone takes from tapping the notification to
+  ringing, and whether a phone whose app slept for a long time gets its connection back in
+  time.
 
 ## A call stops with "The microphone is blocked" (or the camera)
 

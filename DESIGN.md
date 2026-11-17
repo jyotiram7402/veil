@@ -104,7 +104,9 @@ One component for both screens (`notifications.tsx`).
   "Notifications blocked" in the menu and a sheet that says where the switch is.
 - The sheets use the avatar picker's frame: 28px corners, an extra-bold title, a full-width
   primary button. Steps are a 40px grey circle (an icon or a number) and one sentence.
-- The notification itself: the app icon, one line. No message text, ever.
+- The notification itself: the app icon, one line. No message text, ever. An incoming call
+  stays on screen until it is tapped or closed (on computers and Android); when it ends
+  unanswered it turns into "Missed voice call".
 
 ## Chat screen
 
@@ -147,8 +149,9 @@ held sideways.
 - A picture whose shape is far from the stage's (a laptop seen on a phone, a phone seen on a
   laptop) is shown whole on a dark ground; filling the stage would cut off more than a
   quarter of it and blow the rest up.
-- Sheet: the name, one status line (Calling…, Connecting…, the timer, Reconnecting…, why a
-  call ended), one line kept free for a note so the controls never jump, then the controls.
+- Sheet: the name, one status line (Calling…, Ringing… once the other phone rings,
+  Connecting…, the timer, Reconnecting…, why a call ended), one line kept free for a note so
+  the controls never jump, then the controls.
   Tapping the timer shows "call details" in that line: the size and frame rate of both
   pictures, and "direct" or "via relay".
 - Controls are round (56px, 52px on phones under 375px) with their name underneath. Mute and
@@ -162,6 +165,9 @@ held sideways.
 - "Chat" shrinks the call to a pill under the chat header: avatar, name, timer, Mute, End.
   In the admin's app it also opens that person's chat, and the pill then stays on every
   screen until the call ends. An incoming call takes the whole screen wherever the person is.
+- A member's screen lock never hides a call: the call screen and the pill sit above it, so
+  a call is answered and ended without the password, and the chat stays locked behind.
+  While the lock is up the pill sits at the top of the screen, since there is no header.
 - A call that failed says what went wrong and what to do, and stays until it is closed.
 
 ## Entry screens

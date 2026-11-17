@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
+import { CALL_RING_TIMEOUT_MS } from "@/lib/webrtc/types";
 import {
   generateVapidKeys,
   pushTopic,
@@ -9,10 +10,11 @@ import {
   type VapidKeys,
 } from "@/lib/web-push";
 
-export type Notice = { title: string; body?: string; tag: string; url: string };
+export type Notice = { title: string; body?: string; tag: string; url: string; ring?: boolean };
 
 const APP_OPEN_WINDOW_MS = 45_000;
 const NOTICE_TTL_SECONDS = 24 * 60 * 60;
+const RING_TTL_SECONDS = Math.ceil(CALL_RING_TIMEOUT_MS / 1000);
 const MAX_DEVICES_PER_PERSON = 10;
 
 type Person = {
@@ -124,7 +126,11 @@ function nameOf(person: Person | null | undefined): string {
   return person?.display_name?.trim() || person?.username || "Someone";
 }
 
-async function deliver(notices: Map<string, Notice>, origin: string): Promise<void> {
+async function deliver(
+  notices: Map<string, Notice>,
+  origin: string,
+  ttlSeconds: number = NOTICE_TTL_SECONDS,
+): Promise<void> {
   if (notices.size === 0) return;
   const admin = supabaseAdmin();
   const [keys, { data: devices }] = await Promise.all([
@@ -146,7 +152,7 @@ async function deliver(notices: Map<string, Notice>, origin: string): Promise<vo
       if (device.seen_at && Date.parse(device.seen_at) > openSince) return;
       const result = await sendPush(device, notice, keys, {
         subject,
-        ttlSeconds: NOTICE_TTL_SECONDS,
+        ttlSeconds,
         topic: pushTopic(notice.tag),
       });
       if (result === "gone") gone.push(device.id);
@@ -191,6 +197,38 @@ export async function notifyNewMessage(
     await deliver(notices, origin);
   } catch (err) {
     console.error("[push] a message notification failed", err);
+  }
+}
+
+export async function notifyIncomingCall(
+  call: { callId: string; chatId: string; callerId: string; kind: "voice" | "video" },
+  origin: string,
+): Promise<void> {
+  try {
+    const { data } = await supabaseAdmin()
+      .from("chat_members")
+      .select(
+        "user_id, blocked, removed_at, chat:chats(type), user:profiles(username, display_name, is_admin, suspended, archived)",
+      )
+      .eq("chat_id", call.chatId);
+    const members = (data ?? []) as unknown as MemberRow[];
+    if (members[0]?.chat?.type !== "direct") return;
+
+    const reachable = (m: MemberRow | undefined): m is MemberRow & { user: Person } =>
+      !!m && !m.blocked && !m.removed_at && !!m.user && !m.user.suspended && !m.user.archived;
+    const caller = members.find((m) => m.user_id === call.callerId);
+    const callee = members.find((m) => m.user_id !== call.callerId);
+    if (!reachable(caller) || !reachable(callee)) return;
+    if (!caller.user.is_admin && !callee.user.is_admin) return;
+
+    const what = call.kind === "video" ? "Incoming video call" : "Incoming voice call";
+    const tag = `call-${call.chatId}`;
+    const notice: Notice = callee.user.is_admin
+      ? { title: nameOf(caller.user), body: what, tag, url: `/chats/${call.chatId}`, ring: true }
+      : { title: what, tag, url: "/chat", ring: true };
+    await deliver(new Map([[callee.user_id, notice]]), origin, RING_TTL_SECONDS);
+  } catch (err) {
+    console.error("[push] an incoming-call notification failed", err);
   }
 }
 
