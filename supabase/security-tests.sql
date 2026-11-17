@@ -33,6 +33,9 @@ insert into public.chat_members (chat_id, user_id, role)
 insert into public.messages (id, chat_id, sender_id, content)
   values ('00000000-0000-0000-0000-0000000000bb',
           '00000000-0000-0000-0000-0000000000aa', :'member_id', 'secret');
+insert into public.call_sessions (id, chat_id, caller_id, callee_id)
+  values ('00000000-0000-0000-0000-0000000000cc',
+          '00000000-0000-0000-0000-0000000000aa', :'member_id', :'outsider_id');
 
 -- Impersonate the OUTSIDER (not a member, not admin).
 set local role authenticated;
@@ -100,6 +103,73 @@ begin
     raise exception 'FAIL: non-admin created a direct chat via RPC';
   exception when others then null; -- expected: "admin only"
   end;
+end $$;
+
+-- Impersonate the MEMBER: signed in, in the chat, not an admin (v11).
+select set_config(
+  'request.jwt.claims',
+  json_build_object('sub', :'member_id', 'role', 'authenticated')::text,
+  true
+);
+
+-- 7. A member must NOT make themselves admin, lift a suspension or change
+--    their own settings. What they may change (their name) must still work.
+do $$
+begin
+  begin
+    update public.profiles set is_admin = true where id = auth.uid();
+    raise exception 'FAIL: a member made themselves admin';
+  exception when insufficient_privilege then null; -- expected
+  end;
+  begin
+    update public.profiles set suspended = false, settings = '{}'::jsonb where id = auth.uid();
+    raise exception 'FAIL: a member changed suspended / settings on their own profile';
+  exception when insufficient_privilege then null; -- expected
+  end;
+  update public.profiles set display_name = 'Sec Member' where id = auth.uid();
+  if not found then
+    raise exception 'FAIL: a member could not change their own display name';
+  end if;
+end $$;
+
+-- 8. A member must NOT rewrite a message, not even their own.
+do $$
+begin
+  begin
+    update public.messages set content = 'edited'
+      where id = '00000000-0000-0000-0000-0000000000bb';
+    raise exception 'FAIL: a member updated a message';
+  exception when insufficient_privilege then null; -- expected
+  end;
+end $$;
+
+-- 9. A member must NOT insert a "system" note; a normal message must work.
+do $$
+begin
+  begin
+    insert into public.messages (chat_id, sender_id, content, type)
+      values ('00000000-0000-0000-0000-0000000000aa', auth.uid(), 'fake note', 'system');
+    raise exception 'FAIL: a member inserted a system message';
+  exception when insufficient_privilege or check_violation then null; -- expected
+  end;
+  insert into public.messages (chat_id, sender_id, content)
+    values ('00000000-0000-0000-0000-0000000000aa', auth.uid(), 'hello');
+end $$;
+
+-- 10. A member may change the state of their call, but nothing else about it.
+do $$
+begin
+  begin
+    update public.call_sessions set event_posted = true
+      where id = '00000000-0000-0000-0000-0000000000cc';
+    raise exception 'FAIL: a member changed event_posted on a call';
+  exception when insufficient_privilege then null; -- expected
+  end;
+  update public.call_sessions set status = 'ended', ended_at = now()
+    where id = '00000000-0000-0000-0000-0000000000cc';
+  if not found then
+    raise exception 'FAIL: a member could not end their own call';
+  end if;
 end $$;
 
 reset role;

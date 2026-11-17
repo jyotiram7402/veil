@@ -35,22 +35,30 @@ in the database (RLS), never from client-supplied role/permission/identity.
   active|locked), `can_chat_in` (adds room+participant chat permission), and
   `is_room_admin`. Effective voice/video permission lives in
   `src/lib/permissions.ts` and the `/api/calls/authorize` endpoint.
-- **Column lock-down**: `authenticated` may UPDATE only `chat_members.last_read_at`
-  (v5), so a participant cannot self-promote role or self-grant permissions.
+- **Column lock-down**: row-level security decides which rows a signed-in person may change,
+  not which columns, and anyone signed in can call the database directly. So the writable
+  columns are granted one by one: `chat_members.last_read_at` (v5); on their own profile
+  `display_name`, `bio`, `avatar_url`, `last_seen_at` (v11); on a call they are in `status`,
+  `connected_at`, `ended_at`, `end_reason` (v11). Messages cannot be updated at all, and
+  only `text` / `image` / `file` messages can be inserted (v11).
+  Until v11 a member could update every column of their own profile directly, `is_admin`,
+  `suspended` and `settings` included. Found by reading the policies on 2026-11-17, not
+  through an incident; whether it was ever used is unknown. After running v11, check once
+  that only the owner is an admin (`select username from profiles where is_admin`).
 
 ## Row Level Security
 
 | Table | RLS | Notes |
 |---|---|---|
-| profiles | on | SELECT = self OR admin OR shares-a-chat (v9, was `true`); self-UPDATE only |
+| profiles | on | SELECT = self OR admin OR shares-a-chat (v9, was `true`); self-UPDATE of display_name, bio, avatar_url, last_seen_at only (v11) |
 | chats | on | SELECT members; INSERT/UPDATE/DELETE admin-only |
 | chat_members | on | SELECT members; writes admin (service role); UPDATE column-locked to last_read_at |
-| messages | on | SELECT `can_access_chat`; INSERT `can_chat_in`; UPDATE/DELETE sender or chat admin |
+| messages | on | SELECT `can_access_chat`; INSERT `can_chat_in`, kinds text/image/file only (v11); no UPDATE (v11); DELETE sender or chat admin |
 | invite_tokens | on | admin-only SELECT; writes service-role; removed from realtime (v9) |
 | app_settings | on | admin-only; removed from realtime (v9) |
 | room_invites | on | admin-only SELECT; writes service-role after `is_room_admin` |
 | room_audit_log | on | admin-only SELECT; writes service-role |
-| call_sessions | on | SELECT members; INSERT caller; UPDATE participant |
+| call_sessions | on | SELECT members; INSERT caller; UPDATE participant, state columns only (v11) |
 | realtime.messages | on | private `call:<chatId>` broadcast limited to chat members (v7) |
 
 Negative RLS tests: `supabase/security-tests.sql`.

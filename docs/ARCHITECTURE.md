@@ -158,7 +158,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `is_room_admin`, `can_access_chat`, `can_chat_in`, `shares_chat`; RPCs
   `claim_room_seat` (advisory-locked seat claim), `get_or_create_admin_user_chat`,
   `get_or_create_direct_chat` (admin-only since v9).
-- `authenticated` may UPDATE only `chat_members.last_read_at` (column grant, v5).
+- Column grants say what a signed-in person may write: `chat_members.last_read_at` (v5); on
+  their own profile `display_name`, `bio`, `avatar_url`, `last_seen_at`; on their calls the
+  state columns; nothing on messages except inserting text / image / file (v11). A new
+  column that the browser's own session must write needs a grant in its migration.
 - Storage buckets: `avatars` (public), `attachments` (private, per-chat path, signed URLs).
 
 ## Auth flows

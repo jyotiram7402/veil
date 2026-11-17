@@ -29,6 +29,10 @@ Run these files in order in **Supabase Studio → SQL Editor → New query**:
 12. `v10.sql` — sign-up with an invite code: the `signup_codes` table (hashes only, no
     policies, service role only), `profiles.signup_code_id`, and the atomic
     `claim_signup_code()` / `release_signup_code()` functions.
+13. `v11.sql` — column lock-down. A signed-in person may change only `display_name`, `bio`,
+    `avatar_url` and `last_seen_at` of their own profile (before, every column, `is_admin`
+    included), may no longer UPDATE messages, may INSERT only `text` / `image` / `file`
+    messages, and may change only the state columns of a call they are in.
 
 Optionally run `security-tests.sql` with **psql** afterwards (see its header) to verify the
 RLS negative cases — it uses psql `\set` variables, so it won't run in the dashboard editor.
@@ -71,6 +75,10 @@ alter default privileges in schema public grant all on routines  to anon, authen
 ```
 
 RLS still decides which rows each user sees; these grants only restore table access.
+
+**Then run `v5.sql` and `v11.sql` again.** The block above hands every signed-in person the
+right to UPDATE all columns again; those two files take it back (a member could otherwise
+make themselves admin). Both are safe to re-run.
 
 **Create an admin without the bootstrap token** (bootstrap only works while `profiles`
 is empty):
