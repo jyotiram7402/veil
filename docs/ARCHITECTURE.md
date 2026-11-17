@@ -58,9 +58,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 | `(auth)/signup` | signed-out | sign-up with an invite code (`components/auth/signup-form.tsx` → `/api/auth/signup`); `?code=` pre-fills it |
 | `(app)/layout.tsx` | admin | requires `is_admin`; loads chat list (`loadChatsForUser`) into `AppShell` |
 | `(app)/chats`, `chats/[id]` | admin | chat list + thread (`components/chat/chat-thread.tsx`) |
-| `(app)/admin` | admin | Members / Archive / Defaults / Account tabs (`components/admin-panel.tsx`) |
+| `(app)/admin` | admin | Members / Sign-up codes / Archive / Defaults / Account tabs (`components/admin/admin-screen.tsx`, one file per tab in `components/admin/`) |
 | `(app)/rooms`, `rooms/[id]` | admin | rooms dashboard + room management (`components/rooms/*`) |
-| `(app)/settings` | admin | own profile |
+| `(app)/settings` | admin | own profile (`components/settings-form.tsx`) |
 | `(user)/chat` | member | single 1:1 chat with an admin (`components/user-chat.tsx`) |
 | `(user)/expired` | anyone | dead-end page after suspension / sign-out |
 | `i/[token]` | member | per-member invite link + gate password → session |

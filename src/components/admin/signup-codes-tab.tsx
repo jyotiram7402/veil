@@ -1,11 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Copy, Link as LinkIcon, Loader2, Plus } from "lucide-react";
+import { Copy, Link as LinkIcon, Loader2, Plus, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Chip,
+  EmptyState,
+  ListSkeleton,
+  LoadError,
+  SelectField,
+  dateText,
+} from "@/components/admin/parts";
+import { FIELD, FIELD_LABEL, PANEL } from "@/components/form-styles";
 import { copyText } from "@/lib/clipboard";
 import { apiErrorMessage, cn } from "@/lib/utils";
 
@@ -22,10 +31,6 @@ type Code = {
   used_by: { id: string; username: string; display_name: string | null }[];
 };
 
-const SELECT =
-  "h-10 w-full rounded-md border border-input bg-background/60 px-3 text-base shadow-sm sm:text-sm " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
 function statusOf(c: Code): { text: string; active: boolean } {
   if (c.revoked_at) return { text: "Switched off", active: false };
   if (c.expires_at && new Date(c.expires_at).getTime() <= Date.now()) {
@@ -33,14 +38,6 @@ function statusOf(c: Code): { text: string; active: boolean } {
   }
   if (c.use_count >= c.max_uses) return { text: "Used up", active: false };
   return { text: "Active", active: true };
-}
-
-function dateText(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 export function SignupCodesTab() {
@@ -128,20 +125,21 @@ export function SignupCodesTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <p className="max-w-prose text-sm text-muted-foreground">
+    <div className="space-y-5">
+      <p className="px-1 text-sm text-muted-foreground">
         A sign-up code lets somebody create their own account on the Sign up screen. They choose
         their own username and password, and then chat with you.
       </p>
 
-      <form
-        onSubmit={create}
-        className="rounded-lg border border-border/60 bg-card p-4"
-        aria-label="New sign-up code"
-      >
-        <div className="grid gap-4 sm:grid-cols-3">
+      <form onSubmit={create} className={cn(PANEL, "p-5")} aria-labelledby="newCodeTitle">
+        <h2 id="newCodeTitle" className="text-base font-bold">
+          New sign-up code
+        </h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="codeLabel">Who is it for? (optional)</Label>
+            <Label htmlFor="codeLabel" className={FIELD_LABEL}>
+              Who is it for? (optional)
+            </Label>
             <Input
               id="codeLabel"
               value={label}
@@ -149,118 +147,121 @@ export function SignupCodesTab() {
               maxLength={60}
               placeholder="e.g. Rahul"
               autoComplete="off"
+              className={FIELD}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="codeUses">Can be used</Label>
-            <select
-              id="codeUses"
-              value={maxUses}
-              onChange={(e) => setMaxUses(e.target.value)}
-              className={SELECT}
-            >
+            <Label htmlFor="codeUses" className={FIELD_LABEL}>
+              Can be used
+            </Label>
+            <SelectField id="codeUses" value={maxUses} onChange={(e) => setMaxUses(e.target.value)}>
               <option value="1">Once</option>
               <option value="5">5 times</option>
               <option value="10">10 times</option>
               <option value="25">25 times</option>
-            </select>
+            </SelectField>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="codeExpires">Stops working</Label>
-            <select
+            <Label htmlFor="codeExpires" className={FIELD_LABEL}>
+              Stops working
+            </Label>
+            <SelectField
               id="codeExpires"
               value={expires}
               onChange={(e) => setExpires(e.target.value)}
-              className={SELECT}
             >
               <option value="1">After 1 day</option>
               <option value="7">After 7 days</option>
               <option value="30">After 30 days</option>
               <option value="never">Never</option>
-            </select>
+            </SelectField>
           </div>
         </div>
-        <Button type="submit" className="mt-4" disabled={creating}>
-          {creating ? <Loader2 className="animate-spin" /> : <Plus />} Create code
+        <Button type="submit" className="mt-5 h-12 w-full px-6 sm:w-auto" disabled={creating}>
+          {creating ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}{" "}
+          Create code
         </Button>
       </form>
 
       {fresh && (
-        <div
-          role="status"
-          className="rounded-lg border border-primary/40 bg-accent p-4 text-accent-foreground"
-        >
+        <div role="status" className="rounded-2xl bg-accent p-5 text-accent-foreground">
           <p className="text-sm font-semibold">New code</p>
-          <p className="mt-1 select-all break-all font-mono text-2xl font-bold tracking-widest">
+          <p className="mt-1 select-all break-all font-mono text-[1.75rem] font-bold leading-tight tracking-[0.12em]">
             {fresh.code}
           </p>
-          <p className="mt-1 text-sm">
+          <p className="mt-2 text-sm">
             Copy it now and send it to the person. For safety it is not shown again.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => copy(fresh.code, "Code")}>
-              <Copy /> Copy code
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button onClick={() => copy(fresh.code, "Code")}>
+              <Copy aria-hidden="true" /> Copy code
             </Button>
-            <Button size="sm" variant="outline" onClick={() => copy(fresh.url, "Link")}>
-              <LinkIcon /> Copy sign-up link
+            <Button
+              variant="secondary"
+              className="bg-card shadow-none hover:bg-card/80"
+              onClick={() => copy(fresh.url, "Link")}
+            >
+              <LinkIcon aria-hidden="true" /> Copy sign-up link
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setFresh(null)}>
+            <Button variant="ghost" className="hover:bg-card/60" onClick={() => setFresh(null)}>
               Done
             </Button>
           </div>
         </div>
       )}
 
-      {loading ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">Loading codes…</p>
+      {loading && codes.length === 0 ? (
+        <ListSkeleton rows={2} />
       ) : loadError ? (
-        <p role="alert" className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {loadError}
-        </p>
+        <LoadError>{loadError}</LoadError>
       ) : codes.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No codes yet. Create one above and send it to the person you want to invite.
-        </p>
+        <EmptyState title="No codes yet">
+          Create one above and send it to the person you want to invite.
+        </EmptyState>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2" aria-label="Sign-up codes">
           {codes.map((c) => {
             const status = statusOf(c);
             return (
-              <li
-                key={c.id}
-                className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/60 bg-card px-4 py-3"
-              >
+              <li key={c.id} className={cn(PANEL, "flex items-center gap-3 p-4")}>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "hidden h-11 w-11 shrink-0 place-items-center rounded-full sm:grid [&_svg]:size-5",
+                    status.active ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  <Ticket />
+                </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-mono text-sm font-semibold tracking-wider">
                       •••••-•{c.code_hint}
                     </span>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
-                        status.active
-                          ? "bg-online/15 text-online-ink"
-                          : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {status.text}
-                    </span>
-                    {c.label && <span className="truncate text-sm">{c.label}</span>}
+                    <Chip tone={status.active ? "good" : "quiet"}>{status.text}</Chip>
+                    {c.label && (
+                      <span className="min-w-0 truncate text-sm font-semibold">{c.label}</span>
+                    )}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
                     Used {c.use_count} of {c.max_uses}
                     {" · "}
                     {c.expires_at ? `stops working ${dateText(c.expires_at)}` : "never expires"}
                     {" · "}made {dateText(c.created_at)}
                   </p>
                   {c.used_by.length > 0 && (
-                    <p className="mt-1 text-xs">
+                    <p className="mt-1 text-[13px] leading-snug">
                       Joined: {c.used_by.map((u) => `@${u.username}`).join(", ")}
                     </p>
                   )}
                 </div>
                 {status.active && (
-                  <Button size="sm" variant="outline" onClick={() => switchOff(c)}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => switchOff(c)}
+                    className="h-9 shrink-0 px-3.5 shadow-none"
+                  >
                     Switch off
                   </Button>
                 )}

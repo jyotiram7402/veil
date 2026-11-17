@@ -259,8 +259,8 @@ is intended (see `docs/SECURITY.md`).
 ## Messages do not disappear
 
 Disappearing messages are off until the admin switches them on: Admin page → **Defaults** →
-"Disappearing messages" (everyone), or **Users** → a person's menu → "Per-user settings"
-(one person). After that:
+"Disappearing messages" (everyone), or **Members** → the ⋯ menu next to a person →
+"Settings for this person" (one person). After that:
 
 - The chat has to be opened once after the switch was changed (an open chat keeps the
   setting it was loaded with).
