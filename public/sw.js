@@ -80,6 +80,7 @@ self.addEventListener("push", (event) => {
       body: text(notice.body),
       tag: text(notice.tag) || "blackfoxx",
       renotify: true,
+      requireInteraction: notice.ring === true,
       icon: "/icon-192.png",
       badge: "/badge-96.png",
       data: { url: text(notice.url) || "/" },

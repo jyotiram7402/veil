@@ -91,6 +91,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `calls/ice?chatId=` — the relay servers for a call in that chat: short-lived Cloudflare
   credentials, only for somebody who may be in the chat. The admin may ask without a chat
   (the relay check). `relay: false` is a normal answer: the call is then tried without one.
+- `calls/[id]/ring` — the caller says a call has started ringing; the other person's closed
+  app is told ("Incoming voice call"). Checks that the caller is in that 1:1 chat.
 - `calls/[id]/event` — caller posts one call-outcome system message (idempotent); a missed
   or cancelled call is announced to the other person's closed app.
 - `push/key` (the server's public key for notifications), `push/subscriptions` (POST: this
@@ -204,10 +206,33 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   call with `useCallActions().startVoice(chatId)`. Room-view call icons are placeholders.
 - Signaling: private Supabase broadcast channel `call:<chatId>`; `realtime.messages` RLS
   (v7) limits it to chat members. Events: `call_started` (+offer, +`media`: the caller's
-  camera on means a video call), `call_accepted`, `call_rejected`, `call_cancelled`, `answer`,
-  `ice_candidate`, `offer` (ICE restart), `call_ended`, `busy`, `media_state` (microphone and
-  camera on/off; the only source for "their camera is on"). Messages carry `callId`; stale
-  ones are ignored. Who is calling is shown from the chat's own member data, not the message.
+  camera on means a video call), `call_ring` and `call_ringing` (below), `call_accepted`,
+  `call_rejected`, `call_cancelled`, `answer`, `ice_candidate`, `offer` (ICE restart),
+  `call_ended`, `busy`, `media_state` (microphone and camera on/off; the only source for
+  "their camera is on"). Messages carry `callId`; stale ones are ignored. Who is calling is
+  shown from the chat's own member data, not the message. `signaling.ts` listens only to the
+  events in its list: a new event has to be added there, and an older open tab never hears
+  one it does not know.
+- Ringing a device that was not listening (`use-call.ts`). A broadcast reaches only the
+  devices that are on the channel at that moment, so a phone whose app was closed, or whose
+  connection slept in the background, missed `call_started`. While the call rings, the
+  caller therefore repeats it every 2 s as `call_ring`, with the offer as it is by then
+  (`pc.localDescription`, which already holds the network addresses gathered so far: the
+  late device also missed those). A device that starts ringing answers `call_ringing`; the
+  caller then shows "Ringing…" instead of "Calling…" and keeps ringing for at least 25 s
+  more (90 s at most). Without that, a call rings for 45 s. It is a new event and not a
+  second `call_started` on purpose: the code before this change answers a second
+  `call_started` with `busy`.
+- A ringing device that hears no repeat for 8 s while it is visible stops ringing ("Missed
+  call"): the caller's app is gone. A later repeat makes it ring again. This only starts once
+  a `call_ring` has been heard, so a caller on an older version is never cut short.
+- The last 20 calls that ended on a device are remembered, so a repeat that was already on
+  its way cannot make a declined call ring again.
+- One person on two devices (the admin's laptop and phone): both are on the channel and
+  hear everything. A `call_started` they sent themselves is ignored (before, the other
+  device rang for its own outgoing call). When one device answers, declines or is busy,
+  the other stops ringing; anything else a device hears from its own person is ignored
+  (before, the device that had not answered ended the call 30 s later).
 - One `RTCPeerConnection` per call. The caller offers a video line with every call, so camera
   on/off is `replaceTrack` (no renegotiation). The side that answers takes over that same
   line after reading the offer (`adoptOfferedVideo`); a transceiver it added itself would
@@ -229,8 +254,14 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   only reads `call-store` and calls the actions `use-call` returns. A closing state
   (`isCallOver`) keeps the screen up for 2.5 s; an error stays until closed (`dismiss`).
   "Chat" shrinks the call to a pill and, for the admin, opens that chat (`onOpenChat`).
-- Limits: the app has to be open to ring (no push notifications). The admin holds one Realtime
-  channel per person; Supabase caps channels per connection (100 by default, unverified).
+- The call screen and the pill sit above a member's screen lock (z-index 90, the lock is 80):
+  a call can be answered, seen and ended without unlocking, while the chat stays behind the
+  lock. While locked the pill moves to the top, where the chat header would be. The lock
+  does not take the keyboard focus while the full call screen is up.
+- A closed app learns of a call through a notification (see Notifications): the caller
+  POSTs `/api/calls/[id]/ring` when the call starts, and the repeats above reach the app once
+  it is open. The admin holds one Realtime channel per person; Supabase caps channels per
+  connection (100 by default, unverified).
 - `/api/calls/authorize` runs at start, accept, every reconnect and every 30 s.
 - Outcome → caller POSTs `/api/calls/[id]/event` → one `system` message in the chat.
 - The relay (TURN, Cloudflare Realtime). Two devices on different networks usually cannot
@@ -304,8 +335,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 
 ## Notifications
 
-- What: a notification for a new message and for a missed call, on a device where the app
-  is closed or in the background. It is web push: the browser's own push service (Google,
+- What: a notification for a new message, for an incoming call and for a missed call, on a
+  device where the app is closed or in the background. It is web push: the browser's own push service (Google,
   Apple, Mozilla, Microsoft) carries it to `public/sw.js`, which shows it. There is no
   account with any of them and no package: the two standards are written out in
   `src/lib/web-push.ts` (RFC 8291 for the encryption, RFC 8292 for the sender's proof).
@@ -319,13 +350,20 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   needed, so there is no environment variable to set. A device that subscribed under another
   key renews itself at its next page load.
 - Sending (`src/lib/push.ts`) happens after the answer has gone out (`after()`):
-  `chats/[id]/messages` POST → `notifyNewMessage`, and `calls/[id]/event` with `missed` or
-  `cancelled` → `notifyMissedCall`. Told are the other people of the chat who are not
+  `chats/[id]/messages` POST → `notifyNewMessage`, `calls/[id]/ring` → `notifyIncomingCall`,
+  and `calls/[id]/event` with `missed` or `cancelled` → `notifyMissedCall`. Told are the other people of the chat who are not
   suspended, archived, blocked or removed. Rooms send nothing, and a member is only ever
   told about the admin's messages.
 - What it says: never the message. The admin reads the sender's name and "New message" (or
-  "Missed voice call"). A member reads only "New message": a member's lock screen does not
-  show who they talk to. One notification per chat (`tag`); the next one replaces it.
+  "Incoming voice call", "Missed voice call"). A member reads only "New message" or
+  "Incoming voice call": a member's lock screen does not show who they talk to. One
+  notification per chat (`tag`); the next one replaces it.
+- An incoming call: `ring: true` makes the service worker keep it on screen until it is
+  dealt with (`requireInteraction`, computers and Android). It is only worth 45 s (`TTL`),
+  and it shares its topic with the missed-call notice of the same chat, so a phone that was
+  offline during the ring gets "Missed voice call" instead. A call answered on another device
+  leaves its notification until the app is next opened on that phone (opening it clears
+  them all).
 - A device with the app open and in front gets none. `use-heartbeat` tells the server every
   30 s while the app is in front, with the device's push address; the server keeps the time
   in `push_subscriptions.seen_at` and skips a device seen in the last 45 s. Leaving sends
@@ -340,8 +378,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   shows one, and why the choice to stay quiet is made on the server.
 - Before `supabase/v12.sql` has been run both routes answer 503, the screen says
   notifications are not available yet, and sending is skipped without an error.
-- Not built: answering a call from a closed app (it ends as a missed call), and muting one
-  chat.
+- Not built: muting one chat, and answering straight from the notification (it opens the
+  app, which then shows the call).
 - Tested against the standard's own example values, and with pretend browsers and push
   services. Not yet seen: a real delivery to a real phone.
 
@@ -399,6 +437,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   handed them to the next one, and the side that answered stayed on "Connecting…".
 - `<img>` is used on purpose for previews, call pictures and the image viewer (blob and
   signed links, which the image optimiser cannot fetch); the linter rule is off for it.
+- A call that reaches a device late depends on the Realtime connection coming back when the
+  app does. The Supabase client reconnects at once when a page becomes visible and its
+  connection was closed; a connection that looks open but is dead is only noticed by its
+  heartbeat (25 s). Seen only in the browser, not on a real phone (unverified).
 - `public/sw.js` is served exactly as written: no build step, no imports. It has to stay at
   the top of the site (its place decides which pages it may act for), and it has no `fetch`
   handler on purpose, so it never sits between a page and the network.

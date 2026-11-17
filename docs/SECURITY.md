@@ -100,6 +100,8 @@ account (never an admin).
   caller/callee/room IDs are not trusted; every message carries the `callId` and
   stale/ended-call messages are ignored. The name and avatar shown for an incoming
   call come from the chat's own member data, not from the signaling message.
+- The call screen opens above a member's screen lock, so a call can be answered and ended
+  without the password, as on a locked phone. The chat stays behind the lock.
 - Authorization is re-checked server-side at call start, on accept, on every
   reconnection, and every 30s while connected. Removed/blocked/suspended
   participants and ended rooms cannot start or keep a call; disabling room video
@@ -165,6 +167,10 @@ Off on every device until its owner turns them on there. Needs `supabase/v12.sql
   from the chat. Signing out removes the device. A session that ends another way (it
   expired) leaves the device subscribed: "New message" can still appear there until
   somebody signs in on that browser again or the browser's permission is taken back.
+- `POST /api/calls/[id]/ring` (an incoming-call notification) needs a session, 10 requests a
+  minute, and is only sent when the caller is an active member of that 1:1 chat with the
+  admin on one side; the other member is the one told. Nothing reaches a suspended, archived,
+  blocked or removed person.
 - A tap on a notification can only open a page of this app (`public/sw.js` rebuilds the
   address from a path and falls back to the start page).
 - Someone holding the server's private key and a device's address could send that device

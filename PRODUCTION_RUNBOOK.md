@@ -90,6 +90,11 @@ setup and `docs/SECURITY.md` for the security model.
 
 ## Smoke tests (run after each deploy)
 
+Calls to a closed app (needs notifications on for that phone): close the app on the
+member's phone → call it from the admin's app → "Incoming voice call" appears → tap it →
+the app opens on the ringing call → Accept → talk → End. The admin's screen says
+"Ringing…" from the moment the phone rings.
+
 Functional: open prod URL → admin login → create room → create invite (copy) →
 participant opens invite → enter code → join → send/receive message → voice call →
 video call → mute/unmute → camera on/off → switch camera → end call → leave.

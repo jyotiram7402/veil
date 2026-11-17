@@ -25,6 +25,10 @@ import {
 import { SignalingChannel } from "@/lib/webrtc/signaling";
 import {
   CALL_RING_TIMEOUT_MS,
+  MAX_RING_MS,
+  RING_AFTER_REACHED_MS,
+  RING_REPEAT_MS,
+  RING_SILENCE_MS,
   isCallOver,
   type PeerInfo,
   type SignalPayload,
@@ -49,6 +53,15 @@ const CONNECT_TIMEOUT_MS = 30_000;
 const ENDED_LINGER_MS = 2500;
 
 const CAMERA_RELEASE_MS = 400;
+const REMEMBERED_CALLS = 20;
+
+function offerSoFar(
+  pc: RTCPeerConnection,
+  fallback: RTCSessionDescriptionInit,
+): RTCSessionDescriptionInit {
+  const local = pc.localDescription;
+  return local ? { type: local.type, sdp: local.sdp } : fallback;
+}
 
 function cameraIsBusy(err: unknown): boolean {
   return (
@@ -110,6 +123,13 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
   const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ringRepeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ringWatchRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ringStartedAtRef = useRef(0);
+  const ringDeadlineRef = useRef(0);
+  const heardCallerAtRef = useRef(0);
+  const callerRepeatsRef = useRef(false);
+  const endedCallsRef = useRef(new Set<string>());
   const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -244,6 +264,11 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const teardown = useCallback(() => {
     if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
     ringTimeoutRef.current = null;
+    if (ringRepeatRef.current) clearInterval(ringRepeatRef.current);
+    ringRepeatRef.current = null;
+    if (ringWatchRef.current) clearInterval(ringWatchRef.current);
+    ringWatchRef.current = null;
+    callerRepeatsRef.current = false;
     if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
     connectTimeoutRef.current = null;
     clearReconnect();
@@ -281,6 +306,13 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     incomingOfferRef.current = null;
     pendingCandidatesRef.current = [];
+    const ended = callIdRef.current;
+    if (ended) {
+      const remembered = endedCallsRef.current;
+      remembered.add(ended);
+      const oldest = remembered.values().next().value;
+      if (remembered.size > REMEMBERED_CALLS && oldest) remembered.delete(oldest);
+    }
     callIdRef.current = null;
     activeChatRef.current = null;
   }, [clearReconnect, stopMonitors, remoteAudioRef]);
@@ -304,6 +336,44 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     (code: CallErrorCode) => finish("failed", callErrorMessage(code)),
     [finish],
   );
+
+  const ringUntil = useCallback(
+    (deadline: number) => {
+      const callId = callIdRef.current;
+      if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+      ringDeadlineRef.current = deadline;
+      ringTimeoutRef.current = setTimeout(() => {
+        ringTimeoutRef.current = null;
+        if (callIdRef.current !== callId || store.getState().state !== "calling") return;
+        send("call_cancelled", { reason: "no answer" });
+        updateSession({ status: "missed", ended_at: new Date().toISOString(), end_reason: "no answer" });
+        postOutcome("missed");
+        finish("ended", "No answer");
+      }, Math.max(0, deadline - Date.now()));
+    },
+    [store, send, updateSession, postOutcome, finish],
+  );
+
+  const watchCaller = useCallback(() => {
+    if (ringWatchRef.current) clearInterval(ringWatchRef.current);
+    const callId = callIdRef.current;
+    const watch = setInterval(() => {
+      if (callIdRef.current !== callId || store.getState().state !== "ringing") {
+        clearInterval(watch);
+        if (ringWatchRef.current === watch) ringWatchRef.current = null;
+        return;
+      }
+      if (document.visibilityState !== "visible") {
+        heardCallerAtRef.current = Date.now();
+        return;
+      }
+      if (!callerRepeatsRef.current) return;
+      if (Date.now() - heardCallerAtRef.current < RING_SILENCE_MS) return;
+      finish("ended", "Missed call");
+      if (callId) endedCallsRef.current.delete(callId);
+    }, 1000);
+    ringWatchRef.current = watch;
+  }, [store, finish]);
 
   const expectConnection = useCallback(() => {
     if (connectTimeoutRef.current) return;
@@ -556,24 +626,33 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
             kind: withVideo ? "video" : "voice",
           })
           .then(() => undefined, () => undefined);
+        void fetch(`/api/calls/${callId}/ring`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatId, kind: withVideo ? "video" : "voice" }),
+        }).catch(() => undefined);
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         if (!stillOurs()) return;
-        send("call_started", {
-          from: peerInfo(me),
-          sdp: offer,
-          media: { audio: !store.getState().muted, video: store.getState().videoEnabled },
-        });
-
-        ringTimeoutRef.current = setTimeout(() => {
-          if (store.getState().state === "calling") {
-            send("call_cancelled", { reason: "no answer" });
-            updateSession({ status: "missed", ended_at: new Date().toISOString(), end_reason: "no answer" });
-            postOutcome("missed");
-            finish("ended", "No answer");
+        const ring = (type: "call_started" | "call_ring") =>
+          send(type, {
+            from: peerInfo(me),
+            sdp: offerSoFar(pc, offer),
+            media: { audio: !store.getState().muted, video: store.getState().videoEnabled },
+          });
+        ring("call_started");
+        ringStartedAtRef.current = Date.now();
+        ringUntil(ringStartedAtRef.current + CALL_RING_TIMEOUT_MS);
+        const repeat = setInterval(() => {
+          if (callIdRef.current !== callId || store.getState().state !== "calling") {
+            clearInterval(repeat);
+            if (ringRepeatRef.current === repeat) ringRepeatRef.current = null;
+            return;
           }
-        }, CALL_RING_TIMEOUT_MS);
+          ring("call_ring");
+        }, RING_REPEAT_MS);
+        ringRepeatRef.current = repeat;
       } catch (err) {
         if (!stillOurs()) return;
         send("call_cancelled", { reason: "error" });
@@ -581,7 +660,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         finishWithError(classifyMediaError(err));
       }
     },
-    [store, me, authorize, createPeer, attachLocalMedia, send, updateSession, finish, finishWithError, postOutcome],
+    [store, me, authorize, createPeer, attachLocalMedia, send, ringUntil, finishWithError, postOutcome],
   );
 
   const accept = useCallback(
@@ -839,8 +918,18 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const onSignal = async (chatId: string, type: SignalType, payload: SignalPayload) => {
     const current = store.getState();
 
-    if (type === "call_started") {
-      if (current.state !== "idle" && !isCallOver(current.state)) {
+    if (type === "call_started" || type === "call_ring") {
+      if (payload.senderId === me.id || endedCallsRef.current.has(payload.callId)) return;
+      const inCall = current.state !== "idle" && !isCallOver(current.state);
+      if (inCall && chatId === activeChatRef.current && payload.callId === callIdRef.current) {
+        if (current.state !== "ringing") return;
+        heardCallerAtRef.current = Date.now();
+        if (type === "call_ring") callerRepeatsRef.current = true;
+        if (payload.sdp) incomingOfferRef.current = payload.sdp;
+        if (payload.media) store.getState().setRemoteMedia(payload.media);
+        return;
+      }
+      if (inCall) {
         void channelsRef.current
           .get(chatId)
           ?.send("busy", { callId: payload.callId, senderId: me.id });
@@ -854,13 +943,36 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       activeChatRef.current = chatId;
       incomingOfferRef.current = payload.sdp;
       store.getState().startIncoming(payload.callId, chatId, peerInfo(caller), payload.media);
+      heardCallerAtRef.current = Date.now();
+      callerRepeatsRef.current = type === "call_ring";
+      watchCaller();
+      send("call_ringing");
       void getRtcConfig(chatId);
       return;
     }
 
     if (chatId !== activeChatRef.current || payload.callId !== callIdRef.current) return;
 
+    if (payload.senderId === me.id) {
+      const elsewhere = type === "call_accepted" || type === "call_rejected" || type === "busy";
+      if (elsewhere && current.state === "ringing") {
+        teardown();
+        store.getState().reset();
+      }
+      return;
+    }
+
     switch (type) {
+      case "call_ringing": {
+        if (current.state !== "calling" || !current.isCaller) break;
+        if (!current.reached) store.getState().setReached();
+        const wanted = Math.min(
+          Date.now() + RING_AFTER_REACHED_MS,
+          ringStartedAtRef.current + MAX_RING_MS,
+        );
+        if (wanted > ringDeadlineRef.current) ringUntil(wanted);
+        break;
+      }
       case "offer": {
         const pc = pcRef.current;
         if (!pc || !payload.sdp) return;

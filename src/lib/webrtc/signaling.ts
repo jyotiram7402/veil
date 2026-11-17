@@ -4,6 +4,8 @@ import type { SignalPayload, SignalType } from "@/lib/webrtc/types";
 
 const SIGNAL_EVENTS: SignalType[] = [
   "call_started",
+  "call_ring",
+  "call_ringing",
   "call_accepted",
   "call_rejected",
   "call_cancelled",
