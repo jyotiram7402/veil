@@ -36,6 +36,11 @@ insert into public.messages (id, chat_id, sender_id, content)
 insert into public.call_sessions (id, chat_id, caller_id, callee_id)
   values ('00000000-0000-0000-0000-0000000000cc',
           '00000000-0000-0000-0000-0000000000aa', :'member_id', :'outsider_id');
+insert into public.push_subscriptions (user_id, endpoint, p256dh, auth)
+  values (:'member_id', 'https://fcm.googleapis.com/fcm/send/sec-test', 'k', 'a');
+insert into public.push_keys (id, public_key, private_key)
+  values (1, 'sec-public', 'sec-private')
+on conflict (id) do nothing;
 
 -- Impersonate the OUTSIDER (not a member, not admin).
 set local role authenticated;
@@ -170,6 +175,34 @@ begin
   if not found then
     raise exception 'FAIL: a member could not end their own call';
   end if;
+end $$;
+
+-- 11. The notification tables are closed to every browser session (v12): not
+--     the server's key pair, and not even a person's own devices.
+do $$
+declare
+  n integer;
+begin
+  begin
+    select count(*) into n from public.push_keys;
+    if n > 0 then
+      raise exception 'FAIL: a member read the notification key pair';
+    end if;
+  exception when insufficient_privilege then null; -- expected
+  end;
+  begin
+    select count(*) into n from public.push_subscriptions;
+    if n > 0 then
+      raise exception 'FAIL: a member read notification devices';
+    end if;
+  exception when insufficient_privilege then null; -- expected
+  end;
+  begin
+    insert into public.push_subscriptions (user_id, endpoint, p256dh, auth)
+      values (auth.uid(), 'https://fcm.googleapis.com/fcm/send/sec-test-2', 'k', 'a');
+    raise exception 'FAIL: a member stored a notification device directly';
+  exception when insufficient_privilege then null; -- expected
+  end;
 end $$;
 
 reset role;

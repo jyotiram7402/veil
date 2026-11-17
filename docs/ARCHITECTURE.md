@@ -78,7 +78,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   (rotate/enable/revoke invite link), `.../settings` (per-user overrides), `.../chat`
   (open admin↔member chat), `settings` (global `app_settings`), `me` (own username/password).
 - `chats/` — list/create (admin), `[id]` (rename/delete), `[id]/messages` (page via
-  `before=`, resync via `after=`), `[id]/read`, `[id]/members`, `[id]/vanish` (disappearing
+  `before=`, resync via `after=`; a sent message is announced to closed apps after the
+  answer has gone out), `[id]/read`, `[id]/members`, `[id]/vanish` (disappearing
   messages: "I am leaving, and had read up to this time").
 - `messages/[id]` — delete. `upload` — avatars (public) / attachments (signed URLs).
 - `i/[token]` — gate password check → rotate the member's auth password → sign in.
@@ -90,8 +91,12 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `calls/ice?chatId=` — the relay servers for a call in that chat: short-lived Cloudflare
   credentials, only for somebody who may be in the chat. The admin may ask without a chat
   (the relay check). `relay: false` is a normal answer: the call is then tried without one.
-- `calls/[id]/event` — caller posts one call-outcome system message (idempotent).
-- `profile`, `profile/heartbeat` (last_seen), `users/search` (admin picker), `health`.
+- `calls/[id]/event` — caller posts one call-outcome system message (idempotent); a missed
+  or cancelled call is announced to the other person's closed app.
+- `push/key` (the server's public key for notifications), `push/subscriptions` (POST: this
+  device wants notifications; DELETE: it no longer does).
+- `profile`, `profile/heartbeat` (last_seen, and "the app is in front on this device" /
+  "away" for notifications), `users/search` (admin picker), `health`.
 
 ## Libraries (`src/lib`)
 
@@ -118,6 +123,11 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   (`copyText`: copy buttons copy, they never open the share sheet), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
 - `turn.ts` (server only: trades the Cloudflare TURN key for short-lived relay credentials).
+- Notifications: `web-push.ts` (server only: encrypts one push and signs it, on Node's
+  `crypto`; also the list of push services an address may belong to), `push.ts` (server
+  only: the server's key pair, a person's devices, who is told about a message or a missed
+  call), `push-client.ts` (the browser's half: permission, service worker, subscription;
+  imports nothing, so it runs in a plain Node test).
 - `webrtc/` — `ice.ts` (the servers a call uses: the relay from `/api/calls/ice`, else public
   STUN; no candidate pool, see Things that bite), `relay-check.ts` (the admin's relay test),
   `signaling.ts` (private broadcast channel; a message sent while it is joining waits),
@@ -131,7 +141,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - Zustand stores (`src/store`): `session-store` (current profile; `locked` while the screen
   lock covers the chat), `chat-store` (chats, messages by chat, optimistic `local-` ids; for
   disappearing messages `dropReadMessages`, `leftBehind`, `matchServer`), `presence-store`
-  (online set, typing), `sync-store`, `call-store` (call + media state).
+  (online set, typing), `sync-store`, `call-store` (call + media state), `push-store`
+  (notifications on this device: status, the help sheet, whether the pill was dismissed).
 - `use-chat-realtime` — channel `chat:<chatId>`: message INSERT/DELETE, typing broadcast,
   and the server's `vanished` broadcast.
 - `use-chat-list-realtime` — channel `chats:<userId>`: previews, unread, new memberships; a
@@ -141,7 +152,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   An empty chat asks for the newest page; `exact` mode (disappearing chats) also takes off
   the screen what the server no longer has.
 - `use-vanish-on-leave` — disappearing messages, the screen's half (see below).
-- `use-heartbeat` — `last_seen_at` every 30 s.
+- `use-heartbeat` — every 30 s while the app is in front: `last_seen_at`, and for a device
+  with notifications on, "do not notify this device". Says "away" when the app is left.
+  Runs for the admin and for members.
 - `use-call` — the WebRTC engine (see below). `use-media-devices` — the device list for the
   call screen.
 
@@ -153,7 +166,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `removed_at`, `can_chat/voice/video`, `last_read_at`), `messages` (`text|image|file|system`),
   `invite_tokens`, `app_settings`, `room_invites`, `room_audit_log`, `call_sessions`,
   `signup_codes` (v10; hash + hint only, RLS on with no policies, so service role only;
-  `profiles.signup_code_id` says which code a member joined with).
+  `profiles.signup_code_id` says which code a member joined with), `push_subscriptions`
+  (v12; one row per device that wants notifications) and `push_keys` (v12; the server's
+  one key pair), both service role only.
 - SECURITY DEFINER helpers used by RLS: `is_chat_member`, `is_chat_admin`, `is_admin`,
   `is_room_admin`, `can_access_chat`, `can_chat_in`, `shares_chat`; RPCs
   `claim_room_seat` (advisory-locked seat claim), `get_or_create_admin_user_chat`,
@@ -287,13 +302,56 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   on the live site: the broadcast request and the change feed's DELETE events (both only make
   it faster; the 5 s check covers for them).
 
+## Notifications
+
+- What: a notification for a new message and for a missed call, on a device where the app
+  is closed or in the background. It is web push: the browser's own push service (Google,
+  Apple, Mozilla, Microsoft) carries it to `public/sw.js`, which shows it. There is no
+  account with any of them and no package: the two standards are written out in
+  `src/lib/web-push.ts` (RFC 8291 for the encryption, RFC 8292 for the sender's proof).
+- Turning it on is per device: the pill on the chat home and in the member's chat, or the
+  item in the menu (`components/notifications.tsx`). `push-client.ts` asks for the
+  browser's permission inside the tap itself (Safari insists), registers `/sw.js`, fetches
+  the server's public key, subscribes, and hands the subscription to
+  `POST /api/push/subscriptions`. A device that is on repeats that last step at every page
+  load, which also gives the device to whoever is signed in now. Signing out removes it.
+- The server's key pair is one row in `push_keys`. The server makes it the first time it is
+  needed, so there is no environment variable to set. A device that subscribed under another
+  key renews itself at its next page load.
+- Sending (`src/lib/push.ts`) happens after the answer has gone out (`after()`):
+  `chats/[id]/messages` POST → `notifyNewMessage`, and `calls/[id]/event` with `missed` or
+  `cancelled` → `notifyMissedCall`. Told are the other people of the chat who are not
+  suspended, archived, blocked or removed. Rooms send nothing, and a member is only ever
+  told about the admin's messages.
+- What it says: never the message. The admin reads the sender's name and "New message" (or
+  "Missed voice call"). A member reads only "New message": a member's lock screen does not
+  show who they talk to. One notification per chat (`tag`); the next one replaces it.
+- A device with the app open and in front gets none. `use-heartbeat` tells the server every
+  30 s while the app is in front, with the device's push address; the server keeps the time
+  in `push_subscriptions.seen_at` and skips a device seen in the last 45 s. Leaving sends
+  "away", which clears the time at once. "In front" means visible, and on a computer also
+  focused: a window open behind another one is not being read. The rule is per device, so
+  a laptop left open does not silence the phone.
+- A push service answers 404 or 410 for a device that is gone, and its row is deleted. A
+  person keeps at most ten devices.
+- iPhone and iPad deliver only to an app on the Home Screen (iOS 16.4 or later). In Safari
+  the pill says "Get notifications" and shows the steps. On those devices every push must
+  show a notification or the permission is withdrawn: that is why the service worker always
+  shows one, and why the choice to stay quiet is made on the server.
+- Before `supabase/v12.sql` has been run both routes answer 503, the screen says
+  notifications are not available yet, and sending is skipped without an error.
+- Not built: answering a call from a closed app (it ends as a missed call), and muting one
+  chat.
+- Tested against the standard's own example values, and with pretend browsers and push
+  services. Not yet seen: a real delivery to a real phone.
+
 ## Conventions
 
 - Never trust a role or an id sent by the browser. Every route checks the session again;
   admin means `profiles.is_admin`; room actions also call `assertRoomAdmin()`.
   `supabaseAdmin()` (service role) only after those checks, and only on the server.
 - Server-only modules start with `import "server-only"` (`rooms`, `permissions`, `queries`,
-  `settings`, `invite-token`, `signup-codes`, `vanish`).
+  `settings`, `invite-token`, `signup-codes`, `vanish`, `turn`, `push`, `web-push`).
 - Environment variables are read through `src/lib/env.ts`. The exceptions: `next.config.ts`
   (the Supabase host) and `src/app/api/health` (booleans only).
 - A new route: copy `src/app/api/rooms/route.ts`. Session check → 401, `is_admin` → 403,
@@ -341,5 +399,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   handed them to the next one, and the side that answered stayed on "Connecting…".
 - `<img>` is used on purpose for previews, call pictures and the image viewer (blob and
   signed links, which the image optimiser cannot fetch); the linter rule is off for it.
+- `public/sw.js` is served exactly as written: no build step, no imports. It has to stay at
+  the top of the site (its place decides which pages it may act for), and it has no `fetch`
+  handler on purpose, so it never sits between a page and the network.
+- The list of open windows a service worker gets from `clients.matchAll()` is read-only:
+  copy it before sorting.
 - Old names that must stay: `INTERNAL_EMAIL_DOMAIN=rooms.local` is part of every login, and
   the GitHub repository and the Vercel address are still called `veil`.

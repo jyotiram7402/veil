@@ -16,6 +16,8 @@ deployable to Vercel's free tier in about ten minutes.
 - Typing indicators, online presence, read receipts, unread counts
 - Disappearing messages (off until the admin switches them on): a read message is deleted
   for both people, for good, when its reader leaves the chat
+- Notifications when the app is closed (new message, missed call), turned on per device;
+  they never show what a message says
 - Mobile-first UI (light/dark), safe-area aware, works on phones and tablets
 - Admin panel: members, rooms, invitations, participant permissions
 - Strict Row-Level Security on every table; private storage with signed URLs

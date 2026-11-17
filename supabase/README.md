@@ -33,6 +33,9 @@ Run these files in order in **Supabase Studio → SQL Editor → New query**:
     `avatar_url` and `last_seen_at` of their own profile (before, every column, `is_admin`
     included), may no longer UPDATE messages, may INSERT only `text` / `image` / `file`
     messages, and may change only the state columns of a call they are in.
+14. `v12.sql` — notifications for a closed app: `push_subscriptions` (one row per device
+    that asked for them) and `push_keys` (the server's one key pair, which the server
+    creates by itself). No policies on either: service role only.
 
 Optionally run `security-tests.sql` with **psql** afterwards (see its header) to verify the
 RLS negative cases — it uses psql `\set` variables, so it won't run in the dashboard editor.

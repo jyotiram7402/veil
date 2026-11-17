@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getAuthUserId } from "@/lib/auth/session";
 import { messageInputSchema } from "@/lib/validations";
 import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
 import { loadMessagesAfter, loadMessagesPage } from "@/lib/queries";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
+import { notifyNewMessage } from "@/lib/push";
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -71,5 +72,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .single();
 
   if (error) return jsonError(403, "Not allowed");
+
+  const origin = new URL(req.url).origin;
+  after(() => notifyNewMessage(id, userId, origin));
   return NextResponse.json({ message: data });
 }

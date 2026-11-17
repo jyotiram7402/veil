@@ -19,15 +19,18 @@ import { useTheme } from "@/components/theme-toggle";
 import { CallProvider } from "@/components/call/call-provider";
 import { CallButton } from "@/components/call/call-button";
 import { LiveIndicator } from "@/components/chat/live-indicator";
+import { NotificationsMenuItem, NotificationsPrompt } from "@/components/notifications";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
 import { useVanishOnLeave } from "@/hooks/use-vanish-on-leave";
+import { useHeartbeat } from "@/hooks/use-heartbeat";
 import { usePresence } from "@/hooks/use-presence";
 import { useTypingPrune } from "@/hooks/use-typing-prune";
 import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
 import { usePresenceStore } from "@/store/presence-store";
 import { lastSeen } from "@/lib/format";
+import { forgetPushDevice } from "@/lib/push-client";
 import { cn } from "@/lib/utils";
 import type { SettingsShape } from "@/lib/settings";
 import type { MessageWithSender, Profile } from "@/types/chat";
@@ -57,6 +60,7 @@ export function UserChat({
   }, [chatId, initialMessages, initialHasMore, setInitial]);
 
   usePresence(me);
+  useHeartbeat(true);
   useTypingPrune();
 
   const memberProfiles = useMemo(() => {
@@ -86,6 +90,7 @@ export function UserChat({
   const myProfile = useSessionStore((s) => s.profile) ?? me;
 
   async function signOut() {
+    await forgetPushDevice();
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/expired");
   }
@@ -131,6 +136,7 @@ export function UserChat({
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {theme === "dark" ? "Light mode" : "Dark mode"}
             </DropdownMenuItem>
+            <NotificationsMenuItem />
             <DropdownMenuItem className="px-3 py-2.5 text-destructive" onClick={signOut}>
               <LogOut className="h-4 w-4" /> Sign out
             </DropdownMenuItem>
@@ -138,13 +144,16 @@ export function UserChat({
         </DropdownMenu>
       </header>
 
-      <MessageList
-        chatId={chatId}
-        me={me}
-        memberProfiles={memberProfiles}
-        showTyping={settings.typing_indicator}
-        disappearing={disappearing}
-      />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <MessageList
+          chatId={chatId}
+          me={me}
+          memberProfiles={memberProfiles}
+          showTyping={settings.typing_indicator}
+          disappearing={disappearing}
+        />
+        <NotificationsPrompt place="top" />
+      </div>
       <Composer
         chatId={chatId}
         me={me}

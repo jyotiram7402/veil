@@ -59,6 +59,8 @@ in the database (RLS), never from client-supplied role/permission/identity.
 | room_invites | on | admin-only SELECT; writes service-role after `is_room_admin` |
 | room_audit_log | on | admin-only SELECT; writes service-role |
 | call_sessions | on | SELECT members; INSERT caller; UPDATE participant, state columns only (v11) |
+| signup_codes | on | no policies: service role only (v10) |
+| push_subscriptions, push_keys | on | no policies: service role only (v12) |
 | realtime.messages | on | private `call:<chatId>` broadcast limited to chat members (v7) |
 
 Negative RLS tests: `supabase/security-tests.sql`.
@@ -140,6 +142,34 @@ Off by default. Only an admin can switch it on: `/api/admin/settings` (everyone)
   messages on an open screen until the next 5 s check puts them back. It cannot delete
   anything: only the route above deletes.
 
+## Notifications
+
+Off on every device until its owner turns them on there. Needs `supabase/v12.sql`.
+
+- What is stored: per device, the address its browser's push service gave it and the two
+  keys a message for it is encrypted with (`push_subscriptions`); and the server's own key
+  pair (`push_keys`). Both tables have RLS on and no policies, so a browser can read
+  neither; the routes use the service role after checking the session.
+- A notification never carries what a message says. The admin's shows the sender's name; a
+  member's shows no name at all. The text is encrypted for the one device (RFC 8291), so
+  the push service (Google, Apple, Mozilla or Microsoft, whichever the browser belongs to)
+  cannot read it. It does learn that this server sent something to that device, when, and
+  how large it was.
+- The address a browser hands in must be an `https` address of a known push service
+  (`isPushEndpoint` in `src/lib/web-push.ts`), checked when it is stored and again before
+  every send. The server later makes requests to that address, so without the list a
+  member could point the server at an address of their choosing.
+- Every route needs a signed-in session, and a person can add, mark and remove only their
+  own devices. Adding is limited to 20 requests a minute, and to ten devices a person.
+- Nothing is sent to a suspended or archived person, or to someone blocked in or removed
+  from the chat. Signing out removes the device. A session that ends another way (it
+  expired) leaves the device subscribed: "New message" can still appear there until
+  somebody signs in on that browser again or the browser's permission is taken back.
+- A tap on a notification can only open a page of this app (`public/sw.js` rebuilds the
+  address from a path and falls back to the start page).
+- Someone holding the server's private key and a device's address could send that device
+  notifications of their own. They could not read anything. Both live only in the database.
+
 ## Secrets management
 
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only (never `NEXT_PUBLIC_`), used by
@@ -150,6 +180,9 @@ Off by default. Only an admin can switch it on: `/api/admin/settings` (everyone)
   credentials let their holder pass traffic through the owner's relay until they expire:
   they are only ever given to invited members. Only the status code of a Cloudflare answer
   is logged, never the request or the body. `.env.example` holds placeholders only.
+- The key pair for notifications is not an environment variable: the server creates it in
+  the `push_keys` table, which only the service role can read. Emptying that table makes
+  every device subscribe again.
 - Secrets must never be logged. Errors returned to clients are generic.
 
 ## Security headers
@@ -165,7 +198,8 @@ CSP is recommended future work.
 ## Rate limiting / abuse
 
 In-memory token-bucket (`src/lib/api.ts`) on login, invite gate, room join,
-message send, room/invite creation, lock, and the disappearing-messages route. It is per-instance (resets on
+message send, room/invite creation, lock, the disappearing-messages route and the
+notification device route. It is per-instance (resets on
 cold start, not shared across serverless instances) and keys on a spoofable
 `x-forwarded-for` — adequate as a speed bump, not a hard control. A shared store
 (e.g. Postgres/Upstash) is recommended before public launch.
@@ -188,4 +222,6 @@ disappearing messages (above) delete read messages and their files for good.
   chat UUID (low severity; IDs are unguessable). The same goes for the
   `vanished` notice of disappearing messages (it can hide, never delete).
 - Browser calls cannot run while the page is fully suspended/terminated.
+- Notifications tell the browser makers' push services that a device received something
+  from this server, and when (never what).
 - No automated test runner in the repo (see the manual matrix in the report).

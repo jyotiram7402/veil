@@ -213,6 +213,42 @@ Open the site's permissions in the browser (usually the icon next to the
 address), set Microphone and Camera to Allow, and call again. A blocked camera
 never ends a call: it carries on as a voice call.
 
+## No notification arrives
+
+Work down the list; the first one that fits is usually it.
+
+1. **Turning them on answers "Notifications aren't available yet"**: `supabase/v12.sql` has
+   not been run in this Supabase project.
+2. **Is it on for this device?** Notifications are switched on per phone or browser. Open
+   the menu (the avatar on the chat home, "More" in a member's chat): it must offer "Turn off
+   notifications". "Notifications blocked" means the browser was told no; the sheet behind
+   that item says how to allow them.
+3. **The app is open and in front on that device.** Then there is none, by design. Put the
+   app in the background, wait a moment, and send again.
+4. **iPhone or iPad.** Only the app opened from its Home Screen icon gets notifications
+   (iOS 16.4 or later), and it has to be turned on there, not in Safari. A Focus mode or
+   the Scheduled Summary holds them back.
+5. **Android.** Battery saver and "notifications off" for the browser (or for the installed
+   app) in the phone's settings both stop them.
+6. **Computer.** The browser has to be running, and the system's "do not disturb" off.
+7. **Brave.** Needs "Use Google services for push messaging" in its privacy settings.
+8. **Server side.** In the Vercel logs, `[push] the push service answered 403` means the
+   device was subscribed under another server key (was `push_keys` emptied?). Opening the
+   app once on that device renews it. Other codes are the push service's own trouble and
+   pass.
+
+To see which devices are subscribed, in the Supabase SQL editor:
+
+```sql
+select p.username, count(*) as devices, max(s.seen_at) as app_last_in_front
+  from public.push_subscriptions s
+  join public.profiles p on p.id = s.user_id
+ group by p.username;
+```
+
+A notification never shows what the message says, and a member's never shows a name. That
+is intended (see `docs/SECURITY.md`).
+
 ## Messages do not disappear
 
 Disappearing messages are off until the admin switches them on: Admin page → **Defaults** →

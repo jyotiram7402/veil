@@ -270,6 +270,40 @@ type SignupCodeInsert = {
 };
 type SignupCodeUpdate = Partial<SignupCodeInsert>;
 
+type PushSubscriptionRow = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  seen_at: string | null;
+  created_at: string;
+};
+type PushSubscriptionInsert = {
+  id?: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  seen_at?: string | null;
+  created_at?: string;
+};
+type PushSubscriptionUpdate = Partial<PushSubscriptionInsert>;
+
+type PushKeyRow = {
+  id: number;
+  public_key: string;
+  private_key: string;
+  created_at: string;
+};
+type PushKeyInsert = {
+  id?: number;
+  public_key: string;
+  private_key: string;
+  created_at?: string;
+};
+type PushKeyUpdate = Partial<PushKeyInsert>;
+
 export type Database = {
   public: {
     Tables: {
@@ -331,6 +365,18 @@ export type Database = {
         Row: SignupCodeRow;
         Insert: SignupCodeInsert;
         Update: SignupCodeUpdate;
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: PushSubscriptionRow;
+        Insert: PushSubscriptionInsert;
+        Update: PushSubscriptionUpdate;
+        Relationships: [];
+      };
+      push_keys: {
+        Row: PushKeyRow;
+        Insert: PushKeyInsert;
+        Update: PushKeyUpdate;
         Relationships: [];
       };
     };

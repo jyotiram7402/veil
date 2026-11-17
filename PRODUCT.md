@@ -35,6 +35,9 @@ on a laptop. The owner manages members from the same app.
 - One-to-one voice and video calls. A call rings on any screen while the app is
   open; a closed app does not ring. Calls between two different networks pass through
   a relay (Cloudflare); they work once the owner has added the two Cloudflare values.
+- Notifications for a closed app: a new message, and a missed call. Each person turns them
+  on per device. They never show what a message says, and a member's never shows a name.
+  On an iPhone the app has to be added to the Home Screen first.
 - Disappearing messages, off unless the owner switches them on (for everyone, or for one
   person): a message is deleted for both people once the person it was sent to has read it
   and then leaves the chat (goes back, switches app or tab, locks the phone). A message that
