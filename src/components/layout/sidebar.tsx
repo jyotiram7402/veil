@@ -15,7 +15,9 @@ import {
 import { ChatList } from "@/components/chat/chat-list";
 import { NewChatDialog } from "@/components/chat/new-chat-dialog";
 import { UserAvatar } from "@/components/chat/user-avatar";
+import { NotificationsMenuItem, NotificationsPrompt } from "@/components/notifications";
 import { useTheme } from "@/components/theme-toggle";
+import { forgetPushDevice } from "@/lib/push-client";
 import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
 import type { Profile } from "@/types/chat";
@@ -31,6 +33,7 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
   const firstName = name.trim().split(/\s+/)[0] || name;
 
   async function signOut() {
+    await forgetPushDevice();
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
@@ -95,6 +98,7 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 {theme === "dark" ? "Light mode" : "Dark mode"}
               </DropdownMenuItem>
+              <NotificationsMenuItem />
               <DropdownMenuSeparator />
               <DropdownMenuItem className="px-3 py-2.5 text-destructive" onClick={signOut}>
                 <LogOut className="h-4 w-4" /> Sign out
@@ -104,11 +108,14 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
         </div>
       </header>
 
-      <ChatList
-        me={profile}
-        activeChatId={activeChatId}
-        onNewChat={() => setNewChatOpen(true)}
-      />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <ChatList
+          me={profile}
+          activeChatId={activeChatId}
+          onNewChat={() => setNewChatOpen(true)}
+        />
+        <NotificationsPrompt place="bottom" />
+      </div>
 
       <NewChatDialog open={newChatOpen} onOpenChange={setNewChatOpen} />
     </>

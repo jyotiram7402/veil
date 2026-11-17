@@ -87,8 +87,24 @@ white column from tablet up.
   Search swaps the row for a pill search field.
 - Rows: 48px moji, name, one-line preview, time, and a blue count when unread. Unread rows
   use heavier text. Only a green dot marks presence; offline shows nothing.
-- Header controls are 40px circles. Members, Settings, the theme switch and Sign out live in
-  the menu behind your own avatar.
+- Header controls are 40px circles. Members, Settings, the theme switch, notifications and
+  Sign out live in the menu behind your own avatar.
+
+## Notifications
+
+One component for both screens (`notifications.tsx`).
+
+- The offer is a floating pill, like the call pill: a white bell in a blue circle, "Turn on
+  notifications", and a small close button. It floats over the content, so nothing moves
+  when it comes or goes: at the top of the messages in a member's chat, at the bottom of the
+  chat list on the chat home. It is shown until the person turns notifications on or closes
+  it, never during a call, and it does not come back once closed. The menu item stays.
+- On an iPhone in Safari it says "Get notifications" and opens a sheet with three steps
+  (Share, Add to Home Screen, open from the new icon). A browser that was told no gets
+  "Notifications blocked" in the menu and a sheet that says where the switch is.
+- The sheets use the avatar picker's frame: 28px corners, an extra-bold title, a full-width
+  primary button. Steps are a 40px grey circle (an icon or a number) and one sentence.
+- The notification itself: the app icon, one line. No message text, ever.
 
 ## Chat screen
 
@@ -96,7 +112,8 @@ One screen for the admin (`chat-thread.tsx`), the member (`user-chat.tsx`) and r
 
 - Header, 64px: avatar, name, and a status line ("Online" in `text-online-ink`, otherwise
   "Last seen …"), then video and voice call. For the admin, tapping the name opens the chat
-  details; the member has a "More" menu with the theme switch and Sign out.
+  details; the member has a "More" menu with the avatar picker, the theme switch,
+  notifications and Sign out.
 - Bubbles: 20px corners. Outgoing is `--bubble-out` blue with white text, incoming is white
   (slate in dark mode). The last bubble of a run gets one tight corner and the time under it,
   with ticks for your own messages. No names or avatars in a 1:1 chat; groups show both.

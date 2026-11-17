@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { getAuthUserId } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { jsonError, parseBody } from "@/lib/api";
+import { notifyMissedCall } from "@/lib/push";
 
 export const runtime = "nodejs";
 
@@ -43,7 +44,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const admin = supabaseAdmin();
   const { data: call } = await admin
     .from("call_sessions")
-    .select("id, chat_id, caller_id, connected_at, event_posted")
+    .select("id, chat_id, caller_id, callee_id, connected_at, event_posted")
     .eq("id", id)
     .maybeSingle();
 
@@ -78,6 +79,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     type: "system",
     content: label(parsed.data.kind, parsed.data.status, duration),
   });
+
+  if (parsed.data.status === "missed" || parsed.data.status === "cancelled") {
+    const origin = new URL(req.url).origin;
+    const missed = {
+      chatId: call.chat_id,
+      callerId: call.caller_id,
+      calleeId: call.callee_id,
+      kind: parsed.data.kind,
+    };
+    after(() => notifyMissedCall(missed, origin));
+  }
 
   return NextResponse.json({ ok: true });
 }

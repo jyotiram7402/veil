@@ -21,8 +21,11 @@ setup and `docs/SECURITY.md` for the security model.
 ## Database / migrations
 
 - Source of truth: `supabase/*.sql`, ordered in `supabase/README.md`
-  (`schema → policies → storage → v2..v9`). Deterministic, idempotent.
+  (`schema → policies → storage → v2..v12`). Deterministic, idempotent.
 - After any migration, re-run `supabase/security-tests.sql` to confirm RLS.
+- Notifications need `v12.sql`. Until it has been run the app works as before and "Turn on
+  notifications" says they are not available yet. Nothing has to be set in Vercel for them.
+  Never empty `push_keys`: every device would have to subscribe again.
 
 ## Authentication
 
