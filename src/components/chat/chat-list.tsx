@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ImageIcon, Paperclip, Search, X } from "lucide-react";
+import { BellOff, ImageIcon, Paperclip, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/chat/user-avatar";
@@ -231,12 +231,27 @@ export function ChatList({
                         >
                           <Preview chat={chat} meId={me.id} />
                         </p>
-                        {unread && (
-                          <span
-                            className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-bold tabular-nums text-primary-foreground"
-                            aria-label={`${chat.unread_count} unread`}
-                          >
-                            {chat.unread_count > 99 ? "99+" : chat.unread_count}
+                        {(unread || chat.muted) && (
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            {chat.muted && (
+                              <>
+                                <BellOff className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                                <span className="sr-only">Muted</span>
+                              </>
+                            )}
+                            {unread && (
+                              <span
+                                className={cn(
+                                  "grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold tabular-nums",
+                                  chat.muted
+                                    ? "bg-muted-foreground text-background"
+                                    : "bg-primary text-primary-foreground",
+                                )}
+                                aria-label={`${chat.unread_count} unread`}
+                              >
+                                {chat.unread_count > 99 ? "99+" : chat.unread_count}
+                              </span>
+                            )}
                           </span>
                         )}
                       </div>

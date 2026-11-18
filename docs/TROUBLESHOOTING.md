@@ -125,6 +125,10 @@ also deleted yourself).
 A real password-reset flow would need a recovery email; BlackFoxx is
 deliberately email-less.
 
+## Mute says "Muting isn't available yet"
+
+`supabase/v14.sql` has not been run. Run it in the Supabase SQL editor; nothing else is needed.
+
 ## A member I unsuspended or restored cannot get in
 
 - "…but they still can't sign in. Try again." after Unsuspend or Restore: the account is

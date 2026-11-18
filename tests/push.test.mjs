@@ -480,6 +480,22 @@ await test("a suspended, archived, blocked or removed person on either end rings
   }
 });
 
+await test("a muted chat brings no message notification to whoever muted it, but its calls still ring", async () => {
+  world();
+  globalThis.__db.tables.chat_members.find((m) => m.user_id === ADMIN).muted = true;
+  const push = await freshServer();
+  await give(push, ADMIN, "adminphone");
+  await give(push, ASHA, "ashaphone");
+  await push.notifyNewMessage(CHAT, ASHA, ORIGIN);
+  assert.deepEqual(pushes, []);
+  await push.notifyNewMessage(CHAT, ADMIN, ORIGIN);
+  assert.deepEqual(pushes.map((p) => p.to), ["ashaphone"]);
+  pushes.length = 0;
+  await push.notifyIncomingCall(ring(ASHA), ORIGIN);
+  await push.notifyMissedCall({ chatId: CHAT, callerId: ASHA, calleeId: ADMIN, kind: "voice" }, ORIGIN);
+  assert.deepEqual(pushes.map((p) => p.to), ["adminphone", "adminphone"]);
+});
+
 await test("an incoming call never throws, whatever the database or the push service does", async () => {
   const db = world();
   const push = await freshServer();

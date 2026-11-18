@@ -29,6 +29,7 @@ type ChatState = {
   upsertChat: (chat: ChatSummary) => void;
   bumpChatPreview: (chatId: string, message: MessageWithSender, fromSelf: boolean) => void;
   markChatRead: (chatId: string, at: string) => void;
+  setChatMuted: (chatId: string, muted: boolean) => void;
   removeChat: (chatId: string) => void;
 
   readAt: Record<string, Record<string, string>>;
@@ -103,6 +104,13 @@ export const useChatStore = create<ChatState>((set) => ({
         c.id === chatId ? { ...c, unread_count: 0, my_last_read_at: at } : c,
       ),
     })),
+
+  setChatMuted: (chatId, muted) =>
+    set((s) => {
+      const chat = s.chats.find((c) => c.id === chatId);
+      if (!chat || (chat.muted === true) === muted) return s;
+      return { chats: s.chats.map((c) => (c.id === chatId ? { ...c, muted } : c)) };
+    }),
 
   removeChat: (chatId) =>
     set((s) => ({ chats: s.chats.filter((c) => c.id !== chatId) })),

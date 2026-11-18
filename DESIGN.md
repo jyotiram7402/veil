@@ -119,6 +119,8 @@ white column from tablet up.
   Search swaps the row for a pill search field.
 - Rows: 48px moji, name, one-line preview, time, and a blue count when unread. Unread rows
   use heavier text. Only a green dot marks presence; offline shows nothing.
+- A muted chat shows a small bell-off icon before its count, and the count turns grey
+  (`bg-muted-foreground`): still counted, no longer asking for attention.
 - Header controls are 40px circles. Members, Settings, the light/dark switch, the colour
   switch (Blue or Yellow), notifications and Sign out live in the menu behind your own avatar.
 
@@ -146,7 +148,8 @@ One screen for the admin (`chat-thread.tsx`), the member (`user-chat.tsx`) and r
 
 - Header, 64px: avatar, name, and a status line ("Online" in `text-online-ink`, otherwise
   "Last seen …"), then video and voice call. For the admin, tapping the name opens the chat
-  details; the member has a "More" menu with the avatar picker, the light/dark switch,
+  details, which hold the Mute switch (a toggle row in a bordered panel, as on the admin
+  pages: "No notifications for new messages in this chat. Calls still ring."); the member has a "More" menu with the avatar picker, the light/dark switch,
   the colour switch, notifications and Sign out.
 - Bubbles: 20px corners. Outgoing is `--bubble-out` blue with white text, incoming is white
   (slate in dark mode). The last bubble of a run gets one tight corner and the time under it,

@@ -73,7 +73,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `before=`, resync via `after=`; every answer also carries `readers`, each member's
   `last_read_at`; a sent message is announced to closed apps after the answer has gone
   out), `[id]/read` (I have seen this chat up to now), `[id]/members`, `[id]/vanish`
-  (disappearing messages: "I am leaving, and had read up to this time").
+  (disappearing messages: "I am leaving, and had read up to this time"), `[id]/mute` (PATCH
+  `{ muted }` on the caller's own membership, written with the service role; 503 "Muting isn't
+  available yet" until `v14.sql` has run).
 - `messages/[id]` — delete. `upload` — avatars (public) / attachments (signed URLs).
 - `i/[token]` — gate password check → rotate the member's auth password → sign in.
 - `lock` — unlock `SessionLock` with the gate password.
@@ -380,7 +382,11 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `chats/[id]/messages` POST → `notifyNewMessage`, `calls/[id]/ring` → `notifyIncomingCall`,
   and `calls/[id]/event` with `missed` or `cancelled` → `notifyMissedCall`. Told are the other people of the chat who are not
   suspended, archived, blocked or removed. Rooms send nothing, and a member is only ever
-  told about the admin's messages.
+  told about the admin's messages. Someone who muted the chat (`chat_members.muted`, v14) is
+  not told about its messages; calls ignore mute and still ring.
+- `notifyNewMessage` and the chat list (`loadChatsForUser`) read `chat_members` with `*`,
+  not by naming `muted`: before `v14.sql` has run the column is missing, and naming it would
+  break the chat list and every message notification.
 - What it says: never the message. The admin reads the sender's name and "New message" (or
   "Incoming voice call", "Missed voice call"). A member reads only "New message" or
   "Incoming voice call": a member's lock screen does not show who they talk to. One

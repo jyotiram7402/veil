@@ -39,6 +39,7 @@ Run these files in order in **Supabase Studio → SQL Editor → New query**:
 15. `v13.sql` — a suspended or archived person loses every chat at once, even on a phone
     that is still signed in: `is_active_profile()`, required by `can_access_chat()` and
     `is_chat_member()`. Run v11 first.
+16. `v14.sql` — mute one chat: `chat_members.muted`. Written only by the server (no grant).
 
 Optionally run `security-tests.sql` with **psql** afterwards (see its header) to verify the
 RLS negative cases — it uses psql `\set` variables, so it won't run in the dashboard editor.

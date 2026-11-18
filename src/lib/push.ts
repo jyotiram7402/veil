@@ -29,6 +29,7 @@ type MemberRow = {
   user_id: string;
   blocked: boolean;
   removed_at: string | null;
+  muted?: boolean;
   chat: { type: string } | null;
   user: Person | null;
 };
@@ -174,7 +175,7 @@ export async function notifyNewMessage(
     const { data } = await supabaseAdmin()
       .from("chat_members")
       .select(
-        "user_id, blocked, removed_at, chat:chats(type), user:profiles(username, display_name, is_admin, suspended, archived)",
+        "*, chat:chats(type), user:profiles(username, display_name, is_admin, suspended, archived)",
       )
       .eq("chat_id", chatId);
     const members = (data ?? []) as unknown as MemberRow[];
@@ -185,7 +186,7 @@ export async function notifyNewMessage(
     const tag = `chat-${chatId}`;
     const notices = new Map<string, Notice>();
     for (const m of members) {
-      if (m.user_id === senderId || m.blocked || m.removed_at || !m.user) continue;
+      if (m.user_id === senderId || m.blocked || m.removed_at || m.muted || !m.user) continue;
       if (m.user.suspended || m.user.archived) continue;
       if (m.user.is_admin) {
         notices.set(m.user_id, {
