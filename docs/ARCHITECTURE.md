@@ -91,7 +91,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `push/key` (the server's public key for notifications), `push/subscriptions` (POST: this
   device wants notifications; DELETE: it no longer does).
 - `profile`, `profile/heartbeat` (last_seen, and "the app is in front on this device" /
-  "away" for notifications), `users/search` (admin picker), `health`.
+  "away" for notifications; answers 403 to a suspended or archived person, read from the same
+  update, so it costs no extra query), `users/search` (admin picker), `health`.
 
 ## Libraries (`src/lib`)
 
@@ -117,6 +118,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   (`copyText`: copy buttons copy, they never open the share sheet), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
 - `turn.ts` (server only: trades the Cloudflare TURN key for short-lived relay credentials).
+- `lockout.ts` (server only): `lockOut` (random password, Supabase Auth ban, forget the
+  person's notification devices) for Suspend and Remove; `letBackIn` (lift the ban) for
+  Unsuspend and Restore.
 - Notifications: `web-push.ts` (server only: encrypts one push and signs it, on Node's
   `crypto`; also the list of push services an address may belong to), `push.ts` (server
   only: the server's key pair, a person's devices, who is told about a message or a missed
@@ -154,7 +158,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   and again on coming back. Used by the admin's chat screen and the member's.
 - `use-heartbeat` — every 30 s while the app is in front: `last_seen_at`, and for a device
   with notifications on, "do not notify this device". Says "away" when the app is left.
-  Runs for the admin and for members.
+  Runs for the admin and for members. On a 403 it turns notifications off on that device,
+  signs out and goes to `/expired`: that is how a suspended member's open app ends.
 - `use-call` — the WebRTC engine (see below). `use-media-devices` — the device list for the
   call screen.
 
@@ -193,6 +198,11 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - **Room guest:** admin creates room + invitation → `/join/<code>` → `/api/rooms/join`
   creates an ephemeral `is_room_guest` user, claims a seat, consumes one invite use →
   `/room/<id>`.
+- **Suspend / Remove:** the flag on `profiles`, then `lockOut` (see `lockout.ts`). Remove also
+  revokes their invite links, so a restored member needs a new one; a suspended member's link
+  works again once they are unsuspended. With `v13.sql`, `can_access_chat()` and
+  `is_chat_member()` are false for a suspended or archived person, so the database itself
+  shuts them out of every chat, attachment and call channel.
 
 ## Calling
 

@@ -409,6 +409,10 @@ export type Database = {
         Args: { p_chat: string; p_user: string };
         Returns: boolean;
       };
+      is_active_profile: {
+        Args: { p_user: string };
+        Returns: boolean;
+      };
       claim_room_seat: {
         Args: { p_room: string; p_user: string };
         Returns: boolean;

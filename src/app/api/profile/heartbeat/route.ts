@@ -17,15 +17,18 @@ export async function POST(req: Request) {
   const away = body?.away === true;
 
   const supabase = await supabaseServer();
-  await Promise.all([
+  const [seen] = await Promise.all([
     away
       ? null
       : supabase
           .from("profiles")
           .update({ last_seen_at: new Date().toISOString() })
-          .eq("id", userId),
+          .eq("id", userId)
+          .select("suspended, archived")
+          .maybeSingle(),
     endpoint ? markDevice(userId, endpoint, !away).catch(() => undefined) : null,
   ]);
 
+  if (seen?.data?.suspended || seen?.data?.archived) return jsonError(403, "Suspended");
   return NextResponse.json({ ok: true });
 }

@@ -147,6 +147,16 @@ export function supabaseAdmin() {
   const db = globalThis.__db;
   return {
     from: (table) => new Query(db, table),
+    auth: {
+      admin: {
+        async updateUserById(id, attrs) {
+          db.calls.push(`auth: update ${id} (${Object.keys(attrs)})`);
+          if (db.authDown) return { data: { user: null }, error: { message: "auth is down" } };
+          (db.authUpdates ??= []).push({ id, attrs });
+          return { data: { user: { id } }, error: null };
+        },
+      },
+    },
     storage: {
       from(bucket) {
         return {

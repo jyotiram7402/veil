@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
+import { lockOut } from "@/lib/lockout";
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
@@ -29,10 +30,7 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
 
   await admin.from("profiles").update({ archived: true, suspended: true }).eq("id", id);
 
-  const bytes = new Uint8Array(24);
-  globalThis.crypto.getRandomValues(bytes);
-  const garbage = btoa(String.fromCharCode(...bytes)).replace(/=+$/, "");
-  await admin.auth.admin.updateUserById(id, { password: garbage });
+  await lockOut(id);
 
   return NextResponse.json({ ok: true, mode: "soft" });
 }

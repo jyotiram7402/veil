@@ -100,6 +100,10 @@ export async function saveDevice(
   return true;
 }
 
+export async function forgetAllDevices(userId: string): Promise<void> {
+  await supabaseAdmin().from("push_subscriptions").delete().eq("user_id", userId);
+}
+
 export async function removeDevice(userId: string, endpoint: string): Promise<void> {
   await supabaseAdmin()
     .from("push_subscriptions")
