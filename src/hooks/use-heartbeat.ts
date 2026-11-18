@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { PRESENCE_HEARTBEAT_MS } from "@/lib/constants";
 import {
   clearShownNotifications,
+  forgetPushDevice,
   onPushStatus,
   pushEndpoint,
   pushKnown,
@@ -19,6 +20,15 @@ function inFront(): boolean {
 }
 
 let toldEndpoint: string | null = null;
+let leaving = false;
+
+async function leaveForGood() {
+  if (leaving) return;
+  leaving = true;
+  await forgetPushDevice().catch(() => undefined);
+  await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+  window.location.replace("/expired");
+}
 
 function ping() {
   toldEndpoint = pushEndpoint();
@@ -26,7 +36,11 @@ function ping() {
     method: "POST",
     headers: JSON_HEADERS,
     body: JSON.stringify({ endpoint: toldEndpoint ?? undefined }),
-  }).catch(() => undefined);
+  })
+    .then((res) => {
+      if (res.status === 403) void leaveForGood();
+    })
+    .catch(() => undefined);
 }
 
 function sayAway() {

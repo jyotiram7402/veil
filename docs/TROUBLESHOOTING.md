@@ -125,6 +125,13 @@ also deleted yourself).
 A real password-reset flow would need a recovery email; BlackFoxx is
 deliberately email-less.
 
+## A member I unsuspended or restored cannot get in
+
+- "…but they still can't sign in. Try again." after Unsuspend or Restore: the account is
+  marked active again, but Supabase Auth did not lift the ban. Press the same button again.
+- A restored member needs a new invite link ("Set invite link" on their card in Members):
+  Remove revoked the old ones. A suspended member's own link works again after Unsuspend.
+
 ## Build fails on Vercel: "Type error: ..."
 
 Builds check types. The build log names the file and the line. The site keeps running the

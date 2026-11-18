@@ -25,6 +25,14 @@ in the database (RLS), never from client-supplied role/permission/identity.
   (`(app)/layout.tsx`), and the member page sends a suspended or archived member to
   `/expired`. `getAuthUserId()` and `getSessionUser()` are the server-side source of
   identity: both ask Supabase Auth to verify the session on every request.
+- Suspending or removing a member (`lockOut` in `src/lib/lockout.ts`, since 2026-11-18):
+  their password is replaced with a random one nobody knows, their account is banned in
+  Supabase Auth (a session can no longer be renewed), and their notification devices are
+  forgotten. An app they still have open signs itself out and shows `/expired` at its next
+  heartbeat (within 30 s while it is on screen), because the heartbeat now answers 403 for
+  them. With `supabase/v13.sql` the database also stops showing them any chat at once.
+  Unsuspending and Restore lift the ban (`letBackIn`); if that fails the admin sees an error
+  and can press again.
 
 ## Authorization
 
@@ -235,12 +243,10 @@ disappearing messages (above) delete read messages and their files for good.
   chat UUID (low severity; IDs are unguessable). The same goes for the
   `vanished` notice of disappearing messages (it can hide, never delete).
 - Browser calls cannot run while the page is fully suspended/terminated.
-- A suspended or archived member who is still signed in is not signed out. Suspending
-  replaces their password (no new sign-in), the database refuses their messages, the call
-  routes refuse their calls and the member page sends them to `/expired`. But the database
-  still lets them read their chat (`can_access_chat` does not look at `suspended`), so an app
-  that was already open keeps receiving messages while the session lasts. (unverified:
-  whether replacing the password also ends sessions that are already open.)
+- A suspended member's phone that ignores the sign-out keeps the access token it already has
+  until it runs out (one hour by Supabase's default; unverified for this project). Once
+  `supabase/v13.sql` has run, the database shows it no chat in that time. Before that, it can
+  still read its chat until the token runs out.
 - Library versions are fixed (since 2026-11-18), so a security fix in a library arrives only
   when someone raises its version in `package.json`.
 - Notifications tell the browser makers' push services that a device received something
