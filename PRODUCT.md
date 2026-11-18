@@ -58,7 +58,9 @@ on a laptop. The owner manages members from the same app.
 - The name is **BlackFoxx**. It replaces the earlier names everywhere.
 - The look follows the owner's reference screenshots: white-and-blue app
   screens, emoji avatars on bright grounds, and a first screen of floating
-  coloured tiles around the wordmark. Details are in `DESIGN.md`.
+  coloured tiles around the wordmark. Anyone can switch the blue for a
+  Snapchat-like yellow in their menu; blue stays the default. Details are in
+  `DESIGN.md`.
 - The app must feel fast and work well on phones.
 
 ## Evidence on Hand

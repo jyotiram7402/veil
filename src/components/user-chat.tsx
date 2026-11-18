@@ -15,7 +15,7 @@ import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
 import { SessionLock } from "@/components/session-lock";
 import { MojiPicker } from "@/components/moji-picker";
-import { useTheme } from "@/components/theme-toggle";
+import { AccentMenuItem, useTheme } from "@/components/theme-toggle";
 import { CallProvider } from "@/components/call/call-provider";
 import { CallButton } from "@/components/call/call-button";
 import { LiveIndicator } from "@/components/chat/live-indicator";
@@ -144,6 +144,7 @@ export function UserChat({
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {theme === "dark" ? "Light mode" : "Dark mode"}
             </DropdownMenuItem>
+            <AccentMenuItem />
             <NotificationsMenuItem />
             <DropdownMenuItem className="px-3 py-2.5 text-destructive" onClick={signOut}>
               <LogOut className="h-4 w-4" /> Sign out

@@ -14,6 +14,7 @@
 
     --primary: 217 100% 52%;
     --primary-foreground: 0 0% 100%;
+    --primary-ink: 217 100% 52%;
 
     --secondary: 220 18% 92%;
     --secondary-foreground: 228 20% 9%;
@@ -62,6 +63,7 @@
 
     --primary: 217 100% 52%;
     --primary-foreground: 0 0% 100%;
+    --primary-ink: 217 100% 52%;
 
     --secondary: 228 13% 16%;
     --secondary-foreground: 220 20% 96%;
@@ -100,6 +102,22 @@
     --radius: 1rem;
   }
 
+  [data-accent="yellow"] {
+    --primary: 55 100% 50%;
+    --primary-foreground: 228 20% 9%;
+    --primary-ink: 46 100% 25%;
+    --accent: 54 100% 90%;
+    --ring: 46 100% 25%;
+    --bubble-out: 55 100% 50%;
+    --bubble-out-foreground: 228 20% 9%;
+  }
+
+  .dark[data-accent="yellow"] {
+    --primary-ink: 55 100% 50%;
+    --accent: 48 26% 17%;
+    --ring: 55 100% 50%;
+  }
+
   html,
   body {
     height: 100%;
@@ -114,7 +132,7 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overscroll-behavior-y: none;
-    caret-color: hsl(var(--primary));
+    caret-color: hsl(var(--primary-ink));
     overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
     padding-top: env(safe-area-inset-top);

@@ -130,7 +130,7 @@ export function MojiChooser({
                 onClick={() => setChoice({ id: m.id, color: m.color })}
                 className={cn(
                   "grid aspect-square place-items-center rounded-2xl text-[28px] leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  m.id === choice.id ? "bg-accent ring-2 ring-primary" : "hover:bg-muted",
+                  m.id === choice.id ? "bg-accent ring-2 ring-primary-ink" : "hover:bg-muted",
                 )}
               >
                 <span aria-hidden="true">{m.emoji}</span>

@@ -12,6 +12,8 @@ The look was set by the owner from reference screenshots:
 - **First screen**: a wall of coloured, rounded tiles floating around a big
   chunky wordmark, with Log in and Sign up at the bottom.
 - **Avatars**: playful emoji characters on bright coloured grounds.
+- **Yellow theme**: the owner also asked for a Snapchat-like look. It is a choice next to the
+  blue, not a replacement: blue stays the default.
 
 ## Colour
 
@@ -25,6 +27,7 @@ appear only on moji tiles and avatars.
 | `--card`, `--surface`, `--header` | white | `228 15% 11%` | panels, sheets, headers |
 | `--foreground` | `228 20% 9%` | `220 20% 96%` | text, the "ink" button |
 | `--primary` | `217 100% 52%` | same | main action, links, unread |
+| `--primary-ink` | `217 100% 52%` | same | the brand colour as text, an icon or a ring on a plain surface |
 | `--muted` / `--muted-foreground` | `220 18% 93%` / `222 10% 40%` | `228 13% 17%` / `222 12% 68%` | field fill / secondary text |
 | `--accent` | `217 80% 95%` | `222 30% 19%` | hover and selected tint |
 | `--destructive` | `0 78% 45%` | `0 84% 64%` | errors, delete |
@@ -43,6 +46,35 @@ Rules:
   `text-foreground` with an underline for links there, not `text-primary`.
 - Light and dark both ship. The theme follows the system until the user picks
   one (`blackfoxx-theme` in localStorage).
+
+### Yellow theme
+
+Anyone can swap the blue for yellow in the menu behind their avatar (a member: the More
+menu), right under the light/dark item; it names the colour you would switch to, with a dot
+of it. The choice is kept per device (`blackfoxx-accent` in localStorage), and
+`ThemeScript` puts `data-accent="yellow"` on `<html>` before the first paint, so nothing
+flashes blue. Yellow changes only the brand tokens; grounds, text and status colours stay.
+
+| Token | Light | Dark | Used for |
+|---|---|---|---|
+| `--primary`, `--bubble-out` | `55 100% 50%` | same | main action, sent messages, unread, the sign-in stage |
+| `--primary-foreground`, `--bubble-out-foreground` | `228 20% 9%` (ink) | same | text and icons on yellow |
+| `--primary-ink`, `--ring` | `46 100% 25%` | `55 100% 50%` | brand colour as text, icon, ring; focus |
+| `--accent` | `54 100% 90%` | `48 26% 17%` | hover and selected tint |
+
+Rules:
+
+- Nothing is white on yellow. Text, icons and tints on `bg-primary` or `bg-bubble-out` use
+  their foreground token (`text-primary-foreground`, `bg-bubble-out-foreground/20`), which is
+  white in blue and ink in yellow. Never write `text-white` or `bg-white/…` on them.
+- Yellow on white is 1.2:1, so the brand colour as text, an icon, a ring or a selected outline
+  on a light surface is `primary-ink` (`text-primary-ink`, `ring-primary-ink`), never
+  `text-primary`. In blue it is the same blue. Ink on yellow is 14.9:1; `primary-ink` on
+  white is 5.8:1, and 4.9:1 on the grey field fill.
+- Seen ticks stay blue in both themes: two blue ticks mean "seen" everywhere. Green (online,
+  Accept) and red (errors, End) stay too.
+- The sign-in stage takes its text, icons and rings from `--primary-foreground`: white lines
+  on blue, ink lines on yellow.
 
 ## Type
 
@@ -87,8 +119,8 @@ white column from tablet up.
   Search swaps the row for a pill search field.
 - Rows: 48px moji, name, one-line preview, time, and a blue count when unread. Unread rows
   use heavier text. Only a green dot marks presence; offline shows nothing.
-- Header controls are 40px circles. Members, Settings, the theme switch, notifications and
-  Sign out live in the menu behind your own avatar.
+- Header controls are 40px circles. Members, Settings, the light/dark switch, the colour
+  switch (Blue or Yellow), notifications and Sign out live in the menu behind your own avatar.
 
 ## Notifications
 
@@ -114,8 +146,8 @@ One screen for the admin (`chat-thread.tsx`), the member (`user-chat.tsx`) and r
 
 - Header, 64px: avatar, name, and a status line ("Online" in `text-online-ink`, otherwise
   "Last seen …"), then video and voice call. For the admin, tapping the name opens the chat
-  details; the member has a "More" menu with the avatar picker, the theme switch,
-  notifications and Sign out.
+  details; the member has a "More" menu with the avatar picker, the light/dark switch,
+  the colour switch, notifications and Sign out.
 - Bubbles: 20px corners. Outgoing is `--bubble-out` blue with white text, incoming is white
   (slate in dark mode). The last bubble of a run gets one tight corner and the time under it,
   with ticks for your own messages: one grey tick while it is sending, two grey ticks once it
@@ -178,8 +210,8 @@ held sideways.
   above the buttons) and sized in design pixels times `--u`, which follows
   whichever of width or height is tighter. That keeps tiles off the wordmark on
   short phones. Re-check 320x568, 390x844 and 1440x900 after moving a tile.
-- `/login`, `/signup`, `/i/<token>` (`auth-shell.tsx`): blue stage with drifting
-  emoji on top, the form on a white sheet. From 640px up it is a centred card.
+- `/login`, `/signup`, `/i/<token>` (`auth-shell.tsx`): a stage in the brand colour (blue,
+  or yellow with ink text and lines) with drifting emoji on top, the form on a white sheet. From 640px up it is a centred card.
 - Styles are in `entry.module.css` (plain CSS, no JavaScript).
 
 ## Motion

@@ -145,7 +145,7 @@ export function RoomsAdmin() {
             <li key={r.id}>
               <div className="rounded-xl border border-border/60 bg-card/40 p-4">
                 <div className="flex items-start gap-3">
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-primary shrink-0">
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-primary-ink shrink-0">
                     <Users className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
