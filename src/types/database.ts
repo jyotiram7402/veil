@@ -77,6 +77,7 @@ type ChatMemberRow = {
   can_voice: boolean;
   can_video: boolean;
   removed_at: string | null;
+  muted: boolean;
 };
 type ChatMemberInsert = {
   chat_id: string;
@@ -89,6 +90,7 @@ type ChatMemberInsert = {
   can_voice?: boolean;
   can_video?: boolean;
   removed_at?: string | null;
+  muted?: boolean;
 };
 type ChatMemberUpdate = Partial<ChatMemberInsert>;
 

@@ -6,6 +6,7 @@ type SB = Awaited<ReturnType<typeof supabaseServer>>;
 
 type ChatListRow = {
   last_read_at: string;
+  muted?: boolean;
   chat: {
     id: string;
     type: "direct" | "group" | "room";
@@ -37,7 +38,7 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
     .from("chat_members")
     .select(
       `
-        last_read_at,
+        *,
         chat:chats(
           id, type, name, avatar_url, created_by, created_at, updated_at,
           members:chat_members(
@@ -118,6 +119,7 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
           : null,
         my_last_read_at: r.last_read_at,
         unread_count: unreadByChat.get(chat.id) ?? 0,
+        muted: r.muted === true,
       } satisfies ChatSummary;
     });
 

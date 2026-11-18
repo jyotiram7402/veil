@@ -12,6 +12,7 @@ export type ChatSummary = Pick<
   last_message: Pick<Message, "id" | "content" | "type" | "created_at" | "sender_id"> | null;
   unread_count: number;
   my_last_read_at: string;
+  muted?: boolean;
 };
 
 export type MessageWithSender = Message & {

@@ -39,6 +39,8 @@ on a laptop. The owner manages members from the same app.
   a relay (Cloudflare); they work once the owner has added the two Cloudflare values.
 - Notifications for a closed app: a new message, an incoming call, and a missed call. Each person turns them
   on per device. They never show what a message says, and a member's never shows a name.
+  The owner can mute one chat: no message notifications from it, on any device; its calls
+  still ring.
   On an iPhone the app has to be added to the Home Screen first.
 - Disappearing messages, off unless the owner switches them on (for everyone, or for one
   person): a message is deleted for both people once the person it was sent to has read it
