@@ -6,22 +6,14 @@ the code are at the end of this file (Conventions, Things that bite).
 
 ## Request / data flow
 
-> **The first step below does not run in production.** `middleware.ts` sits in the repo root,
-> but with `src/app` Next.js only loads `src/middleware.ts`. Pages, layouts and API routes do
-> the auth checks and redirects themselves (`getSessionUser`, `requireSessionUser`,
-> `redirectIfSignedIn`). The diagram shows the intended design once the file is moved.
+There is no middleware: every page, layout and API route checks the session itself.
 
 ```
-Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSession)
-              │  refresh auth cookie, getUser(), load profiles(is_admin, suspended, archived)
-              │  logged-out: public paths pass ("/" is the first screen); the rest → /login?next=…
-              │  signed-in on an entry screen (/ /login /signup) → /chats or /chat
-              │  suspended/archived → sign out → /expired
-              │  admin-only prefixes (/chats /settings /admin /archive /rooms) ← non-admins → /chat
-              │  /chat ← admins → /chats
-              ▼
-        Server Components (src/app/**/page.tsx, layout.tsx)
+Browser ──► Server Components (src/app/**/page.tsx, layout.tsx)
               │  getSessionUser() (React-cached per request) + supabaseServer() → RLS as the user
+              │  / /login /signup: signed in → /chats or /chat (redirectIfSignedIn)
+              │  (app)/layout.tsx: signed out → /login; not an admin → /chat
+              │  /chat: signed out → /login; an admin → /chats; suspended or archived → /expired
               ▼
         Client Components ──► fetch /api/** for every mutation
               │                  └─ route handler: auth check → zod parse → supabaseServer (RLS)
@@ -105,8 +97,7 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 
 - `env.ts` — typed env access; throws if public Supabase vars missing. Direct `process.env`
   reads elsewhere: `next.config.ts`, `webrtc/ice.ts`, `app/api/health`.
-- `supabase/client.ts` (browser), `server.ts` (cookies, RLS), `admin.ts` (service role),
-  `middleware.ts` (route gating).
+- `supabase/client.ts` (browser), `server.ts` (cookies, RLS), `admin.ts` (service role).
 - `auth/session.ts` (`getAuthUserId`, `getSessionUser`, `requireSessionUser`,
   `redirectIfSignedIn`), `auth/username.ts` (`<username>@INTERNAL_EMAIL_DOMAIN`).
 - `entry-checks.ts` (field checks for the log-in and sign-up forms), `format.ts` (times and
@@ -464,6 +455,13 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   in this file, next to the part they belong to.
 
 ## Things that bite
+
+- There is no `middleware.ts` (deleted 2026-11-18). The one in the repo root never ran: with
+  `src/app`, Next.js only loads `src/middleware.ts`. Adding one would put two calls to
+  Supabase (`getUser` and the profile) in front of every request, `/sw.js` and `/api/health`
+  included, so measure before doing it. Sessions are refreshed by the browser's Supabase
+  client and by API routes; Server Components cannot write cookies, so `supabaseServer()`
+  skips that write there.
 
 - Builds run the type check (since 2026-11-17); the linter still does not run during builds
   (`next.config.ts`). A type mistake fails the Vercel build, and the previous deployment stays

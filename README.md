@@ -80,14 +80,13 @@ src/
     call/                  — call provider, call screen, buttons
     auth/, layout/         — login form, app shell, sidebar
   lib/
-    supabase/{client,server,admin,middleware}.ts
+    supabase/{client,server,admin}.ts
     webrtc/{ice,signaling,codec,stats,audio-level,devices,errors,ringtone,types}.ts
     {rooms,permissions,share,api,env,queries,validations,...}.ts
   hooks/                   — realtime, presence, typing, calling
   store/                   — zustand stores (session, chat, presence, call)
   types/                   — database & domain types
 supabase/                  — schema.sql, policies.sql, storage.sql, v2…v9.sql
-middleware.ts              — refreshes the Supabase session + protects routes
 tests/                     — Node tests for src/lib (`npm test`; GitHub runs them on every push)
 .github/workflows/         — that GitHub run
 ```

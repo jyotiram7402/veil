@@ -79,11 +79,11 @@ delete from public.chat_members where chat_id not in (select id from public.chat
 
 ## "Cookies cannot be modified in a Server Component"
 
-You're seeing this in the dev console as a warning, not an error. The
-Supabase helper writes the refreshed cookie from `middleware.ts`, which
-is where it belongs. Server Components only read cookies. If you see
-this as a hard error, you probably created a new server entry point and
-forgot to add it to the middleware matcher in `middleware.ts`.
+Server Components can only read cookies, so `supabaseServer()` skips the write when
+Supabase hands it a refreshed session there (`setAll` in `src/lib/supabase/server.ts`). The
+browser's Supabase client and the API routes save refreshed sessions. If you see this as a
+hard error, something sets a cookie in a Server Component outside `supabaseServer()`: move
+that into an API route or a Server Action.
 
 ## I broke `INTERNAL_EMAIL_DOMAIN` after seeding users
 
@@ -97,11 +97,6 @@ set email = regexp_replace(email, '@old\\.local$', '@new.local');
 ```
 
 Then update `INTERNAL_EMAIL_DOMAIN` in your env vars.
-
-## Hot reload stops working after editing `middleware.ts`
-
-That's a Next.js quirk — middleware doesn't HMR. Stop and restart
-`npm run dev`.
 
 ## My typing indicator never shows for the other person
 

@@ -20,9 +20,11 @@ in the database (RLS), never from client-supplied role/permission/identity.
   password: they open a per-user invite link (`/i/<token>`) or a room invite
   (`/join/<selector.verifier>`), pass a gate/verifier, and the server mints an
   ephemeral Supabase session. No email/phone/PII.
-- Middleware refreshes the session and gates route prefixes; suspended/archived
-  users are signed out. `getAuthUserId()` and `getSessionUser()` are the server-side source
-  of identity: both ask Supabase Auth to verify the session on every request.
+- Every page, layout and API route checks the session itself; there is no middleware.
+  Signed-out people are sent to `/login`, non-admins cannot open the admin pages
+  (`(app)/layout.tsx`), and the member page sends a suspended or archived member to
+  `/expired`. `getAuthUserId()` and `getSessionUser()` are the server-side source of
+  identity: both ask Supabase Auth to verify the session on every request.
 
 ## Authorization
 
@@ -233,6 +235,12 @@ disappearing messages (above) delete read messages and their files for good.
   chat UUID (low severity; IDs are unguessable). The same goes for the
   `vanished` notice of disappearing messages (it can hide, never delete).
 - Browser calls cannot run while the page is fully suspended/terminated.
+- A suspended or archived member who is still signed in is not signed out. Suspending
+  replaces their password (no new sign-in), the database refuses their messages, the call
+  routes refuse their calls and the member page sends them to `/expired`. But the database
+  still lets them read their chat (`can_access_chat` does not look at `suspended`), so an app
+  that was already open keeps receiving messages while the session lasts. (unverified:
+  whether replacing the password also ends sessions that are already open.)
 - Library versions are fixed (since 2026-11-18), so a security fix in a library arrives only
   when someone raises its version in `package.json`.
 - Notifications tell the browser makers' push services that a device received something
