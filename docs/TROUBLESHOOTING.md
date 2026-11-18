@@ -134,8 +134,9 @@ deliberately email-less.
 
 Builds check types. The build log names the file and the line. The site keeps running the
 previous deployment, so nothing is down; fix the line, or revert the merge on GitHub. If no
-code changed and the error is inside a library, a new release of that library brought it
-(there is no lockfile): pin that package in `package.json` to the version before.
+code changed and the error is inside a library, a library that one of ours brings in has
+released a new version (ours have exact versions, theirs do not): add that library under
+`overrides` in `package.json`, with the version before.
 
 ## GitHub shows a red cross next to a commit
 
