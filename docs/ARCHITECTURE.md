@@ -409,6 +409,29 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - Tested against the standard's own example values, and with pretend browsers and push
   services. Not yet seen: a real delivery to a real phone.
 
+## Tests
+
+- `tests/*.test.mjs`, run by `npm test` and by GitHub after every push
+  (`.github/workflows/tests.yml`, Node 24). Node's own test runner loads the files in
+  `src/lib` as they are (Node strips the types), so nothing is installed and nothing is
+  built; a run takes a few seconds.
+- `tests/hooks.mjs` points `@/...` at `src/` and swaps three modules for stand-ins in
+  `tests/fakes/`: `server-only` (empty), `@/lib/env` (made-up values; a test changes them
+  through `globalThis.__env`) and `@/lib/supabase/admin` (an in-memory database that knows
+  the queries `vanish.ts` and `push.ts` make, compares times in microseconds as Postgres
+  does, and writes each query it gets into `globalThis.__db.calls`).
+- A file under test can import other files in `src/` through `@/...` and Node's own
+  modules, nothing else: there is no `node_modules` in the run, so React, Next and every npm
+  package are out of reach. Node only strips types, so `enum` and `namespace` cannot be used
+  there either. Logic worth testing goes into a module like that, as `read-cutoff.ts` and
+  `attachment-path.ts` are.
+- Covered: disappearing messages (`vanish.ts`, `read-cutoff.ts`), notifications
+  (`web-push.ts` against the standards' own example values, `push.ts`, `push-client.ts`,
+  `public/sw.js`), `attachment-path.ts` and `turn.ts`. Not covered: API routes, screens,
+  calls, the database policies.
+- Nothing in the repository makes Vercel wait for the tests: a red cross on GitHub does not
+  stop a deployment.
+
 ## Conventions
 
 - Never trust a role or an id sent by the browser. Every route checks the session again;

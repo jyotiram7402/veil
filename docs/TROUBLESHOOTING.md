@@ -137,6 +137,12 @@ previous deployment, so nothing is down; fix the line, or revert the merge on Gi
 code changed and the error is inside a library, a new release of that library brought it
 (there is no lockfile): pin that package in `package.json` to the version before.
 
+## GitHub shows a red cross next to a commit
+
+The tests failed. Click the cross, then "Details": the log names the test and shows what
+it expected and what came back. Vercel deploys anyway, so merge only once the cross has
+turned into a green tick. `npm test` runs the same tests on any computer with Node 24.
+
 ## Build fails on Vercel: "Module not found: @/..."
 
 Path aliases come from `tsconfig.json`. Make sure that file made it

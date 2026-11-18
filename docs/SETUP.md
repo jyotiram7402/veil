@@ -101,5 +101,7 @@ and password with the person privately.
 - `npm run build` — production build (it checks types; lint is skipped, see `next.config.ts`)
 - `npm run start` — runs the production build
 - `npm run typecheck` — `tsc --noEmit`, fastest way to catch a regression
+- `npm test` — runs the tests in `tests/` (Node 24; nothing needs to be installed). GitHub
+  runs the same command after every push.
 
 See [`DEPLOY.md`](DEPLOY.md) when you're ready to put it on the internet.

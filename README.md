@@ -88,6 +88,8 @@ src/
   types/                   — database & domain types
 supabase/                  — schema.sql, policies.sql, storage.sql, v2…v9.sql
 middleware.ts              — refreshes the Supabase session + protects routes
+tests/                     — Node tests for src/lib (`npm test`; GitHub runs them on every push)
+.github/workflows/         — that GitHub run
 ```
 
 ## Voice & video calling
