@@ -150,7 +150,7 @@ export function AddMembersDialog({
                       <div
                         className={cn(
                           "h-5 w-5 rounded-full border-2",
-                          isSel ? "border-primary bg-primary" : "border-border/60",
+                          isSel ? "border-primary-ink bg-primary" : "border-border/60",
                         )}
                       />
                     </button>

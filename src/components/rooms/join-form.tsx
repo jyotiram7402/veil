@@ -46,7 +46,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   return (
     <form onSubmit={submit} className="w-full max-w-sm">
       <div className="flex flex-col items-center text-center mb-8">
-        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary">
+        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary-ink">
           <ShieldCheck className="h-7 w-7" />
         </div>
         <h1 className="mt-4 text-xl font-semibold">Private Room</h1>

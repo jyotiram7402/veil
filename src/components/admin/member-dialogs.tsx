@@ -190,7 +190,7 @@ export function CreateMemberDialog({
           className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border/70 px-4 py-3"
         >
           <Shield
-            className={cn("h-5 w-5 shrink-0", isAdmin ? "text-primary" : "text-muted-foreground")}
+            className={cn("h-5 w-5 shrink-0", isAdmin ? "text-primary-ink" : "text-muted-foreground")}
             aria-hidden="true"
           />
           <span className="min-w-0 flex-1 text-[15px] font-semibold">Make admin</span>
@@ -337,7 +337,7 @@ function ResetButton({ onClick, what }: { onClick: () => void; what: string }) {
       onClick={onClick}
       aria-label={`Reset ${what} to the default`}
       title="Clear override, inherit default"
-      className="h-7 shrink-0 gap-1 px-2 text-xs text-primary hover:bg-accent hover:text-accent-foreground dark:text-foreground [&_svg]:size-3.5"
+      className="h-7 shrink-0 gap-1 px-2 text-xs text-primary-ink hover:bg-accent hover:text-accent-foreground dark:text-foreground [&_svg]:size-3.5"
     >
       <RotateCcw aria-hidden="true" /> Reset
     </Button>

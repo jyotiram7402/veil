@@ -157,13 +157,13 @@ export const MessageBubble = memo(function MessageBubble({
               rel="noreferrer"
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 transition-colors",
-                fromMe ? "hover:bg-white/10" : "hover:bg-muted/60",
+                fromMe ? "hover:bg-bubble-out-foreground/10" : "hover:bg-muted/60",
               )}
             >
               <span
                 className={cn(
                   "grid h-10 w-10 shrink-0 place-items-center rounded-full",
-                  fromMe ? "bg-white/20" : "bg-muted",
+                  fromMe ? "bg-bubble-out-foreground/20" : "bg-muted",
                 )}
               >
                 <FileText className="h-5 w-5" aria-hidden="true" />

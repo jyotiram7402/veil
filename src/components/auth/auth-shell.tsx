@@ -30,7 +30,7 @@ export function AuthShell({
               <span className="h-10 w-10" aria-hidden="true" />
             )}
             <span className={styles.authBrand}>{APP_NAME}</span>
-            <ThemeToggle className="text-white hover:bg-white/15 hover:text-white" />
+            <ThemeToggle className="text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground" />
           </div>
 
           <div aria-hidden="true">

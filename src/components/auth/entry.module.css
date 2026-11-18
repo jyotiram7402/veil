@@ -228,6 +228,14 @@
   filter: brightness(1.07);
 }
 
+:global([data-accent="yellow"]) .ctaPrimary {
+  box-shadow: 0 14px 26px -14px hsl(var(--primary-ink) / 0.55);
+}
+
+:global([data-accent="yellow"]) .ctaPrimary:hover {
+  filter: brightness(0.96);
+}
+
 .ctaInk {
   background: hsl(var(--foreground));
   color: hsl(var(--background));
@@ -262,10 +270,15 @@
 }
 
 .authStage {
+  --moji-shadow: rgb(0 20 80 / 0.28);
   position: relative;
   flex: 1 1 auto;
   min-height: 11rem;
-  color: #fff;
+  color: hsl(var(--primary-foreground));
+}
+
+:global([data-accent="yellow"]) .authStage {
+  --moji-shadow: rgb(90 62 0 / 0.3);
 }
 
 .rings {
@@ -274,7 +287,7 @@
   background: repeating-radial-gradient(
     circle at 50% 82%,
     transparent 0 43px,
-    rgb(255 255 255 / 0.13) 43px 44.5px
+    hsl(var(--primary-foreground) / 0.13) 43px 44.5px
   );
   -webkit-mask-image: radial-gradient(circle at 50% 82%, #000 10%, transparent 78%);
   mask-image: radial-gradient(circle at 50% 82%, #000 10%, transparent 78%);
@@ -305,17 +318,17 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 999px;
-  color: #fff;
-  background: rgb(255 255 255 / 0.16);
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--primary-foreground) / 0.16);
   transition: background-color 140ms ease-out;
 }
 
 .iconBtn:hover {
-  background: rgb(255 255 255 / 0.26);
+  background: hsl(var(--primary-foreground) / 0.26);
 }
 
 .iconBtn:focus-visible {
-  outline: 3px solid #fff;
+  outline: 3px solid hsl(var(--primary-foreground));
   outline-offset: 2px;
 }
 
@@ -333,7 +346,7 @@
   display: block;
   font-size: var(--s);
   line-height: 1;
-  filter: drop-shadow(0 12px 10px rgb(0 20 80 / 0.28));
+  filter: drop-shadow(0 12px 10px var(--moji-shadow, rgb(0 20 80 / 0.28)));
   animation: drift var(--t, 7s) ease-in-out var(--fd, 0s) infinite alternate;
   will-change: transform;
 }

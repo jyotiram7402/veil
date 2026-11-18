@@ -16,7 +16,7 @@ import { ChatList } from "@/components/chat/chat-list";
 import { NewChatDialog } from "@/components/chat/new-chat-dialog";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { NotificationsMenuItem, NotificationsPrompt } from "@/components/notifications";
-import { useTheme } from "@/components/theme-toggle";
+import { AccentMenuItem, useTheme } from "@/components/theme-toggle";
 import { forgetPushDevice } from "@/lib/push-client";
 import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
@@ -98,6 +98,7 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 {theme === "dark" ? "Light mode" : "Dark mode"}
               </DropdownMenuItem>
+              <AccentMenuItem />
               <NotificationsMenuItem />
               <DropdownMenuSeparator />
               <DropdownMenuItem className="px-3 py-2.5 text-destructive" onClick={signOut}>
