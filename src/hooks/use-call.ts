@@ -35,6 +35,7 @@ import {
   type SignalType,
 } from "@/lib/webrtc/types";
 import type { Profile } from "@/types/chat";
+import type { Database } from "@/types/database";
 
 type Person = Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
 
@@ -160,7 +161,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     [me.id],
   );
 
-  const updateSession = useCallback((patch: Record<string, unknown>) => {
+  const updateSession = useCallback((patch: Database["public"]["Tables"]["call_sessions"]["Update"]) => {
     const callId = callIdRef.current;
     if (!callId) return;
     void supabaseBrowser().from("call_sessions").update(patch).eq("id", callId).then(

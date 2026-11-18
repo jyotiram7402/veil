@@ -270,7 +270,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   it is open. The admin holds one Realtime channel per person; Supabase caps channels per
   connection (100 by default, unverified).
 - `/api/calls/authorize` runs at start, accept, every reconnect and every 30 s.
-- Outcome → caller POSTs `/api/calls/[id]/event` → one `system` message in the chat.
+- Outcome → caller POSTs `/api/calls/[id]/event` → one `system` message in the chat. A
+  declined call is stored with the status `rejected`: the table has no `declined`, and until
+  2026-11-17 that update failed, so a declined call left no note in the chat.
 - The relay (TURN, Cloudflare Realtime). Two devices on different networks usually cannot
   reach each other directly, so the call passes through a relay. The owner's Cloudflare key
   (`CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`) stays on the server; `turn.ts`
@@ -407,6 +409,29 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - Tested against the standard's own example values, and with pretend browsers and push
   services. Not yet seen: a real delivery to a real phone.
 
+## Tests
+
+- `tests/*.test.mjs`, run by `npm test` and by GitHub after every push
+  (`.github/workflows/tests.yml`, Node 24). Node's own test runner loads the files in
+  `src/lib` as they are (Node strips the types), so nothing is installed and nothing is
+  built; a run takes a few seconds.
+- `tests/hooks.mjs` points `@/...` at `src/` and swaps three modules for stand-ins in
+  `tests/fakes/`: `server-only` (empty), `@/lib/env` (made-up values; a test changes them
+  through `globalThis.__env`) and `@/lib/supabase/admin` (an in-memory database that knows
+  the queries `vanish.ts` and `push.ts` make, compares times in microseconds as Postgres
+  does, and writes each query it gets into `globalThis.__db.calls`).
+- A file under test can import other files in `src/` through `@/...` and Node's own
+  modules, nothing else: there is no `node_modules` in the run, so React, Next and every npm
+  package are out of reach. Node only strips types, so `enum` and `namespace` cannot be used
+  there either. Logic worth testing goes into a module like that, as `read-cutoff.ts` and
+  `attachment-path.ts` are.
+- Covered: disappearing messages (`vanish.ts`, `read-cutoff.ts`), notifications
+  (`web-push.ts` against the standards' own example values, `push.ts`, `push-client.ts`,
+  `public/sw.js`), `attachment-path.ts` and `turn.ts`. Not covered: API routes, screens,
+  calls, the database policies.
+- Nothing in the repository makes Vercel wait for the tests: a red cross on GitHub does not
+  stop a deployment.
+
 ## Conventions
 
 - Never trust a role or an id sent by the browser. Every route checks the session again;
@@ -436,10 +461,18 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 
 ## Things that bite
 
-- Builds do not run the type check or the linter (`next.config.ts`): the hand-written
-  `src/types/database.ts` makes supabase-js infer `never` for some `.update()` arguments. So a
-  missing column never fails a build. There is no lockfile either: every build installs the
-  newest versions `package.json` allows.
+- Builds run the type check (since 2026-11-17); the linter still does not run during builds
+  (`next.config.ts`). A type mistake fails the Vercel build, and the previous deployment stays
+  live. There is no lockfile: every build installs the newest versions `package.json` allows,
+  so a new library release can also fail a build with type errors of its own.
+- The two clients made with `@supabase/ssr` 0.5 are typed as `SupabaseClient<Database>`
+  (`lib/supabase/server.ts`, `client.ts`): that package's own generic types do not match
+  supabase-js 2.1xx and turned every query result into `never`, which is why type checking
+  used to be off. A select with a nested relation (`members:chat_members(...)`) is not typed,
+  because `Relationships` is empty in the hand-written `database.ts`: cast its rows to a local
+  type, as the chat pages do. An update object is typed with the table's `Update` type, not
+  `Record<string, unknown>`. `parseBody` returns the schema's output type, so a zod
+  `.default()` field is never `undefined`.
 - `src/lib/env.ts` stops a build ("Collecting page data") when a required variable is missing
   in that Vercel environment. Preview builds need the variables ticked for Preview as well.
 - Two kinds of member. One who came through an invite link has a throwaway auth password

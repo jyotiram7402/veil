@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { jsonError, parseBody } from "@/lib/api";
 import { updateParticipantSchema } from "@/lib/validations";
 import { assertRoomAdmin, recordAudit } from "@/lib/rooms";
+import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,7 @@ export async function PATCH(
     .maybeSingle();
   if (!member) return jsonError(404, "Participant not found");
 
-  const patch: Record<string, unknown> = {};
+  const patch: Database["public"]["Tables"]["chat_members"]["Update"] = {};
   if (body.blocked !== undefined) patch.blocked = body.blocked;
   if (body.canChat !== undefined) patch.can_chat = body.canChat;
   if (body.canVoice !== undefined) patch.can_voice = body.canVoice;

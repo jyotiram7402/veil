@@ -130,6 +130,19 @@ also deleted yourself).
 A real password-reset flow would need a recovery email; BlackFoxx is
 deliberately email-less.
 
+## Build fails on Vercel: "Type error: ..."
+
+Builds check types. The build log names the file and the line. The site keeps running the
+previous deployment, so nothing is down; fix the line, or revert the merge on GitHub. If no
+code changed and the error is inside a library, a new release of that library brought it
+(there is no lockfile): pin that package in `package.json` to the version before.
+
+## GitHub shows a red cross next to a commit
+
+The tests failed. Click the cross, then "Details": the log names the test and shows what
+it expected and what came back. Vercel deploys anyway, so merge only once the cross has
+turned into a green tick. `npm test` runs the same tests on any computer with Node 24.
+
 ## Build fails on Vercel: "Module not found: @/..."
 
 Path aliases come from `tsconfig.json`. Make sure that file made it

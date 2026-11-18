@@ -235,4 +235,7 @@ disappearing messages (above) delete read messages and their files for good.
 - Browser calls cannot run while the page is fully suspended/terminated.
 - Notifications tell the browser makers' push services that a device received something
   from this server, and when (never what).
-- No automated test runner in the repo (see the manual matrix in the report).
+- The automated tests (`tests/`, run by GitHub after every push) cover disappearing
+  messages, notifications, attachment paths and the call relay credentials. API routes,
+  screens, calls and the database policies have none: they are checked by hand (see the
+  manual matrix in the report, and `supabase/security-tests.sql`).

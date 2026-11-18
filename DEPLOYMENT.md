@@ -88,8 +88,8 @@ is missing when a server route needs it.
   If the database ever moves, change the code there (list: vercel.com/docs/regions).
 - Add all env vars (§2) to Production; give Preview its own (non-production)
   Supabase project or restricted values so previews never touch production data.
-- Note: builds run with `typescript.ignoreBuildErrors` / `eslint.ignoreDuringBuilds`
-  (see `next.config.ts`); run `npm run typecheck` locally/CI to catch type bugs.
+- Builds check types (a type error fails the build and the previous deployment stays live);
+  the linter does not run during builds (`eslint.ignoreDuringBuilds` in `next.config.ts`).
 
 ## 6. TURN configuration
 

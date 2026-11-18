@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { jsonError, parseBody } from "@/lib/api";
+import type { Database } from "@/types/database";
 
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
@@ -42,7 +43,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!parsed.ok) return parsed.response;
 
   const supabase = await supabaseServer();
-  const patch: Record<string, unknown> = {};
+  const patch: Database["public"]["Tables"]["chats"]["Update"] = {};
   if (parsed.data.name !== undefined) patch.name = parsed.data.name;
   if (parsed.data.avatarUrl !== undefined) {
     patch.avatar_url = parsed.data.avatarUrl.length > 0 ? parsed.data.avatarUrl : null;
