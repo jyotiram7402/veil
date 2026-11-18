@@ -456,6 +456,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   into anything smaller), 40px icon buttons. The look is in `DESIGN.md`.
 - Styling: never set one property from both a CSS module class and a Tailwind utility; which
   one wins depends on the order the stylesheets load.
+- Library versions in `package.json` are exact (no `^` or `~`). To update one, raise its
+  number on a branch, check that the Vercel previews build and the GitHub tests pass, then
+  merge. Look for new versions now and then, Next.js and supabase-js first: their releases
+  carry security fixes, and nothing brings them in by itself.
 - The code carries no comments. The reasons for the way something is built are written down
   in this file, next to the part they belong to.
 
@@ -463,8 +467,12 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 
 - Builds run the type check (since 2026-11-17); the linter still does not run during builds
   (`next.config.ts`). A type mistake fails the Vercel build, and the previous deployment stays
-  live. There is no lockfile: every build installs the newest versions `package.json` allows,
-  so a new library release can also fail a build with type errors of its own.
+  live.
+- Every library in `package.json` has an exact version (since 2026-11-18, the versions the
+  builds of that day installed), so every build installs the same ones. There is no lockfile,
+  though: the libraries those bring in still follow their own ranges, so a new release of one
+  of them can still change a build. Security fixes in libraries arrive only when someone
+  raises a version number (see Conventions).
 - The two clients made with `@supabase/ssr` 0.5 are typed as `SupabaseClient<Database>`
   (`lib/supabase/server.ts`, `client.ts`): that package's own generic types do not match
   supabase-js 2.1xx and turned every query result into `never`, which is why type checking

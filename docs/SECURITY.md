@@ -233,6 +233,8 @@ disappearing messages (above) delete read messages and their files for good.
   chat UUID (low severity; IDs are unguessable). The same goes for the
   `vanished` notice of disappearing messages (it can hide, never delete).
 - Browser calls cannot run while the page is fully suspended/terminated.
+- Library versions are fixed (since 2026-11-18), so a security fix in a library arrives only
+  when someone raises its version in `package.json`.
 - Notifications tell the browser makers' push services that a device received something
   from this server, and when (never what).
 - The automated tests (`tests/`, run by GitHub after every push) cover disappearing
