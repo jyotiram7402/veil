@@ -4,7 +4,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { usernameToInternalEmail } from "@/lib/auth/username";
 import { generateEphemeralPassword } from "@/lib/invite-token";
 import { verifyPassword } from "@/lib/password";
-import { clientKey, rateLimit } from "@/lib/api";
+import { clientKey } from "@/lib/api";
+import { sharedRateLimit } from "@/lib/shared-rate-limit";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
   const expiredUrl = new URL("/expired", url.origin);
   const gateUrl = new URL(`/i/${token}`, url.origin);
 
-  if (!rateLimit(`gate:${token}:${clientKey(req)}`, 8, 60_000)) {
+  if (!(await sharedRateLimit(`gate:${token}:${clientKey(req)}`, 8, 60_000))) {
     gateUrl.searchParams.set("error", "locked");
     return NextResponse.redirect(gateUrl, { status: 303 });
   }

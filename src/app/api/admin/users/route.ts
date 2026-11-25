@@ -3,7 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { usernameToInternalEmail } from "@/lib/auth/username";
 import { createUserSchema } from "@/lib/validations";
-import { clientKey, jsonError, parseBody, rateLimit, serverError } from "@/lib/api";
+import { clientKey, jsonError, parseBody, serverError } from "@/lib/api";
+import { sharedRateLimit } from "@/lib/shared-rate-limit";
 import { isTaken } from "@/lib/db-errors";
 import { generateInviteToken, generateEphemeralPassword } from "@/lib/invite-token";
 import { hashPassword } from "@/lib/password";
@@ -72,7 +73,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!rateLimit(`admin-users:${clientKey(req)}`, 20, 60_000)) {
+  if (!(await sharedRateLimit(`admin-users:${clientKey(req)}`, 20, 60_000))) {
     return jsonError(429, "Slow down");
   }
 

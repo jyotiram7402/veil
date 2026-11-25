@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType, type ZodTypeDef } from "zod";
 import { describeError } from "@/lib/db-errors";
+import { takeToken, type Bucket } from "@/lib/token-bucket";
 
 export function jsonError(status: number, message: string, extra?: Record<string, unknown>) {
   return NextResponse.json({ error: message, ...extra }, { status });
@@ -34,25 +35,10 @@ export async function parseBody<T>(req: Request, schema: ZodType<T, ZodTypeDef, 
   }
 }
 
-const buckets = new Map<string, { tokens: number; updated: number }>();
+const buckets = new Map<string, Bucket>();
 
 export function rateLimit(key: string, limit = 30, perMs = 60_000): boolean {
-  const now = Date.now();
-  const b = buckets.get(key);
-  if (!b) {
-    buckets.set(key, { tokens: limit - 1, updated: now });
-    return true;
-  }
-  const refill = ((now - b.updated) / perMs) * limit;
-  const tokens = Math.min(limit, b.tokens + refill);
-  if (tokens < 1) {
-    b.tokens = tokens;
-    b.updated = now;
-    return false;
-  }
-  b.tokens = tokens - 1;
-  b.updated = now;
-  return true;
+  return takeToken(buckets, key, limit, perMs, Date.now());
 }
 
 export function clientKey(req: Request): string {

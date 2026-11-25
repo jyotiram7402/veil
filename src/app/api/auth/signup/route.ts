@@ -3,7 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 import { usernameToInternalEmail } from "@/lib/auth/username";
 import { signupSchema } from "@/lib/validations";
-import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
+import { clientKey, jsonError, parseBody } from "@/lib/api";
+import { sharedRateLimit } from "@/lib/shared-rate-limit";
 import { hashSignupCode } from "@/lib/signup-codes";
 
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ const NAME_TAKEN = "That username is taken. Try another one.";
 const FAILED = "Couldn't create your account. Try again in a moment.";
 
 export async function POST(req: Request) {
-  if (!rateLimit(`signup:${clientKey(req)}`, 8, 10 * 60_000)) {
+  if (!(await sharedRateLimit(`signup:${clientKey(req)}`, 8, 10 * 60_000))) {
     return jsonError(429, "Too many attempts. Wait a few minutes and try again.");
   }
 

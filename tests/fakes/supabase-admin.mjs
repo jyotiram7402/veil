@@ -147,6 +147,14 @@ export function supabaseAdmin() {
   const db = globalThis.__db;
   return {
     from: (table) => new Query(db, table),
+    async rpc(name, args) {
+      db.calls.push(`rpc ${name}`);
+      const fn = db.rpc?.[name];
+      if (!fn) {
+        return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${name}` } };
+      }
+      return fn(args);
+    },
     auth: {
       admin: {
         async updateUserById(id, attrs) {
