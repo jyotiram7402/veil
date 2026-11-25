@@ -1,15 +1,3 @@
-/**
- * Password hashing for the invite-link gate.
- *
- * Uses PBKDF2-SHA-256 via Web Crypto so the same code runs in Node and Edge
- * without a native dep. Format:
- *
- *   pbkdf2$<iter>$<salt-b64url>$<hash-b64url>
- *
- * The gate password is admin-set, low-traffic, and the link itself is
- * already a 256-bit secret — so 100k iterations is plenty.
- */
-
 const ITERATIONS = 100_000;
 const KEY_LEN_BYTES = 32;
 const SALT_BYTES = 16;

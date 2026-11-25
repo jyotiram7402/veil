@@ -1,5 +1,3 @@
-// Shared, presentation-only helpers for the room admin UI.
-
 export const EXPIRY_OPTIONS: Array<{ label: string; minutes: number | null }> = [
   { label: "10 minutes", minutes: 10 },
   { label: "1 hour", minutes: 60 },

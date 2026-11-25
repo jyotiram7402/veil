@@ -15,9 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { AddMembersDialog } from "@/components/chat/add-members-dialog";
+import { ToggleRow } from "@/components/admin/parts";
 import { useChatStore } from "@/store/chat-store";
 import { lastSeen } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { apiErrorMessage, cn } from "@/lib/utils";
 import type { Profile } from "@/types/chat";
 
 type Props = {
@@ -42,6 +43,9 @@ export function ChatInfoDrawer({
 }: Props) {
   const router = useRouter();
   const removeChat = useChatStore((s) => s.removeChat);
+  const muted = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.muted === true);
+  const setChatMuted = useChatStore((s) => s.setChatMuted);
+  const [muteBusy, setMuteBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(chatName ?? "");
   const [saving, setSaving] = useState(false);
@@ -49,7 +53,7 @@ export function ChatInfoDrawer({
 
   const isGroup = chatType === "group";
   const isAdmin = isGroup
-    ? members.some((m) => m.id === me.id) // simplified — admins are tracked in chat_members; UI shows action and server enforces
+    ? members.some((m) => m.id === me.id)
     : false;
 
   async function saveName() {
@@ -73,6 +77,27 @@ export function ChatInfoDrawer({
       setEditing(false);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function changeMute(next: boolean) {
+    setMuteBusy(true);
+    setChatMuted(chatId, next);
+    try {
+      const res = await fetch(`/api/chats/${chatId}/mute`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ muted: next }),
+      });
+      if (!res.ok) {
+        setChatMuted(chatId, !next);
+        toast.error(apiErrorMessage(await res.json().catch(() => null), "Couldn't change that"));
+      }
+    } catch {
+      setChatMuted(chatId, !next);
+      toast.error("Couldn't change that");
+    } finally {
+      setMuteBusy(false);
     }
   }
 
@@ -204,6 +229,16 @@ export function ChatInfoDrawer({
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div className="-mx-2 overflow-hidden rounded-2xl border border-border/70">
+            <ToggleRow
+              title="Mute notifications"
+              description="No notifications for new messages in this chat. Calls still ring."
+              value={muted}
+              onChange={(next) => void changeMute(next)}
+              disabled={muteBusy}
+            />
           </div>
 
           {isGroup && (

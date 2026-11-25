@@ -59,8 +59,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 If you don't have `openssl`, any 32+ character random string works for
-`ADMIN_BOOTSTRAP_TOKEN`. It's used exactly once. The optional
-`NEXT_PUBLIC_TURN_*` variables (voice/video across networks) are explained
+`ADMIN_BOOTSTRAP_TOKEN`. It's used exactly once. The two optional
+`CLOUDFLARE_TURN_*` values (calls between different networks) are explained
 in `.env.example`.
 
 ## 5. Run
@@ -98,9 +98,10 @@ and password with the person privately.
 ## What now?
 
 - `npm run dev` — runs the dev server with hot reload
-- `npm run build` — production build (type errors and lint are **skipped**,
-  see `next.config.ts` — always run `npm run typecheck`)
+- `npm run build` — production build (it checks types; lint is skipped, see `next.config.ts`)
 - `npm run start` — runs the production build
 - `npm run typecheck` — `tsc --noEmit`, fastest way to catch a regression
+- `npm test` — runs the tests in `tests/` (Node 24; nothing needs to be installed). GitHub
+  runs the same command after every push.
 
 See [`DEPLOY.md`](DEPLOY.md) when you're ready to put it on the internet.

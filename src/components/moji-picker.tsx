@@ -34,11 +34,6 @@ const GROUPS: { key: MojiGroup; label: string }[] = [
 
 const COLORS = Object.keys(MOJI_COLORS) as MojiColor[];
 
-/**
- * The avatar chooser itself: pick an emoji and the colour behind it. It only
- * reports the choice; what happens with it is up to the caller (the sign-up
- * form keeps it until the account is made, MojiPicker below saves it).
- */
 export function MojiChooser({
   open,
   onOpenChange,
@@ -49,23 +44,18 @@ export function MojiChooser({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** What is selected when the chooser opens. */
   value: MojiChoice;
   onConfirm: (choice: MojiChoice) => void;
   confirmLabel?: string;
-  /** Shows a spinner on the confirm button and blocks a second press. */
   busy?: boolean;
 }) {
   const [choice, setChoice] = useState<MojiChoice>(value);
   const [group, setGroup] = useState<MojiGroup>("animals");
 
-  // Start from the current value each time it opens.
   useEffect(() => {
     if (!open) return;
     setChoice(value);
     setGroup(MOJI.find((m) => m.id === value.id)?.group ?? "animals");
-    // Only when it opens: a new `value` object on every render must not reset it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const entry = MOJI.find((m) => m.id === choice.id) ?? MOJI[0]!;
@@ -129,7 +119,6 @@ export function MojiChooser({
           ))}
         </div>
 
-        {/* The top padding keeps the selection ring of the first row from being cut off. */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-1">
           <div className="grid grid-cols-6 gap-1.5">
             {MOJI.filter((m) => m.group === group).map((m) => (
@@ -138,11 +127,10 @@ export function MojiChooser({
                 type="button"
                 aria-label={m.name}
                 aria-pressed={m.id === choice.id}
-                // A new emoji comes with the colour it stands out on.
                 onClick={() => setChoice({ id: m.id, color: m.color })}
                 className={cn(
                   "grid aspect-square place-items-center rounded-2xl text-[28px] leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  m.id === choice.id ? "bg-accent ring-2 ring-primary" : "hover:bg-muted",
+                  m.id === choice.id ? "bg-accent ring-2 ring-primary-ink" : "hover:bg-muted",
                 )}
               >
                 <span aria-hidden="true">{m.emoji}</span>
@@ -174,10 +162,6 @@ export function MojiChooser({
   );
 }
 
-/**
- * Avatar chooser for someone who is signed in: saves the choice to their
- * profile as "moji:<id>:<colour>".
- */
 export function MojiPicker({
   open,
   onOpenChange,
@@ -191,7 +175,6 @@ export function MojiPicker({
   const patchProfile = useSessionStore((s) => s.patchProfile);
   const [saving, setSaving] = useState(false);
 
-  // What they have now: their saved choice, or the moji picked for them.
   const saved = parseMojiValue(profile.avatar_url);
   const current: MojiChoice = saved
     ? { id: saved.id, color: saved.color }

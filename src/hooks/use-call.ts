@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCallStore } from "@/store/call-store";
-import { getRtcConfig, isWebRtcSupported } from "@/lib/webrtc/ice";
+import { basicRtcConfig, getRtcConfig, isWebRtcSupported } from "@/lib/webrtc/ice";
 import {
   audioConstraints,
   keepResolution,
@@ -25,24 +25,24 @@ import {
 import { SignalingChannel } from "@/lib/webrtc/signaling";
 import {
   CALL_RING_TIMEOUT_MS,
+  MAX_RING_MS,
+  RING_AFTER_REACHED_MS,
+  RING_REPEAT_MS,
+  RING_SILENCE_MS,
   isCallOver,
   type PeerInfo,
   type SignalPayload,
   type SignalType,
 } from "@/lib/webrtc/types";
 import type { Profile } from "@/types/chat";
+import type { Database } from "@/types/database";
 
 type Person = Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
 
-/** A 1:1 chat a call can happen in, and the person on its other end. */
 export type CallChat = { chatId: string; other: Person };
 
 type UseCallArgs = {
   me: Profile;
-  /**
-   * Every chat to listen on for incoming calls. A member has one (with the
-   * admin); the admin has one per person, so a call rings on any screen.
-   */
   chats: CallChat[];
   remoteAudioRef: React.RefObject<HTMLAudioElement | null>;
 };
@@ -50,13 +50,19 @@ type UseCallArgs = {
 const RECONNECT_DELAYS = [1500, 3000, 6000];
 const MAX_RECONNECT = RECONNECT_DELAYS.length;
 const DISCONNECT_GRACE_MS = 2000;
-// How long a closing screen ("Call ended", "No answer") stays up before the
-// call UI goes away by itself. An error does not go by itself: it says what to
-// do, so it stays until it is closed.
+const CONNECT_TIMEOUT_MS = 30_000;
 const ENDED_LINGER_MS = 2500;
 
-// A phone needs a moment to let go of a camera before it can open the other one.
 const CAMERA_RELEASE_MS = 400;
+const REMEMBERED_CALLS = 20;
+
+function offerSoFar(
+  pc: RTCPeerConnection,
+  fallback: RTCSessionDescriptionInit,
+): RTCSessionDescriptionInit {
+  const local = pc.localDescription;
+  return local ? { type: local.type, sdp: local.sdp } : fallback;
+}
 
 function cameraIsBusy(err: unknown): boolean {
   return (
@@ -64,17 +70,11 @@ function cameraIsBusy(err: unknown): boolean {
   );
 }
 
-/**
- * Opens one camera: the good picture first, then whatever that camera gives.
- * If it is still busy (a phone that just let go of its other camera), wait a
- * moment and try once more.
- */
 async function openCamera(camera: CameraChoice): Promise<MediaStream> {
   const open = async () => {
     try {
       return await navigator.mediaDevices.getUserMedia(videoConstraints(camera));
     } catch {
-      // 720p (or that frame rate) unavailable → take what the camera has.
       return navigator.mediaDevices.getUserMedia(relaxedVideoConstraints(camera));
     }
   };
@@ -104,21 +104,11 @@ function reasonToCode(reason?: string): CallErrorCode {
   }
 }
 
-/**
- * The 1-to-1 calling engine (voice, video, quality monitoring, reconnection).
- * One instance serves the whole app: it listens on the signaling channel of
- * every chat in `chats` and runs at most one call at a time, on one
- * RTCPeerConnection. All WebRTC lifecycle lives here — UI only reads the store
- * and calls the returned actions.
- */
 export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const store = useCallStore;
-  // Who is on the other end of each chat. Read through a ref, so the signal
-  // handlers always see the current list.
   const peopleRef = useRef(new Map<string, Person>());
   peopleRef.current = new Map(chats.map((c) => [c.chatId, c.other]));
 
-  // One signaling channel per chat, and the chat the current call runs in.
   const channelsRef = useRef(new Map<string, SignalingChannel>());
   const activeChatRef = useRef<string | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -128,12 +118,20 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const videoStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const facingRef = useRef<"user" | "environment">("user");
-  const usedVideoRef = useRef(false); // did this call ever use the camera?
+  const usedVideoRef = useRef(false);
   const callIdRef = useRef<string | null>(null);
   const incomingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
   const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ringRepeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ringWatchRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ringStartedAtRef = useRef(0);
+  const ringDeadlineRef = useRef(0);
+  const heardCallerAtRef = useRef(0);
+  const callerRepeatsRef = useRef(false);
+  const endedCallsRef = useRef(new Set<string>());
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -146,18 +144,13 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const startCameraRef = useRef<
     ((cameras?: CameraChoice[], preAuthorized?: boolean) => Promise<void>) | null
   >(null);
-  // Camera changes run one at a time: the connection one is at work for, and a
-  // count that goes up each time the camera is told to stop.
   const cameraBusyRef = useRef<RTCRtpSender | null>(null);
   const cameraStopsRef = useRef(0);
   const samplerRef = useRef<ReturnType<typeof createQualitySampler> | null>(null);
-  // How large a picture to send (full size unless the frame rate collapses),
-  // and the queue that applies it: sender settings are changed one at a time.
   const governorRef = useRef(createVideoGovernor());
   const tuningRef = useRef<Promise<void>>(Promise.resolve());
   const audioMonitorRef = useRef<AudioLevelMonitor | null>(null);
 
-  /** Send to the other person of the current call (on that chat's channel). */
   const send = useCallback(
     (type: SignalType, extra: Partial<SignalPayload> = {}) => {
       const callId = callIdRef.current;
@@ -168,7 +161,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     [me.id],
   );
 
-  const updateSession = useCallback((patch: Record<string, unknown>) => {
+  const updateSession = useCallback((patch: Database["public"]["Tables"]["call_sessions"]["Update"]) => {
     const callId = callIdRef.current;
     if (!callId) return;
     void supabaseBrowser().from("call_sessions").update(patch).eq("id", callId).then(
@@ -177,7 +170,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     );
   }, []);
 
-  /** Server re-authorization for the chat of the current call (membership / room / voice|video). */
   const authorize = useCallback(
     async (feature: "voice" | "video" = "voice"): Promise<{ ok: boolean; reason?: string }> => {
       const chatId = activeChatRef.current;
@@ -202,11 +194,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     });
   }, [send, store]);
 
-  /**
-   * Post ONE call event to the chat timeline. Caller-only (avoids duplicates);
-   * the server is also idempotent. Auto-derives completed/cancelled from
-   * whether the call ever connected. Must run BEFORE teardown nulls callId.
-   */
   const postOutcome = useCallback(
     (explicit?: "missed" | "declined" | "failed") => {
       if (!store.getState().isCaller) return;
@@ -222,7 +209,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     [store],
   );
 
-  /** Apply the picture settings (hold the resolution, current size) to our video sender. */
   const tuneVideo = useCallback(() => {
     const sender = videoSenderRef.current;
     const scale = governorRef.current.scale();
@@ -243,7 +229,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   }, [store]);
 
   const startMonitors = useCallback(() => {
-    // Quality sampling (throttled, local only).
     if (!statsTimerRef.current) {
       samplerRef.current = createQualitySampler();
       statsTimerRef.current = setInterval(async () => {
@@ -251,20 +236,18 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         const sampler = samplerRef.current;
         if (!pc || !sampler) return;
         const s = await sampler(pc);
-        if (pcRef.current !== pc) return; // the call ended while the numbers were read
+        if (pcRef.current !== pc) return;
         const now = store.getState();
         now.setQuality(s.quality);
+        now.setRelayed(s.relayed);
         const sent = now.videoEnabled ? s.video.sent : null;
         now.setVideoNumbers(sent, now.remoteVideoOn ? s.video.received : null);
-        // Send a smaller picture when the frame rate has collapsed, a larger
-        // one again when the link has been fine for a while.
         const scale = governorRef.current.next(
           sent ? { fps: sent.fps, cameraFps: s.video.cameraFps, limited: sent.limited } : null,
         );
         if (scale !== null) tuneVideo();
       }, STATS_INTERVAL_MS);
     }
-    // Local mic activity → "speaking" dot.
     if (!audioMonitorRef.current && localStreamRef.current) {
       audioMonitorRef.current = monitorAudioLevel(localStreamRef.current, (speaking) =>
         store.getState().setSpeaking(speaking),
@@ -282,6 +265,13 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const teardown = useCallback(() => {
     if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
     ringTimeoutRef.current = null;
+    if (ringRepeatRef.current) clearInterval(ringRepeatRef.current);
+    ringRepeatRef.current = null;
+    if (ringWatchRef.current) clearInterval(ringWatchRef.current);
+    ringWatchRef.current = null;
+    callerRepeatsRef.current = false;
+    if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+    connectTimeoutRef.current = null;
     clearReconnect();
     stopMonitors();
     reconnectAttemptRef.current = 0;
@@ -294,9 +284,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       pcRef.current.oniceconnectionstatechange = null;
       try {
         pcRef.current.close();
-      } catch {
-        /* ignore */
-      }
+      } catch {}
       pcRef.current = null;
     }
     senderRef.current = null;
@@ -312,8 +300,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
       videoStreamRef.current = null;
     }
-    // The next call starts on the front camera again, whichever was used last,
-    // and at full picture size.
     facingRef.current = "user";
     cameraStopsRef.current++;
     governorRef.current.reset();
@@ -321,15 +307,17 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     incomingOfferRef.current = null;
     pendingCandidatesRef.current = [];
+    const ended = callIdRef.current;
+    if (ended) {
+      const remembered = endedCallsRef.current;
+      remembered.add(ended);
+      const oldest = remembered.values().next().value;
+      if (remembered.size > REMEMBERED_CALLS && oldest) remembered.delete(oldest);
+    }
     callIdRef.current = null;
     activeChatRef.current = null;
   }, [clearReconnect, stopMonitors, remoteAudioRef]);
 
-  /**
-   * End the call and show its closing screen: `message` is the error for
-   * "failed", or a short note such as "No answer". The screen goes away by
-   * itself after a moment (an error only through dismiss()).
-   */
   const finish = useCallback(
     (final: "rejected" | "busy" | "failed" | "ended", message?: string) => {
       teardown();
@@ -350,26 +338,69 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     [finish],
   );
 
-  // ---- Reconnection ---------------------------------------------------------
+  const ringUntil = useCallback(
+    (deadline: number) => {
+      const callId = callIdRef.current;
+      if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+      ringDeadlineRef.current = deadline;
+      ringTimeoutRef.current = setTimeout(() => {
+        ringTimeoutRef.current = null;
+        if (callIdRef.current !== callId || store.getState().state !== "calling") return;
+        send("call_cancelled", { reason: "no answer" });
+        updateSession({ status: "missed", ended_at: new Date().toISOString(), end_reason: "no answer" });
+        postOutcome("missed");
+        finish("ended", "No answer");
+      }, Math.max(0, deadline - Date.now()));
+    },
+    [store, send, updateSession, postOutcome, finish],
+  );
+
+  const watchCaller = useCallback(() => {
+    if (ringWatchRef.current) clearInterval(ringWatchRef.current);
+    const callId = callIdRef.current;
+    const watch = setInterval(() => {
+      if (callIdRef.current !== callId || store.getState().state !== "ringing") {
+        clearInterval(watch);
+        if (ringWatchRef.current === watch) ringWatchRef.current = null;
+        return;
+      }
+      if (document.visibilityState !== "visible") {
+        heardCallerAtRef.current = Date.now();
+        return;
+      }
+      if (!callerRepeatsRef.current) return;
+      if (Date.now() - heardCallerAtRef.current < RING_SILENCE_MS) return;
+      finish("ended", "Missed call");
+      if (callId) endedCallsRef.current.delete(callId);
+    }, 1000);
+    ringWatchRef.current = watch;
+  }, [store, finish]);
+
+  const expectConnection = useCallback(() => {
+    if (connectTimeoutRef.current) return;
+    const callId = callIdRef.current;
+    connectTimeoutRef.current = setTimeout(() => {
+      connectTimeoutRef.current = null;
+      if (callIdRef.current !== callId || store.getState().connectedAt !== null) return;
+      send("call_ended", { reason: "unreachable" });
+      postOutcome("failed");
+      finishWithError("ICE_FAILED");
+    }, CONNECT_TIMEOUT_MS);
+  }, [store, send, postOutcome, finishWithError]);
 
   const handleConnUp = useCallback(() => {
     clearReconnect();
+    if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+    connectTimeoutRef.current = null;
     reconnectAttemptRef.current = 0;
     store.getState().setReconnectAttempt(0);
     store.getState().setConnected();
     updateSession({ status: "connected", connected_at: new Date().toISOString() });
     startMonitors();
     tuneVideo();
-    // Resync media state with the peer after (re)connect.
     broadcastMediaState();
-    // Periodically re-check authorization so a mid-call revocation (participant
-    // removed/blocked/suspended, room ended, voice disabled) ends the call even
-    // if the media connection itself never drops. Video can be revoked on its
-    // own (camera stops, voice continues).
     if (!authTimerRef.current) {
       authTimerRef.current = setInterval(async () => {
-        // The answers below belong to this call only: by the time they arrive
-        // it may have ended and another one begun.
         const callId = callIdRef.current;
         const voice = await authorize("voice");
         if (callIdRef.current !== callId) return;
@@ -395,9 +426,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       const offer = await pc.createOffer({ iceRestart: true });
       await pc.setLocalDescription(offer);
       send("offer", { sdp: offer });
-    } catch {
-      /* next attempt will retry */
-    } finally {
+    } catch {} finally {
       negotiatingRef.current = false;
     }
   }, [send]);
@@ -406,8 +435,9 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     if (reconnectTimerRef.current) return;
     const attempt = reconnectAttemptRef.current;
     if (attempt >= MAX_RECONNECT) {
-      postOutcome(); // it had connected → logs as completed with its duration
-      finishWithError("RECONNECT_FAILED");
+      const everConnected = store.getState().connectedAt !== null;
+      postOutcome(everConnected ? undefined : "failed");
+      finishWithError(everConnected ? "RECONNECT_FAILED" : "ICE_FAILED");
       return;
     }
     const delay = RECONNECT_DELAYS[attempt] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1]!;
@@ -419,7 +449,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         handleConnUp();
         return;
       }
-      // Revalidate authorization on every recovery attempt.
       const auth = await authorize();
       if (!auth.ok) {
         postOutcome();
@@ -428,7 +457,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
       reconnectAttemptRef.current = attempt + 1;
       store.getState().setReconnectAttempt(attempt + 1);
-      // Only the caller drives ICE restart (avoids glare); the callee answers.
       if (store.getState().isCaller) await doIceRestart();
       scheduleReconnect();
     }, delay);
@@ -437,11 +465,9 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const enterReconnecting = useCallback(() => {
     const s = store.getState().state;
     if (s === "idle" || s === "ended" || s === "failed" || s === "rejected" || s === "busy") return;
-    store.getState().setState("reconnecting");
+    if (store.getState().connectedAt !== null) store.getState().setState("reconnecting");
     scheduleReconnect();
   }, [store, scheduleReconnect]);
-
-  // ---- Peer connection ------------------------------------------------------
 
   const applySinkId = useCallback(() => {
     const el = remoteAudioRef.current as (HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }) | null;
@@ -451,28 +477,27 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     }
   }, [remoteAudioRef, store]);
 
-  const createPeer = useCallback(() => {
-    const pc = new RTCPeerConnection(getRtcConfig());
+  const createPeer = useCallback((config: RTCConfiguration) => {
+    let pc: RTCPeerConnection;
+    try {
+      pc = new RTCPeerConnection(config);
+    } catch {
+      pc = new RTCPeerConnection(basicRtcConfig());
+    }
 
     pc.onicecandidate = (e) => {
       if (e.candidate) send("ice_candidate", { candidate: e.candidate.toJSON() });
     };
     pc.ontrack = (e) => {
-      // Accumulate remote tracks (audio + video) into one persistent stream.
       if (!remoteStreamRef.current) remoteStreamRef.current = new MediaStream();
       const remote = remoteStreamRef.current;
       if (!remote.getTracks().some((t) => t.id === e.track.id)) remote.addTrack(e.track);
-      // Audio plays through the hidden audio element (setSinkId target); the
-      // call screen's <video> element binds the same stream (muted) for video.
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = remote;
         applySinkId();
         void remoteAudioRef.current.play().catch(() => undefined);
       }
       store.getState().setRemoteStream(remote);
-      // A video track arrives on every call (the line is negotiated up front),
-      // so it says nothing about the other camera. Whether that camera is on
-      // comes from call_started and media_state.
     };
     pc.onconnectionstatechange = () => {
       switch (pc.connectionState) {
@@ -480,7 +505,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
           handleConnUp();
           break;
         case "disconnected":
-          // Transient — wait briefly before treating as a drop.
           if (!disconnectTimerRef.current) {
             disconnectTimerRef.current = setTimeout(() => {
               disconnectTimerRef.current = null;
@@ -509,11 +533,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     return pc;
   }, [send, remoteAudioRef, applySinkId, handleConnUp, enterReconnecting, store]);
 
-  /**
-   * Opens the microphone and adds it to the connection. Resolves false when the
-   * call was closed while the browser was still asking for permission; the
-   * microphone is released again in that case.
-   */
   const attachLocalMedia = useCallback(
     async (pc: RTCPeerConnection, role: "caller" | "callee"): Promise<boolean> => {
       const stream = await navigator.mediaDevices.getUserMedia(audioConstraints());
@@ -524,16 +543,11 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       localStreamRef.current = stream;
       const [track] = stream.getAudioTracks();
       if (track) {
-        // Mute may have been tapped before the microphone was ready.
         track.enabled = !store.getState().muted;
         senderRef.current = pc.addTrack(track, stream);
-        // Prefer Opus on the audio transceiver (feature-detected, safe no-op else).
         const audioTx = pc.getTransceivers().find((t) => t.sender === senderRef.current);
         preferOpus(audioTx);
       }
-      // The caller offers a video line up front, so turning a camera on or off
-      // later is a plain replaceTrack(): no renegotiation. The callee must not
-      // add a line of its own; it takes over the offered one (adoptOfferedVideo).
       if (role === "caller") {
         videoSenderRef.current = pc.addTransceiver("video", { direction: "sendrecv" }).sender;
         tuneVideo();
@@ -544,12 +558,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     [store, tuneVideo],
   );
 
-  /**
-   * Callee, right after reading the offer: send our camera on the video line the
-   * caller offered. A transceiver the callee creates itself is never paired with
-   * that line (only ones made by addTrack are), so its picture would not reach
-   * the caller.
-   */
   const adoptOfferedVideo = useCallback(
     (pc: RTCPeerConnection) => {
       const offered = pc
@@ -571,35 +579,31 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     for (const c of pending) {
       try {
         await pc.addIceCandidate(c);
-      } catch {
-        /* ignore late/duplicate */
-      }
+      } catch {}
     }
   }, []);
-
-  // ---- Public actions -------------------------------------------------------
 
   const startCall = useCallback(
     async (chatId: string, withVideo = false) => {
       const other = peopleRef.current.get(chatId);
-      if (!other) return; // not a chat we can call in
-      if (store.getState().state !== "idle") return; // double-call protection
+      if (!other) return;
+      if (store.getState().state !== "idle") return;
 
       const callId = crypto.randomUUID();
       callIdRef.current = callId;
       activeChatRef.current = chatId;
       usedVideoRef.current = false;
-      // Open the call screen at once: the steps below can each take a moment,
-      // and any of them failing needs a screen to say so.
       store.getState().startOutgoing(callId, chatId, peerInfo(other));
-      // False once this call has been cancelled or replaced (teardown clears the id).
       const stillOurs = () => callIdRef.current === callId;
 
       if (!isWebRtcSupported()) {
         finishWithError("UNSUPPORTED");
         return;
       }
-      const auth = await authorize(withVideo ? "video" : "voice");
+      const [auth, rtcConfig] = await Promise.all([
+        authorize(withVideo ? "video" : "voice"),
+        getRtcConfig(chatId),
+      ]);
       if (!stillOurs()) return;
       if (!auth.ok) {
         finishWithError(reasonToCode(auth.reason));
@@ -607,10 +611,8 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
 
       try {
-        const pc = createPeer();
+        const pc = createPeer(rtcConfig);
         if (!(await attachLocalMedia(pc, "caller"))) return;
-        // Video call: capture the camera up front so the initial offer carries
-        // the video track (voice→video upgrade later is the same replaceTrack).
         if (withVideo) await startCameraRef.current?.(undefined, true);
         if (!stillOurs()) return;
 
@@ -625,46 +627,56 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
             kind: withVideo ? "video" : "voice",
           })
           .then(() => undefined, () => undefined);
+        void fetch(`/api/calls/${callId}/ring`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatId, kind: withVideo ? "video" : "voice" }),
+        }).catch(() => undefined);
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         if (!stillOurs()) return;
-        // `media` tells the other side whether this is a voice or a video call.
-        send("call_started", {
-          from: peerInfo(me),
-          sdp: offer,
-          media: { audio: !store.getState().muted, video: store.getState().videoEnabled },
-        });
-
-        ringTimeoutRef.current = setTimeout(() => {
-          if (store.getState().state === "calling") {
-            send("call_cancelled", { reason: "no answer" });
-            updateSession({ status: "missed", ended_at: new Date().toISOString(), end_reason: "no answer" });
-            postOutcome("missed");
-            finish("ended", "No answer");
+        const ring = (type: "call_started" | "call_ring") =>
+          send(type, {
+            from: peerInfo(me),
+            sdp: offerSoFar(pc, offer),
+            media: { audio: !store.getState().muted, video: store.getState().videoEnabled },
+          });
+        ring("call_started");
+        ringStartedAtRef.current = Date.now();
+        ringUntil(ringStartedAtRef.current + CALL_RING_TIMEOUT_MS);
+        const repeat = setInterval(() => {
+          if (callIdRef.current !== callId || store.getState().state !== "calling") {
+            clearInterval(repeat);
+            if (ringRepeatRef.current === repeat) ringRepeatRef.current = null;
+            return;
           }
-        }, CALL_RING_TIMEOUT_MS);
+          ring("call_ring");
+        }, RING_REPEAT_MS);
+        ringRepeatRef.current = repeat;
       } catch (err) {
-        if (!stillOurs()) return; // cancelled meanwhile: nothing to report
+        if (!stillOurs()) return;
         send("call_cancelled", { reason: "error" });
         postOutcome("failed");
         finishWithError(classifyMediaError(err));
       }
     },
-    [store, me, authorize, createPeer, attachLocalMedia, send, updateSession, finish, finishWithError, postOutcome],
+    [store, me, authorize, createPeer, attachLocalMedia, send, ringUntil, finishWithError, postOutcome],
   );
 
-  /** Answer the ringing call. `withVideo` also turns our camera on. */
   const accept = useCallback(
     async (withVideo = false) => {
       const offer = incomingOfferRef.current;
       const callId = callIdRef.current;
-      if (!offer || !callId || store.getState().state !== "ringing") return;
+      const chatId = activeChatRef.current;
+      if (!offer || !callId || !chatId || store.getState().state !== "ringing") return;
       const stillOurs = () => callIdRef.current === callId;
 
-      // Leave "ringing" at once: the tap shows straight away and cannot answer twice.
       store.getState().setState("connecting");
-      const auth = await authorize(withVideo ? "video" : "voice");
+      const [auth, rtcConfig] = await Promise.all([
+        authorize(withVideo ? "video" : "voice"),
+        getRtcConfig(chatId),
+      ]);
       if (!stillOurs()) return;
       if (!auth.ok) {
         send("call_rejected", { reason: "unauthorized" });
@@ -673,7 +685,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
 
       try {
-        const pc = createPeer();
+        const pc = createPeer(rtcConfig);
         if (!(await attachLocalMedia(pc, "callee"))) return;
         await pc.setRemoteDescription(offer);
         adoptOfferedVideo(pc);
@@ -683,7 +695,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         if (!stillOurs()) return;
         send("call_accepted", {});
         send("answer", { sdp: answer });
-        // The answer does not wait for the camera: it joins as soon as it is ready.
+        expectConnection();
         if (withVideo) void startCameraRef.current?.(undefined, true);
       } catch (err) {
         if (!stillOurs()) return;
@@ -691,7 +703,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         finishWithError(classifyMediaError(err));
       }
     },
-    [store, authorize, createPeer, attachLocalMedia, adoptOfferedVideo, drainCandidates, send, finishWithError],
+    [store, authorize, createPeer, attachLocalMedia, adoptOfferedVideo, drainCandidates, send, finishWithError, expectConnection],
   );
 
   const reject = useCallback(() => {
@@ -710,21 +722,17 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       send("call_ended", { reason: "hangup" });
       updateSession({ status: "ended", ended_at: new Date().toISOString(), end_reason: "hangup" });
     }
-    postOutcome(); // completed if it connected, else cancelled
+    postOutcome();
     finish("ended");
   }, [store, send, updateSession, finish, postOutcome]);
 
   const toggleMute = useCallback(() => {
     const next = !store.getState().muted;
-    // enabled=false keeps the track/connection alive — no renegotiation. Before
-    // the microphone is open this only records the choice; attachLocalMedia
-    // applies it to the track when it arrives.
     for (const track of localStreamRef.current?.getAudioTracks() ?? []) track.enabled = !next;
     store.getState().setMuted(next);
     broadcastMediaState();
   }, [store, broadcastMediaState]);
 
-  /** Close the closing screen now instead of waiting for it to go by itself. */
   const dismiss = useCallback(() => {
     if (!isCallOver(store.getState().state)) return;
     if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
@@ -732,15 +740,12 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     store.getState().reset();
   }, [store]);
 
-  // ---- Camera (video) -------------------------------------------------------
-
-  /** Lets go of the camera in use, and says which one it was. */
   const releaseCamera = useCallback((): CameraChoice | null => {
     const stream = videoStreamRef.current;
     if (!stream) return null;
     const was = stream.getVideoTracks()[0]?.getSettings();
     for (const t of stream.getTracks()) {
-      t.onended = null; // we are stopping it ourselves: that is not a lost camera
+      t.onended = null;
       t.stop();
     }
     videoStreamRef.current = null;
@@ -748,27 +753,16 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     return { facing: was?.facingMode === "environment" ? "environment" : "user" };
   }, []);
 
-  /**
-   * Turns the camera on, or changes to another one. `cameras` are tried in
-   * order; without any, the side used last (the front camera at first).
-   * `preAuthorized`: the caller of this function has just checked "video" itself.
-   */
   const startCamera = useCallback(
     async (cameras?: CameraChoice[], preAuthorized = false) => {
       const sender = videoSenderRef.current;
-      if (!sender) return; // not set up yet (the store's `mediaReady` is still false)
-      // One camera change at a time. A tap that lands while one is at work is
-      // dropped: two of them racing could leave a camera on behind a screen
-      // that says it is off.
+      if (!sender) return;
       if (cameraBusyRef.current === sender) return;
       cameraBusyRef.current = sender;
       const stops = cameraStopsRef.current;
-      // True while this is still the same call and nobody has switched the
-      // camera off in the meantime.
       const stillWanted = () =>
         videoSenderRef.current === sender && cameraStopsRef.current === stops;
       try {
-        // Video authorization is checked server-side too (never trust the client).
         if (!preAuthorized) {
           const auth = await authorize("video");
           if (!stillWanted()) return;
@@ -779,8 +773,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         }
         const wanted = cameras?.length ? cameras : [{ facing: facingRef.current }];
 
-        // Most phones cannot have two cameras open at once, so the one in use
-        // is let go first. If none of the wanted ones opens, we go back to it.
         const previous = releaseCamera();
         let stream: MediaStream | null = null;
         let failure: unknown = null;
@@ -797,19 +789,14 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         if (!stream && previous) {
           try {
             stream = await openCamera(previous);
-          } catch {
-            /* reported below */
-          }
+          } catch {}
         }
-        // The call may have ended, or the camera been switched off, while the
-        // browser was opening it: let it go again instead of leaving it running.
         if (!stillWanted()) {
           for (const t of stream?.getTracks() ?? []) t.stop();
           return;
         }
         const track = stream?.getVideoTracks()[0];
         if (!stream || !track) {
-          // No camera any more. The call itself goes on as a voice call.
           void sender.replaceTrack(null).catch(() => undefined);
           store.getState().setVideoEnabled(false);
           store.getState().setLocalStream(null);
@@ -821,20 +808,17 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
           broadcastMediaState();
           return;
         }
-        // Camera lost mid-call (unplugged, taken by the system) → keep the call
-        // and say so. Only while it is the camera in use.
         const opened = stream;
         track.onended = () => {
           if (videoStreamRef.current === opened) stopCameraRef.current?.("CAMERA_LOST");
         };
         videoStreamRef.current = stream;
-        await sender.replaceTrack(track); // no renegotiation (transceiver exists)
-        if (!stillWanted()) return; // stopped meanwhile; whoever stopped it let the camera go
+        await sender.replaceTrack(track);
+        if (!stillWanted()) return;
         tuneVideo();
         const facing = track.getSettings().facingMode;
         if (facing === "user" || facing === "environment") facingRef.current = facing;
         usedVideoRef.current = true;
-        // Back on the camera we came from: the other one did not start.
         store.getState().setCameraError(changed ? null : callErrorMessage("CAMERA_SWITCH_FAILED"));
         store.getState().setVideoEnabled(true);
         store.getState().setLocalStream(stream);
@@ -849,7 +833,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const stopCamera = useCallback(
     (reason?: CallErrorCode) => {
       const sender = videoSenderRef.current;
-      cameraStopsRef.current++; // a camera that is still being opened is let go when it arrives
+      cameraStopsRef.current++;
       if (sender) void sender.replaceTrack(null).catch(() => undefined);
       releaseCamera();
       store.getState().setVideoEnabled(false);
@@ -859,7 +843,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     },
     [store, broadcastMediaState, releaseCamera],
   );
-  // expose to earlier-defined callers (periodic auth timer, startCall)
   stopCameraRef.current = stopCamera;
   startCameraRef.current = startCamera;
 
@@ -868,11 +851,10 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     else await startCamera();
   }, [store, stopCamera, startCamera]);
 
-  /** "Flip": the other side on a phone, the next camera on a computer. */
   const switchCamera = useCallback(async () => {
     const sender = videoSenderRef.current;
     if (!store.getState().videoEnabled || !sender) return;
-    if (cameraBusyRef.current === sender) return; // a tap while a change is still at work
+    if (cameraBusyRef.current === sender) return;
     const current = videoStreamRef.current?.getVideoTracks()[0]?.getSettings();
 
     let others: MediaDeviceInfo[] = [];
@@ -881,23 +863,16 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       others = devices.filter(
         (d) => d.kind === "videoinput" && d.deviceId && d.deviceId !== current?.deviceId,
       );
-    } catch {
-      /* no list: a phone can still be asked for its other side */
-    }
+    } catch {}
 
     const cameras: CameraChoice[] = [];
     if (current?.facingMode === "user" || current?.facingMode === "environment") {
-      // A phone. Ask for the other side and let the browser pick the camera: a
-      // phone often has several on the back, and stepping through them one by
-      // one lands on the wide or the zoom lens. Should the phone not know its
-      // sides, fall back on the cameras whose name says so, then on any other.
       const side = current.facingMode === "user" ? "environment" : "user";
       const named = side === "environment" ? /back|rear|environment/i : /front|user|face/i;
       cameras.push({ facing: side, exactFacing: true });
       for (const d of others) if (named.test(d.label)) cameras.push({ deviceId: d.deviceId });
       for (const d of others) if (!named.test(d.label)) cameras.push({ deviceId: d.deviceId });
     } else {
-      // A computer: its cameras do not say which way they face. Take the next one.
       const next = others[0];
       if (next) cameras.push({ deviceId: next.deviceId });
     }
@@ -905,7 +880,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     await startCamera(cameras, true);
   }, [store, startCamera]);
 
-  /** Cycle to the next available audio output device (setSinkId), if supported. */
   const selectOutputDevice = useCallback(async () => {
     const el = remoteAudioRef.current as (HTMLAudioElement & { setSinkId?: (id: string) => Promise<void>; sinkId?: string }) | null;
     if (!el || typeof el.setSinkId !== "function") return;
@@ -913,7 +887,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const outs = realAudioOutputs(devices);
       if (outs.length < 2) return;
-      // Nothing chosen yet means the system default is playing: start from it.
       const currentId = store.getState().outputDeviceId || el.sinkId;
       const systemDefault = devices.find((d) => d.kind === "audiooutput" && d.deviceId === "default");
       const idx = currentId
@@ -922,12 +895,9 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       const next = outs[(idx + 1) % outs.length]!;
       await el.setSinkId(next.deviceId);
       store.getState().setOutputDevice(next.deviceId);
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   }, [remoteAudioRef, store]);
 
-  /** Replace the mic track without renegotiation (device change / selection). */
   const replaceMic = useCallback(async (deviceId?: string) => {
     const sender = senderRef.current;
     if (!sender) return;
@@ -937,31 +907,30 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       if (!track) return;
       track.enabled = !store.getState().muted;
       await sender.replaceTrack(track);
-      // stop the old track(s), swap the reference, refresh the level monitor
       if (localStreamRef.current) {
         for (const t of localStreamRef.current.getTracks()) t.stop();
       }
       localStreamRef.current = stream;
       audioMonitorRef.current?.stop();
       audioMonitorRef.current = monitorAudioLevel(stream, (sp) => store.getState().setSpeaking(sp));
-    } catch {
-      /* keep the existing track if the new one can't be opened */
-    }
+    } catch {}
   }, [store]);
 
-  // ---- Signaling wiring -----------------------------------------------------
-
-  /**
-   * One message, from the channel of `chatId`. The channels are opened once and
-   * call this through a ref, so they always run the current version.
-   */
   const onSignal = async (chatId: string, type: SignalType, payload: SignalPayload) => {
     const current = store.getState();
 
-    if (type === "call_started") {
-      // Already in a call (with anyone): tell this caller so. A call may still
-      // arrive while the closing screen of the last one is up.
-      if (current.state !== "idle" && !isCallOver(current.state)) {
+    if (type === "call_started" || type === "call_ring") {
+      if (payload.senderId === me.id || endedCallsRef.current.has(payload.callId)) return;
+      const inCall = current.state !== "idle" && !isCallOver(current.state);
+      if (inCall && chatId === activeChatRef.current && payload.callId === callIdRef.current) {
+        if (current.state !== "ringing") return;
+        heardCallerAtRef.current = Date.now();
+        if (type === "call_ring") callerRepeatsRef.current = true;
+        if (payload.sdp) incomingOfferRef.current = payload.sdp;
+        if (payload.media) store.getState().setRemoteMedia(payload.media);
+        return;
+      }
+      if (inCall) {
         void channelsRef.current
           .get(chatId)
           ?.send("busy", { callId: payload.callId, senderId: me.id });
@@ -974,18 +943,38 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       callIdRef.current = payload.callId;
       activeChatRef.current = chatId;
       incomingOfferRef.current = payload.sdp;
-      // Who is calling comes from our own data, not from what the message says:
-      // a chat's channel only ever carries calls from the other person in it.
       store.getState().startIncoming(payload.callId, chatId, peerInfo(caller), payload.media);
+      heardCallerAtRef.current = Date.now();
+      callerRepeatsRef.current = type === "call_ring";
+      watchCaller();
+      send("call_ringing");
+      void getRtcConfig(chatId);
       return;
     }
 
-    // Everything else belongs to the call in progress, on its own channel.
     if (chatId !== activeChatRef.current || payload.callId !== callIdRef.current) return;
 
+    if (payload.senderId === me.id) {
+      const elsewhere = type === "call_accepted" || type === "call_rejected" || type === "busy";
+      if (elsewhere && current.state === "ringing") {
+        teardown();
+        store.getState().reset();
+      }
+      return;
+    }
+
     switch (type) {
+      case "call_ringing": {
+        if (current.state !== "calling" || !current.isCaller) break;
+        if (!current.reached) store.getState().setReached();
+        const wanted = Math.min(
+          Date.now() + RING_AFTER_REACHED_MS,
+          ringStartedAtRef.current + MAX_RING_MS,
+        );
+        if (wanted > ringDeadlineRef.current) ringUntil(wanted);
+        break;
+      }
       case "offer": {
-        // Renegotiation / ICE-restart offer (callee side) on an existing call.
         const pc = pcRef.current;
         if (!pc || !payload.sdp) return;
         try {
@@ -994,9 +983,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           send("answer", { sdp: answer });
-        } catch {
-          /* recovery will retry */
-        }
+        } catch {}
         break;
       }
       case "answer": {
@@ -1006,13 +993,13 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
           await pc.setRemoteDescription(payload.sdp);
           await drainCandidates();
           if (store.getState().state === "calling") store.getState().setState("connecting");
-        } catch {
-          /* ignore */
-        }
+          expectConnection();
+        } catch {}
         break;
       }
       case "call_accepted":
         if (current.state === "calling") store.getState().setState("connecting");
+        expectConnection();
         break;
       case "ice_candidate": {
         if (!payload.candidate) return;
@@ -1020,9 +1007,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         if (pc && pc.remoteDescription) {
           try {
             await pc.addIceCandidate(payload.candidate);
-          } catch {
-            /* ignore */
-          }
+          } catch {}
         } else {
           pendingCandidatesRef.current.push(payload.candidate);
         }
@@ -1033,17 +1018,19 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         finish("rejected");
         break;
       case "busy":
-        // They are talking to someone else. Leave a "missed call" in the chat,
-        // so they see afterwards that we tried.
         postOutcome("missed");
         finish("busy");
         break;
       case "call_cancelled":
-        // The caller gave up. Say so for a moment instead of just vanishing.
         finish("ended", current.state === "ringing" ? "Missed call" : undefined);
         break;
       case "call_ended":
-        postOutcome(); // caller posts completed/cancelled; callee is a no-op
+        if (payload.reason === "unreachable" && current.connectedAt === null) {
+          postOutcome("failed");
+          finishWithError("ICE_FAILED");
+          break;
+        }
+        postOutcome();
         finish("ended");
         break;
       case "media_state":
@@ -1054,9 +1041,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   const onSignalRef = useRef(onSignal);
   onSignalRef.current = onSignal;
 
-  // Listen on the channel of every chat. Channels open and close as the list
-  // changes (someone is added or removed); the one a call is running on is
-  // never closed under it.
   const chatIds = chats
     .map((c) => c.chatId)
     .sort()
@@ -1078,7 +1062,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     }
   }, [chatIds]);
 
-  // Leaving the app: end whatever is running, tell the other side, stop listening.
   useEffect(() => {
     const channels = channelsRef.current;
     return () => {
@@ -1099,7 +1082,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
       teardown();
       store.getState().reset();
-      // The goodbye has to leave before its channel is closed.
       const closing = [...channels.values()];
       channels.clear();
       void Promise.resolve(goodbye)
@@ -1108,10 +1090,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
           for (const channel of closing) void channel.disconnect();
         });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ---- Browser lifecycle & network transitions ------------------------------
 
   useEffect(() => {
     const active = () => {
@@ -1124,8 +1103,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       }
     };
     const onOnline = () => {
-      // navigator.onLine is only a hint; the pc state is authoritative. Nudge a
-      // recovery attempt if we're mid-drop.
       const s = store.getState().state;
       if (s === "reconnecting" || s === "disconnected") {
         clearReconnect();
@@ -1139,7 +1116,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (active()) {
         e.preventDefault();
-        e.returnValue = ""; // triggers the browser's "leave site?" confirmation
+        e.returnValue = "";
       }
     };
 
@@ -1157,8 +1134,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     };
   }, [send, store, clearReconnect, enterReconnecting]);
 
-  // ---- Device changes (mic disconnect/reconnect) ----------------------------
-
   useEffect(() => {
     const md = navigator.mediaDevices;
     if (!md || typeof md.addEventListener !== "function") return;
@@ -1166,7 +1141,6 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
       const track = localStreamRef.current?.getAudioTracks()[0];
       const s = store.getState().state;
       const inCall = s === "connected" || s === "connecting" || s === "reconnecting";
-      // If our mic vanished mid-call, transparently re-acquire the default one.
       if (inCall && (!track || track.readyState === "ended")) {
         void replaceMic();
       }

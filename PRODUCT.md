@@ -1,7 +1,5 @@
 # Product
 
-<!-- impeccable:product-schema 1 -->
-
 ## Platform
 
 web
@@ -33,10 +31,17 @@ on a laptop. The owner manages members from the same app.
 ## Capabilities and Constraints
 
 - One-to-one chat between the owner and each member: text, images, files,
-  typing and online indicators, read receipts.
+  typing and online indicators, read receipts (two blue ticks once the other person has
+  seen a message; a chat only counts as seen while it is on screen and not locked).
 - One-to-one voice and video calls. A call rings on any screen while the app is
-  open; a closed app does not ring. Calls between different networks need a TURN
-  relay, which is not set up yet.
+  open; a closed app shows an "Incoming call" notification, and tapping it opens the app
+  on the ringing call. Calls between two different networks pass through
+  a relay (Cloudflare); they work once the owner has added the two Cloudflare values.
+- Notifications for a closed app: a new message, an incoming call, and a missed call. Each person turns them
+  on per device. They never show what a message says, and a member's never shows a name.
+  The owner can mute one chat: no message notifications from it, on any device; its calls
+  still ring.
+  On an iPhone the app has to be added to the Home Screen first.
 - Disappearing messages, off unless the owner switches them on (for everyone, or for one
   person): a message is deleted for both people once the person it was sent to has read it
   and then leaves the chat (goes back, switches app or tab, locks the phone). A message that
@@ -55,7 +60,9 @@ on a laptop. The owner manages members from the same app.
 - The name is **BlackFoxx**. It replaces the earlier names everywhere.
 - The look follows the owner's reference screenshots: white-and-blue app
   screens, emoji avatars on bright grounds, and a first screen of floating
-  coloured tiles around the wordmark. Details are in `DESIGN.md`.
+  coloured tiles around the wordmark. Anyone can switch the blue for a
+  Snapchat-like yellow in their menu; blue stays the default. Details are in
+  `DESIGN.md`.
 - The app must feel fast and work well on phones.
 
 ## Evidence on Hand

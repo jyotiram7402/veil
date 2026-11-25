@@ -2,12 +2,11 @@ import "server-only";
 import type { supabaseServer } from "@/lib/supabase/server";
 import type { ChatSummary, MessageWithSender, Profile } from "@/types/chat";
 
-// Derive the client type from the factory itself so we stay aligned with
-// whatever generics supabase-js currently uses (the 3-generic shape in 2.x).
 type SB = Awaited<ReturnType<typeof supabaseServer>>;
 
 type ChatListRow = {
   last_read_at: string;
+  muted?: boolean;
   chat: {
     id: string;
     type: "direct" | "group" | "room";
@@ -34,17 +33,12 @@ type LastMessageLite = {
   created_at: string;
 };
 
-/**
- * Build the chat list for a user, with members, latest message, and unread
- * count. Done in two queries instead of a single deep embed so we can put
- * proper limits on the message scan.
- */
 export async function loadChatsForUser(supabase: SB, userId: string): Promise<ChatSummary[]> {
   const { data: memberData, error } = await supabase
     .from("chat_members")
     .select(
       `
-        last_read_at,
+        *,
         chat:chats(
           id, type, name, avatar_url, created_by, created_at, updated_at,
           members:chat_members(
@@ -61,9 +55,6 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
 
   const chatIds = rows.map((r) => r.chat?.id).filter((x): x is string => !!x);
 
-  // Latest message per chat. We pull a bounded recent window (250) and pick
-  // the newest one for each chat; for a small private app this is fine and
-  // avoids per-chat round trips.
   const lastByChat = new Map<string, LastMessageLite>();
   const unreadByChat = new Map<string, number>();
 
@@ -93,15 +84,7 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
 
   const summaries = rows
     .filter((r): r is ChatListRow & { chat: NonNullable<ChatListRow["chat"]> } => !!r.chat)
-    // Hide:
-    //   - orphan chats: the other party was hard-deleted, so chat_members is
-    //     down to just me. Without this, the chat list shows a row labeled
-    //     with the admin's own name.
-    //   - chats whose other party is archived. History is preserved
-    //     server-side, but the active sidebar shouldn't surface them.
     .filter((r) => {
-      // Rooms are managed from the admin Rooms page, not the
-      // DM/group sidebar — keep them out of the normal chat list.
       if (r.chat.type === "room") return false;
       if (r.chat.type !== "direct") return true;
       const others = (r.chat.members ?? [])
@@ -136,6 +119,7 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
           : null,
         my_last_read_at: r.last_read_at,
         unread_count: unreadByChat.get(chat.id) ?? 0,
+        muted: r.muted === true,
       } satisfies ChatSummary;
     });
 
@@ -145,11 +129,6 @@ export async function loadChatsForUser(supabase: SB, userId: string): Promise<Ch
   return summaries;
 }
 
-/**
- * Resume-sync fetch: every message in `chatId` strictly newer than `after`,
- * ascending. Used by useResumeSync to close the gap whenever the realtime
- * websocket was offline (background tab, screen lock, network blip).
- */
 export async function loadMessagesAfter(
   supabase: SB,
   chatId: string,

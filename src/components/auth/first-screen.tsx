@@ -6,9 +6,6 @@ import { MOJI_COLORS } from "@/lib/moji";
 import { cn } from "@/lib/utils";
 import styles from "./entry.module.css";
 
-// Order matters: tile n takes the position class t{n} in entry.module.css.
-// The fox sits on the text colour, so it is black in light mode and white in
-// dark mode.
 const TILES: { emoji: string; bg: string }[] = [
   { emoji: "🐼", bg: MOJI_COLORS.sun },
   { emoji: "🐱", bg: MOJI_COLORS.sky },
@@ -24,11 +21,6 @@ const TILES: { emoji: string; bg: string }[] = [
   { emoji: "🚀", bg: MOJI_COLORS.cloud },
 ];
 
-/**
- * What a signed-out visitor sees at "/": the wordmark inside a wall of
- * floating moji tiles, with Log in and Sign up in thumb reach. Server-rendered
- * and animated in CSS only, so it ships no JavaScript of its own.
- */
 export function FirstScreen() {
   return (
     <main className={cn(fontDisplay.variable, styles.screen)}>

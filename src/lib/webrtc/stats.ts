@@ -1,22 +1,10 @@
-/**
- * Lightweight, local-only WebRTC quality sampling via getStats().
- *
- * Nothing is sent to the backend. We derive a coarse quality tier from several
- * signals (RTT, packet loss, jitter) so no single metric dominates. All field
- * access is defensive because stats shapes differ across browsers.
- */
-
 export type Quality = "excellent" | "fair" | "poor" | "unknown";
 
-/** One picture stream as it really travels: its size and frames per second. */
 export type VideoNumbers = { width: number; height: number; fps: number };
 
 export type VideoSample = {
-  /** What we send. `limited`: the encoder is holding back (slow link or busy processor). */
   sent: (VideoNumbers & { limited: boolean }) | null;
-  /** Frames per second our camera delivers. */
   cameraFps: number | null;
-  /** What arrives from the other side. */
   received: VideoNumbers | null;
 };
 
@@ -25,6 +13,7 @@ export type QualitySample = {
   rttMs: number | null;
   lossPct: number | null;
   jitterMs: number | null;
+  relayed: boolean | null;
   video: VideoSample;
 };
 
@@ -36,7 +25,6 @@ function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** The size and frame rate of one outbound-rtp / inbound-rtp video report, if it has a picture. */
 function videoNumbers(report: Record<string, unknown>): VideoNumbers | null {
   const width = num(report.frameWidth);
   const height = num(report.frameHeight);
@@ -44,7 +32,6 @@ function videoNumbers(report: Record<string, unknown>): VideoNumbers | null {
   return { width, height, fps: Math.round(num(report.framesPerSecond) ?? 0) };
 }
 
-/** Stateful sampler: call sample() on an interval; it computes deltas itself. */
 export function createQualitySampler() {
   const loss: LossTracker = { lastReceived: 0, lastLost: 0 };
 
@@ -52,16 +39,26 @@ export function createQualitySampler() {
     let rttMs: number | null = null;
     let jitterMs: number | null = null;
     let lossPct: number | null = null;
+    let relayed: boolean | null = null;
     const video: VideoSample = { sent: null, cameraFps: null, received: null };
 
     try {
       const stats = await pc.getStats();
       let received = 0;
       let lost = 0;
+      let selectedPair: unknown = null;
+      const pairs = new Map<unknown, Record<string, unknown>>();
+      const candidateTypes = new Map<unknown, unknown>();
 
       stats.forEach((raw) => {
-        // Browser stats shapes vary and aren't fully typed in lib.dom.
         const report = raw as Record<string, unknown> & { type: string };
+        if (report.type === "transport" && report.selectedCandidatePairId) {
+          selectedPair = report.selectedCandidatePairId;
+        }
+        if (report.type === "local-candidate" || report.type === "remote-candidate") {
+          candidateTypes.set(report.id, report.candidateType);
+        }
+        if (report.type === "candidate-pair") pairs.set(report.id, report);
         if (report.type === "candidate-pair" && report.state === "succeeded") {
           if (typeof report.currentRoundTripTime === "number") {
             rttMs = Math.round(report.currentRoundTripTime * 1000);
@@ -87,6 +84,16 @@ export function createQualitySampler() {
         }
       });
 
+      const inUse =
+        pairs.get(selectedPair) ??
+        [...pairs.values()].find((p) => p.selected === true) ??
+        [...pairs.values()].find((p) => p.nominated === true && p.state === "succeeded");
+      if (inUse) {
+        relayed =
+          candidateTypes.get(inUse.localCandidateId) === "relay" ||
+          candidateTypes.get(inUse.remoteCandidateId) === "relay";
+      }
+
       const dReceived = received - loss.lastReceived;
       const dLost = lost - loss.lastLost;
       loss.lastReceived = received;
@@ -95,10 +102,24 @@ export function createQualitySampler() {
         lossPct = Math.max(0, Math.min(100, (dLost / (dReceived + dLost)) * 100));
       }
     } catch {
-      return { quality: "unknown", rttMs: null, lossPct: null, jitterMs: null, video: NO_VIDEO };
+      return {
+        quality: "unknown",
+        rttMs: null,
+        lossPct: null,
+        jitterMs: null,
+        relayed: null,
+        video: NO_VIDEO,
+      };
     }
 
-    return { quality: computeQuality(rttMs, lossPct, jitterMs), rttMs, lossPct, jitterMs, video };
+    return {
+      quality: computeQuality(rttMs, lossPct, jitterMs),
+      rttMs,
+      lossPct,
+      jitterMs,
+      relayed,
+      video,
+    };
   };
 }
 

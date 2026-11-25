@@ -83,6 +83,5 @@ export {
   DropdownMenuSub,
 };
 
-// Silence unused-import lint hints for the future:
 void Check;
 void ChevronRight;

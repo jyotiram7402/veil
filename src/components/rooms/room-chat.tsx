@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, LogOut, Mic, Users, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -61,7 +61,6 @@ export function RoomChat({
   const setInitial = useChatStore((s) => s.setInitialMessages);
   const setProfile = useSessionStore((s) => s.setProfile);
 
-  // Live, admin-driven state (kept in sync via realtime below).
   const [locked, setLocked] = useState(initialLocked);
   const [roomChatOn, setRoomChatOn] = useState(roomChatEnabled);
   const [roomVoiceOn, setRoomVoiceOn] = useState(roomVoiceEnabled);
@@ -81,8 +80,6 @@ export function RoomChat({
   useChatRealtime({ chatId: roomId, me, memberProfiles });
   useResumeSync(roomId, me);
 
-  // Reflect admin changes (lock/unlock/end + room & personal permissions +
-  // block/remove) without a page refresh.
   useEffect(() => {
     const supabase = supabaseBrowser();
     const channel = supabase
@@ -136,7 +133,6 @@ export function RoomChat({
     };
   }, [roomId, me.id]);
 
-  // Presence: how many room members are currently online (never used for auth).
   const online = usePresenceStore((s) => s.online);
   const onlineCount = useMemo(
     () => Object.keys(memberProfiles).filter((id) => online.has(id)).length,
@@ -153,7 +149,6 @@ export function RoomChat({
     return <RoomClosed title={closed.title} message={closed.message} />;
   }
 
-  // Effective permissions (mirror of the server-side model in lib/permissions).
   const chatOn = roomChatOn && myChatOn;
   const voiceEffective = roomVoiceOn && myVoiceOn;
   const videoEffective = roomVideoOn && myVideoOn;
@@ -179,8 +174,6 @@ export function RoomChat({
           </div>
         </div>
 
-        {/* Reserved voice/video controls — disabled placeholders for .
-            No microphone/camera access is requested. */}
         <CallControl kind="voice" allowed={voiceEffective} />
         <CallControl kind="video" allowed={videoEffective} />
 
@@ -219,30 +212,29 @@ export function RoomChat({
   );
 }
 
-/**
- * Placeholder call control. Reserves the header slot and reflects the
- * effective permission, but is always disabled in (no WebRTC / no
- * media access). Hidden entirely when the feature is not authorized.
- */
 function CallControl({ kind, allowed }: { kind: "voice" | "video"; allowed: boolean }) {
   const Icon = kind === "voice" ? Mic : Video;
   const label = kind === "voice" ? "Voice" : "Video";
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span>
-          <Button
-            size="icon"
-            variant="ghost"
-            disabled
-            aria-label={allowed ? `${label} (coming soon)` : `${label} unavailable`}
-            className={cn("text-current", !allowed && "opacity-30")}
-          >
-            <Icon className="h-5 w-5" />
-          </Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{allowed ? `${label} — coming soon` : `${label} unavailable`}</TooltipContent>
-    </Tooltip>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled
+              aria-label={allowed ? `${label} (coming soon)` : `${label} unavailable`}
+              className={cn("text-current", !allowed && "opacity-30")}
+            >
+              <Icon className="h-5 w-5" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          {allowed ? `${label} — coming soon` : `${label} unavailable`}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

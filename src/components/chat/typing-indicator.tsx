@@ -3,11 +3,6 @@
 import { useMemo } from "react";
 import { usePresenceStore } from "@/store/presence-store";
 
-/**
- * "Someone is typing" bubble. The message list renders it in a slot it keeps
- * free under the newest message, so it scrolls with the conversation and the
- * messages never jump when it appears or goes away.
- */
 export function TypingIndicator({ chatId }: { chatId: string }) {
   const typingMap = usePresenceStore((s) => s.typingByChat[chatId]);
   const names = useMemo(() => {
@@ -37,7 +32,6 @@ export function TypingIndicator({ chatId }: { chatId: string }) {
           style={{ animationDelay: "300ms" }}
         />
       </span>
-      {/* One person: the dots say enough. More than one: say who. */}
       <span className={names.length === 1 ? "sr-only" : undefined}>{label}</span>
     </div>
   );

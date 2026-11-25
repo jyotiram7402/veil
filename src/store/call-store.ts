@@ -7,38 +7,35 @@ import type { Quality, VideoNumbers } from "@/lib/webrtc/stats";
 type CallStore = {
   state: CallState;
   callId: string | null;
-  /** The 1:1 chat this call belongs to. */
   chatId: string | null;
   isCaller: boolean;
+  reached: boolean;
   peer: PeerInfo | null;
   muted: boolean;
   connectedAt: number | null;
-  /** Text for the closing screen: the error, or a note such as "No answer". */
   errorMessage: string | null;
 
-  // additions
   quality: Quality;
-  speaking: boolean; // local mic activity
+  speaking: boolean;
   reconnectAttempt: number;
   outputDeviceId: string | null;
 
-  // additions — media state (tracked separately from call state)
-  mediaReady: boolean; // the connection is set up far enough to take our camera
-  videoEnabled: boolean; // local camera on
+  mediaReady: boolean;
+  videoEnabled: boolean;
   remoteAudioOn: boolean;
   remoteVideoOn: boolean;
   cameraError: string | null;
-  localStream: MediaStream | null; // local camera preview (video only)
-  remoteStream: MediaStream | null; // remote audio+video
-  minimized: boolean; // call collapsed to a pill so chat is usable underneath
-  // The pictures as they really travel (size, frames per second), for "call details".
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  minimized: boolean;
   sentVideo: VideoNumbers | null;
   receivedVideo: VideoNumbers | null;
+  relayed: boolean | null;
 
   startOutgoing: (callId: string, chatId: string, peer: PeerInfo) => void;
-  /** `media` is what the caller has on: its camera makes this a video call. */
   startIncoming: (callId: string, chatId: string, peer: PeerInfo, media?: MediaState) => void;
   setState: (state: CallState) => void;
+  setReached: () => void;
   setConnected: () => void;
   setMuted: (muted: boolean) => void;
   setQuality: (quality: Quality) => void;
@@ -53,7 +50,7 @@ type CallStore = {
   setRemoteStream: (stream: MediaStream | null) => void;
   setMinimized: (minimized: boolean) => void;
   setVideoNumbers: (sent: VideoNumbers | null, received: VideoNumbers | null) => void;
-  /** Move to a closing state, with the text its screen should show (if any). */
+  setRelayed: (relayed: boolean | null) => void;
   close: (state: CallState, message?: string | null) => void;
   reset: () => void;
 };
@@ -63,6 +60,7 @@ const initial = {
   callId: null,
   chatId: null,
   isCaller: false,
+  reached: false,
   peer: null,
   muted: false,
   connectedAt: null,
@@ -81,6 +79,7 @@ const initial = {
   minimized: false,
   sentVideo: null,
   receivedVideo: null,
+  relayed: null as boolean | null,
 };
 
 function sameNumbers(a: VideoNumbers | null, b: VideoNumbers | null): boolean {
@@ -105,8 +104,7 @@ export const useCallStore = create<CallStore>((set) => ({
       remoteVideoOn: media?.video ?? false,
     }),
   setState: (state) => set({ state }),
-  // Only stamp connectedAt the first time we connect, so the timer survives a
-  // reconnection without resetting.
+  setReached: () => set({ reached: true }),
   setConnected: () =>
     set((s) => ({ state: "connected", connectedAt: s.connectedAt ?? Date.now() })),
   setMuted: (muted) => set({ muted }),
@@ -121,7 +119,6 @@ export const useCallStore = create<CallStore>((set) => ({
   setLocalStream: (localStream) => set({ localStream }),
   setRemoteStream: (remoteStream) => set({ remoteStream }),
   setMinimized: (minimized) => set({ minimized }),
-  // Sampled every few seconds: only tell the screen when something changed.
   setVideoNumbers: (sent, received) =>
     set((s) =>
       sameNumbers(s.sentVideo, sent) && sameNumbers(s.receivedVideo, received)
@@ -131,6 +128,7 @@ export const useCallStore = create<CallStore>((set) => ({
             receivedVideo: received,
           },
     ),
+  setRelayed: (relayed) => set((s) => (s.relayed === relayed ? s : { relayed })),
   close: (state, message = null) => set({ state, errorMessage: message }),
   reset: () => set({ ...initial }),
 }));

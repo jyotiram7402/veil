@@ -7,7 +7,6 @@ import { expiryFromMinutes, recordAudit } from "@/lib/rooms";
 
 export const runtime = "nodejs";
 
-/** GET — list the rooms this admin manages, with counts. */
 export async function GET() {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -46,7 +45,7 @@ export async function GET() {
       .in("room_id", ids)
       .is("revoked_at", null);
     const now = Date.now();
-    const soon = now + 60 * 60_000; // "expiring" = within the next hour
+    const soon = now + 60 * 60_000;
     for (const i of inv ?? []) {
       const exp = i.expires_at ? new Date(i.expires_at).getTime() : null;
       if (exp === null || exp > now) {
@@ -68,7 +67,6 @@ export async function GET() {
   });
 }
 
-/** POST — create a room (a chats row of type='room') owned by the admin. */
 export async function POST(req: Request) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");

@@ -6,6 +6,7 @@ import { jsonError } from "@/lib/api";
 import { generateInviteToken } from "@/lib/invite-token";
 import { hashPassword } from "@/lib/password";
 import { inviteUrlFor } from "@/lib/url";
+import type { Database } from "@/types/database";
 
 const rotateSchema = z.object({
   password: z.string().min(4).max(128),
@@ -16,7 +17,6 @@ const patchSchema = z.object({
   password: z.string().min(4).max(128).optional(),
 });
 
-/** GET — current invite link state for this user. */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -47,7 +47,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   });
 }
 
-/** POST — rotate: revoke the old token and issue a new one with a new password. */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -90,7 +89,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   });
 }
 
-/** PATCH — enable/disable, or change the password without rotating the URL. */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
@@ -106,7 +104,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return jsonError(422, "Bad body");
 
-  const patch: Record<string, unknown> = {};
+  const patch: Database["public"]["Tables"]["invite_tokens"]["Update"] = {};
   if (parsed.data.enabled !== undefined) patch.enabled = parsed.data.enabled;
   if (parsed.data.password !== undefined) {
     patch.gate_password_hash = await hashPassword(parsed.data.password);
@@ -123,7 +121,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return NextResponse.json({ ok: true });
 }
 
-/** DELETE — revoke permanently. */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");

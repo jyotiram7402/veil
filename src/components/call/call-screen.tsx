@@ -19,6 +19,7 @@ import { CallStage } from "@/components/call/call-stage";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { useMediaDevices } from "@/hooks/use-media-devices";
 import { useCallStore } from "@/store/call-store";
+import { useSessionStore } from "@/store/session-store";
 import { cameraCount, canChooseAudioOutput, realAudioOutputs } from "@/lib/webrtc/devices";
 import { playRingtone } from "@/lib/webrtc/ringtone";
 import { isCallOver, type CallState } from "@/lib/webrtc/types";
@@ -26,24 +27,17 @@ import { cn } from "@/lib/utils";
 import styles from "./call.module.css";
 
 export type CallScreenActions = {
-  /** Answer. `withVideo` also turns our camera on. */
   accept: (withVideo?: boolean) => void;
   reject: () => void;
   hangUp: () => void;
-  /** Leave the closing screen now. */
   dismiss: () => void;
   toggleMute: () => void;
   toggleCamera: () => void;
   switchCamera: () => void;
   selectOutputDevice: () => void;
-  /**
-   * "Chat" on the call screen: where an app with more than one screen takes the
-   * person (the chat of this call). Without it, "Chat" only shrinks the call.
-   */
   onOpenChat?: (chatId: string) => void;
 };
 
-/** "4:07", or "1:02:09" from an hour on. Ticks once a second while `running`. */
 function useCallClock(running: boolean, since: number | null): string {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -60,14 +54,13 @@ function useCallClock(running: boolean, since: number | null): string {
   return h > 0 ? `${h}:${m.toString().padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
 
-/** What is happening, in the words shown under the name. */
 function statusText(
   state: CallState,
-  o: { message: string | null; videoCall: boolean; weak: boolean },
+  o: { message: string | null; videoCall: boolean; weak: boolean; reached: boolean },
 ): string {
   switch (state) {
     case "calling":
-      return "Calling…";
+      return o.reached ? "Ringing…" : "Calling…";
     case "ringing":
       return o.videoCall ? "Video call" : "Voice call";
     case "connecting":
@@ -89,16 +82,11 @@ function statusText(
   }
 }
 
-/** On a touch screen, focusing a text field again would pop the keyboard up. */
 function wouldOpenKeyboard(el: HTMLElement): boolean {
   const typing = el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable;
   return typing && window.matchMedia("(pointer: coarse)").matches;
 }
 
-/**
- * The call: incoming, outgoing, voice and video, on one screen. Reads the call
- * store and asks the engine (use-call) to act; it holds no call logic itself.
- */
 export function CallScreen({
   accept,
   reject,
@@ -112,31 +100,28 @@ export function CallScreen({
 }: CallScreenActions) {
   const call = useCallStore();
   const { state, peer, setMinimized } = call;
+  const locked = useSessionStore((s) => s.locked);
 
   const live = state === "connected" || state === "reconnecting";
   const over = isCallOver(state);
   const incoming = state === "ringing";
   const open = state !== "idle" && !!peer;
-  // An incoming call and an error always take the whole screen.
   const asPill = open && call.minimized && !incoming && state !== "failed";
   const fullOpen = open && !asPill;
 
   const duration = useCallClock(live, call.connectedAt);
-  // Flip and Speaker are only shown when there is something to switch to.
   const inCall = open && !incoming && !over;
   const devices = useMediaDevices(inCall, call.videoEnabled);
   const outputs = realAudioOutputs(devices);
   const canFlip = inCall && call.videoEnabled && cameraCount(devices) >= 2;
   const canPickOutput = inCall && canChooseAudioOutput() && outputs.length >= 2;
 
-  // Ring (and buzz) while a call is coming in. Stops on any change of state.
   useEffect(() => {
     if (state !== "ringing") return;
     const ring = playRingtone();
     return () => ring.stop();
   }, [state]);
 
-  // Say it in the tab title too, for a tab that is open but not in front.
   const callerName = state === "ringing" ? (peer?.name ?? null) : null;
   useEffect(() => {
     if (!callerName) return;
@@ -144,12 +129,10 @@ export function CallScreen({
     const ringing = `${callerName} is calling…`;
     document.title = ringing;
     return () => {
-      // Leave the title alone if the page has changed it in the meantime.
       if (document.title === ringing) document.title = before;
     };
   }, [callerName]);
 
-  // After switching the sound output, name the new one for a moment.
   const [soundNote, setSoundNote] = useState<string | null>(null);
   const outputsRef = useRef(outputs);
   outputsRef.current = outputs;
@@ -161,17 +144,15 @@ export function CallScreen({
     return () => clearTimeout(t);
   }, [call.outputDeviceId]);
 
-  // "Call details": tapping the timer shows how large the pictures really are.
-  // For the day someone says the video looks soft: these two numbers tell why.
   const [showDetails, setShowDetails] = useState(false);
   useEffect(() => {
     if (!open) setShowDetails(false);
   }, [open]);
   const numbers = (v: { width: number; height: number; fps: number } | null) =>
     v ? `${v.width}×${v.height} at ${v.fps} fps` : "no video";
-  const details = `Sending ${numbers(call.sentVideo)} · receiving ${numbers(call.receivedVideo)}`;
+  const route = call.relayed === null ? "" : call.relayed ? " · via relay" : " · direct";
+  const details = `Sending ${numbers(call.sentVideo)} · receiving ${numbers(call.receivedVideo)}${route}`;
 
-  // Full screen for the picture (tablet and up).
   const screenRef = useRef<HTMLDivElement | null>(null);
   const [fullscreenOn, setFullscreenOn] = useState(false);
   const [fullscreenOffered, setFullscreenOffered] = useState(false);
@@ -186,9 +167,6 @@ export function CallScreen({
     else void screenRef.current?.requestFullscreen?.().catch(() => undefined);
   }, []);
 
-  // The screen takes keyboard focus while it is open and gives it back after.
-  // Focus goes to the card, never to a button: a call can arrive while someone
-  // is typing, and their next key press must not answer or decline it.
   const cardRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!fullOpen) return;
@@ -208,7 +186,6 @@ export function CallScreen({
     if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
     setMinimized(true);
   };
-  // "Chat": shrink the call and, where there is more than one screen, go to its chat.
   const backToChat = () => {
     minimize();
     if (call.chatId) onOpenChat?.(call.chatId);
@@ -217,12 +194,17 @@ export function CallScreen({
     message: call.errorMessage,
     videoCall: call.remoteVideoOn,
     weak: call.quality === "poor",
+    reached: call.reached,
   });
 
   if (asPill) {
     const line = over ? status : state === "connected" ? duration : status;
     return (
-      <div className={styles.pill} role="region" aria-label="Call in progress">
+      <div
+        className={cn(styles.pill, locked && styles.pillHigh)}
+        role="region"
+        aria-label="Call in progress"
+      >
         <button
           type="button"
           onClick={() => setMinimized(false)}
@@ -270,7 +252,6 @@ export function CallScreen({
     );
   }
 
-  // What the stage shows: their camera once connected, our own while we wait.
   const theirVideo = live && call.remoteVideoOn ? call.remoteStream : null;
   const myVideo = call.videoEnabled && !over ? call.localStream : null;
   const previewSelf = !!myVideo && !theirVideo && (state === "calling" || state === "connecting");
@@ -278,7 +259,6 @@ export function CallScreen({
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
-      // Never ends or declines a call: it only gets the screen out of the way.
       if (canMinimize) minimize();
       else if (over) dismiss();
       return;
@@ -379,7 +359,6 @@ export function CallScreen({
             )}
           </p>
 
-          {/* One line kept free so the controls do not jump when a note appears. */}
           <p
             role="status"
             className={cn(
@@ -466,7 +445,6 @@ export function CallScreen({
   );
 }
 
-/** A 40px round button on the minimised call pill. */
 function PillButton({
   label,
   onClick,

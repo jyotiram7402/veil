@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId } from "@/lib/auth/session";
 import { profileUpdateSchema } from "@/lib/validations";
 import { jsonError, parseBody } from "@/lib/api";
 
 export async function PATCH(req: Request) {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
 
   const parsed = await parseBody(req, profileUpdateSchema);
   if (!parsed.ok) return parsed.response;
 
-  // Only the fields that were sent are changed; an empty string clears one.
-  // (Before, saving the name wiped the avatar and the other way round.)
   const { displayName, bio, avatarUrl } = parsed.data;
   const update: { display_name?: string | null; bio?: string | null; avatar_url?: string | null } =
     {};
@@ -25,7 +23,7 @@ export async function PATCH(req: Request) {
   const { data, error } = await supabase
     .from("profiles")
     .update(update)
-    .eq("id", session.id)
+    .eq("id", userId)
     .select()
     .single();
 

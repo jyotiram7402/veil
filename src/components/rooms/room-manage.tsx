@@ -111,7 +111,6 @@ export function RoomManage({ roomId }: { roomId: string }) {
     void load();
   }, [load]);
 
-  // Realtime: reflect joins/leaves/blocks/status changes without polling.
   useEffect(() => {
     if (!me?.id) return;
     const debounced = () => {
@@ -119,8 +118,6 @@ export function RoomManage({ roomId }: { roomId: string }) {
       reloadTimer.current = setTimeout(() => void load(), 350);
     };
     const supabase = supabaseBrowser();
-    // Unique topic per mount + guarded: a realtime hiccup must never crash the
-    // management page (see rooms-admin for the reused-channel failure mode).
     let channel: ReturnType<typeof supabase.channel> | null = null;
     try {
       channel = supabase
@@ -199,7 +196,6 @@ export function RoomManage({ roomId }: { roomId: string }) {
         <ArrowLeft className="h-4 w-4" /> All rooms
       </Link>
 
-      {/* Room information */}
       <section className="rounded-xl border border-border/60 bg-card/40 p-4 sm:p-5">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-lg font-semibold">{room.name ?? "Untitled room"}</h2>
@@ -217,7 +213,6 @@ export function RoomManage({ roomId }: { roomId: string }) {
         </dl>
       </section>
 
-      {/* Room permissions */}
       <section className="space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Room permissions
@@ -247,7 +242,6 @@ export function RoomManage({ roomId }: { roomId: string }) {
         />
       </section>
 
-      {/* Room actions */}
       <section className="flex flex-wrap gap-2">
         {room.status === "active" && (
           <Button variant="outline" size="sm" onClick={() => patchRoom({ status: "locked" }, "Room locked")}>
@@ -284,10 +278,8 @@ export function RoomManage({ roomId }: { roomId: string }) {
         )}
       </section>
 
-      {/* Invitations */}
       <InvitesSection roomId={roomId} invites={invites} ended={ended} onChanged={load} />
 
-      {/* Participants */}
       <section className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Participants
@@ -484,7 +476,6 @@ function ParticipantRow({
         )}
       </div>
 
-      {/* Per-participant permissions */}
       {p.status === "active" && (
         <div className="mt-2.5 flex flex-wrap gap-3 border-t border-border/40 pt-2.5">
           <PermToggle label="Chat" checked={p.can_chat} disabled={!editable || busy} onChange={(v) => update({ canChat: v })} />

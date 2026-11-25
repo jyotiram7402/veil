@@ -1,13 +1,3 @@
-/**
- * "Moji" avatars: a native emoji on a coloured ground.
- *
- * Every account without a photo gets one, picked from its id, so the same
- * person looks the same on every screen and device. People can also choose
- * their own: the choice is stored in `profiles.avatar_url` as
- * `moji:<id>:<colour>` (no extra column needed). Native emoji cost zero bytes
- * and render in each platform's own style.
- */
-
 export const MOJI_COLORS = {
   ink: "#16181D",
   sun: "#FFD233",
@@ -26,20 +16,15 @@ export type MojiGroup = "animals" | "faces" | "things";
 export type MojiEntry = {
   id: string;
   emoji: string;
-  /** Ground this emoji stands out on (a fox on orange would disappear). */
   color: MojiColor;
   name: string;
   group: MojiGroup;
 };
 
-/** What a screen needs to draw one: the emoji and its ground colour. */
 export type Moji = { emoji: string; bg: string; name: string };
 
-/** A choice someone can make and we can store: which emoji, on which colour. */
 export type MojiChoice = { id: string; color: MojiColor };
 
-// The first 24 entries are the pool for automatic avatars. Their order decides
-// who gets which, so only ever add new entries after them.
 export const MOJI: readonly MojiEntry[] = [
   { id: "fox", emoji: "🦊", color: "sky", name: "Fox", group: "animals" },
   { id: "lion", emoji: "🦁", color: "blue", name: "Lion", group: "animals" },
@@ -65,7 +50,6 @@ export const MOJI: readonly MojiEntry[] = [
   { id: "robot", emoji: "🤖", color: "sun", name: "Robot", group: "faces" },
   { id: "cool", emoji: "😎", color: "blue", name: "Cool", group: "faces" },
   { id: "cowboy", emoji: "🤠", color: "mint", name: "Cowboy", group: "faces" },
-  // ---- picker only from here on ----
   { id: "hamster", emoji: "🐹", color: "sky", name: "Hamster", group: "animals" },
   { id: "chick", emoji: "🐥", color: "blue", name: "Chick", group: "animals" },
   { id: "shark", emoji: "🦈", color: "sun", name: "Shark", group: "animals" },
@@ -100,7 +84,6 @@ export const MOJI: readonly MojiEntry[] = [
   { id: "pizza", emoji: "🍕", color: "mint", name: "Pizza", group: "things" },
 ];
 
-/** How many entries, from the start of MOJI, automatic avatars are drawn from. */
 const AUTO_POOL = 24;
 
 const BY_ID = new Map(MOJI.map((m) => [m.id, m] as const));
@@ -117,27 +100,20 @@ function autoEntry(seed: string | null | undefined): MojiEntry {
   return MOJI[h % AUTO_POOL]!;
 }
 
-/** Stable pick: the same seed (a user id, or a name) always gets the same moji. */
 export function mojiFor(seed: string | null | undefined): Moji {
   const entry = autoEntry(seed);
   return { emoji: entry.emoji, bg: MOJI_COLORS[entry.color], name: entry.name };
 }
 
-/** The same automatic pick, as a choice that can be shown in the picker and saved. */
 export function autoMojiChoice(seed: string | null | undefined): MojiChoice {
   const entry = autoEntry(seed);
   return { id: entry.id, color: entry.color };
 }
 
-/** The text stored in `profiles.avatar_url` for a chosen moji. */
 export function mojiValue(id: string, color: MojiColor): string {
   return `moji:${id}:${color}`;
 }
 
-/**
- * Reads a stored `moji:<id>:<colour>` value. Returns null for anything else
- * (a photo URL, nothing at all, or an id that no longer exists).
- */
 export function parseMojiValue(
   value: string | null | undefined,
 ): (Moji & { id: string; color: MojiColor }) | null {
@@ -150,7 +126,6 @@ export function parseMojiValue(
   return { id: entry.id, color, emoji: entry.emoji, bg: MOJI_COLORS[color], name: entry.name };
 }
 
-/** True when the text is a moji choice we can draw. */
 export function isMojiValue(value: string): boolean {
   return parseMojiValue(value) !== null;
 }

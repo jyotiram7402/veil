@@ -8,18 +8,12 @@ import { clientKey, rateLimit } from "@/lib/api";
 
 export const runtime = "nodejs";
 
-/**
- * Password-gate handler for the invite link. Reads form-encoded body
- * (so the gate page can use a plain <form> with no JS), validates the
- * token + password, then mints a Supabase session and redirects.
- */
 export async function POST(req: Request, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
   const url = new URL(req.url);
   const expiredUrl = new URL("/expired", url.origin);
   const gateUrl = new URL(`/i/${token}`, url.origin);
 
-  // simple per-IP+token brute force throttle
   if (!rateLimit(`gate:${token}:${clientKey(req)}`, 8, 60_000)) {
     gateUrl.searchParams.set("error", "locked");
     return NextResponse.redirect(gateUrl, { status: 303 });
@@ -61,7 +55,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
     return NextResponse.redirect(gateUrl, { status: 303 });
   }
 
-  // Mint an ephemeral auth password and sign the browser in.
   const ephemeral = generateEphemeralPassword();
   const upd = await admin.auth.admin.updateUserById(profile.id, { password: ephemeral });
   if (upd.error) return NextResponse.redirect(expiredUrl, { status: 303 });

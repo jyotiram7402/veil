@@ -1,6 +1,3 @@
-// Centralized environment access so the rest of the app never reaches into
-// process.env directly. Throws early in dev if anything required is missing.
-
 function required(name: string, value: string | undefined): string {
   if (!value || value.length === 0) {
     throw new Error(
@@ -17,16 +14,12 @@ export const env = {
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   ),
-  // server-only — these will be undefined in the browser, which is fine
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   INTERNAL_EMAIL_DOMAIN: process.env.INTERNAL_EMAIL_DOMAIN ?? "rooms.local",
   ADMIN_BOOTSTRAP_TOKEN: process.env.ADMIN_BOOTSTRAP_TOKEN,
   APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  // Optional TURN relay for WebRTC voice. STUN is built in; TURN is
-  // only needed for peers behind strict/symmetric NATs. See src/lib/webrtc/ice.ts.
-  TURN_URL: process.env.NEXT_PUBLIC_TURN_URL,
-  TURN_USERNAME: process.env.NEXT_PUBLIC_TURN_USERNAME,
-  TURN_CREDENTIAL: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+  CLOUDFLARE_TURN_KEY_ID: process.env.CLOUDFLARE_TURN_KEY_ID,
+  CLOUDFLARE_TURN_API_TOKEN: process.env.CLOUDFLARE_TURN_API_TOKEN,
 };
 
 export function requireServerEnv(): {

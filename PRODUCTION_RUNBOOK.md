@@ -21,8 +21,11 @@ setup and `docs/SECURITY.md` for the security model.
 ## Database / migrations
 
 - Source of truth: `supabase/*.sql`, ordered in `supabase/README.md`
-  (`schema → policies → storage → v2..v9`). Deterministic, idempotent.
+  (`schema → policies → storage → v2..v12`). Deterministic, idempotent.
 - After any migration, re-run `supabase/security-tests.sql` to confirm RLS.
+- Notifications need `v12.sql`. Until it has been run the app works as before and "Turn on
+  notifications" says they are not available yet. Nothing has to be set in Vercel for them.
+  Never empty `push_keys`: every device would have to subscribe again.
 
 ## Authentication
 
@@ -33,10 +36,11 @@ setup and `docs/SECURITY.md` for the security model.
 
 ## WebRTC / STUN / TURN
 
-- ICE config is env-driven (`src/lib/webrtc/ice.ts`). STUN is built in; TURN is
-  optional via `NEXT_PUBLIC_TURN_*`. To change relays, update env vars and
-  redeploy — no code change. Signaling is the private Supabase `call:<chatId>`
-  channel (member-only via `realtime.messages` RLS).
+- STUN is built in. The relay (TURN) is Cloudflare Realtime: `CLOUDFLARE_TURN_KEY_ID` and
+  `CLOUDFLARE_TURN_API_TOKEN` in Vercel, see `DEPLOYMENT.md` §6. To replace the key, create
+  a new one in Cloudflare, change the two values, redeploy, then delete the old key.
+  Signaling is the private Supabase `call:<chatId>` channel (member-only via
+  `realtime.messages` RLS).
 
 ## Monitoring
 
@@ -56,8 +60,9 @@ setup and `docs/SECURITY.md` for the security model.
 
 **Calls fail**
 1. Both parties have the chat open? (signaling is scoped to `call:<chatId>`)
-2. Same network works but cross-network fails → **TURN not configured / NAT** —
-   set `NEXT_PUBLIC_TURN_*`.
+2. Same network works but two different networks fail → the relay. Admin → Members →
+   Defaults → Call relay → Check says what is wrong (not set up, key refused, Cloudflare
+   not answering, or this network blocks it).
 3. Check WebRTC/ICE state in the call UI (reconnecting indicator).
 4. Signaling: Supabase Realtime up + `realtime.messages` policies present.
 5. HTTPS in use? (mic/camera require a secure context)
@@ -84,6 +89,11 @@ setup and `docs/SECURITY.md` for the security model.
   chosen. Do not assume PITR unless the plan provides it.
 
 ## Smoke tests (run after each deploy)
+
+Calls to a closed app (needs notifications on for that phone): close the app on the
+member's phone → call it from the admin's app → "Incoming voice call" appears → tap it →
+the app opens on the ringing call → Accept → talk → End. The admin's screen says
+"Ringing…" from the moment the phone rings.
 
 Functional: open prod URL → admin login → create room → create invite (copy) →
 participant opens invite → enter code → join → send/receive message → voice call →

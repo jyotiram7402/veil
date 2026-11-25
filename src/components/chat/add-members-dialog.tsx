@@ -54,9 +54,7 @@ export function AddMembersDialog({
         if (!res.ok) return;
         const body = (await res.json()) as { users: Profile[] };
         setUsers(body.users.filter((u) => !existingIds.includes(u.id)));
-      } catch {
-        // aborted
-      } finally {
+      } catch {} finally {
         setLoading(false);
       }
     }, 180);
@@ -152,7 +150,7 @@ export function AddMembersDialog({
                       <div
                         className={cn(
                           "h-5 w-5 rounded-full border-2",
-                          isSel ? "border-primary bg-primary" : "border-border/60",
+                          isSel ? "border-primary-ink bg-primary" : "border-border/60",
                         )}
                       />
                     </button>

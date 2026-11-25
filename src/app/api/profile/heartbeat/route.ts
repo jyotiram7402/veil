@@ -1,17 +1,34 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getAuthUserId } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
+import { markDevice } from "@/lib/push";
+import { isPushEndpoint } from "@/lib/web-push";
 
-export async function POST() {
-  const session = await getSessionUser();
-  if (!session) return jsonError(401, "Sign in required");
+export const runtime = "nodejs";
+
+export async function POST(req: Request) {
+  const userId = await getAuthUserId();
+  if (!userId) return jsonError(401, "Sign in required");
+
+  const body = (await req.json().catch(() => null)) as { endpoint?: unknown; away?: unknown } | null;
+  const sent = body?.endpoint;
+  const endpoint = isPushEndpoint(sent) ? sent : null;
+  const away = body?.away === true;
 
   const supabase = await supabaseServer();
-  await supabase
-    .from("profiles")
-    .update({ last_seen_at: new Date().toISOString() })
-    .eq("id", session.id);
+  const [seen] = await Promise.all([
+    away
+      ? null
+      : supabase
+          .from("profiles")
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq("id", userId)
+          .select("suspended, archived")
+          .maybeSingle(),
+    endpoint ? markDevice(userId, endpoint, !away).catch(() => undefined) : null,
+  ]);
 
+  if (seen?.data?.suspended || seen?.data?.archived) return jsonError(403, "Suspended");
   return NextResponse.json({ ok: true });
 }

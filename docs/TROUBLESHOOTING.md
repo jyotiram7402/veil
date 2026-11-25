@@ -79,11 +79,11 @@ delete from public.chat_members where chat_id not in (select id from public.chat
 
 ## "Cookies cannot be modified in a Server Component"
 
-You're seeing this in the dev console as a warning, not an error. The
-Supabase helper writes the refreshed cookie from `middleware.ts`, which
-is where it belongs. Server Components only read cookies. If you see
-this as a hard error, you probably created a new server entry point and
-forgot to add it to the middleware matcher in `middleware.ts`.
+Server Components can only read cookies, so `supabaseServer()` skips the write when
+Supabase hands it a refreshed session there (`setAll` in `src/lib/supabase/server.ts`). The
+browser's Supabase client and the API routes save refreshed sessions. If you see this as a
+hard error, something sets a cookie in a Server Component outside `supabaseServer()`: move
+that into an API route or a Server Action.
 
 ## I broke `INTERNAL_EMAIL_DOMAIN` after seeding users
 
@@ -97,11 +97,6 @@ set email = regexp_replace(email, '@old\\.local$', '@new.local');
 ```
 
 Then update `INTERNAL_EMAIL_DOMAIN` in your env vars.
-
-## Hot reload stops working after editing `middleware.ts`
-
-That's a Next.js quirk — middleware doesn't HMR. Stop and restart
-`npm run dev`.
 
 ## My typing indicator never shows for the other person
 
@@ -129,6 +124,31 @@ also deleted yourself).
 
 A real password-reset flow would need a recovery email; BlackFoxx is
 deliberately email-less.
+
+## Mute says "Muting isn't available yet"
+
+`supabase/v14.sql` has not been run. Run it in the Supabase SQL editor; nothing else is needed.
+
+## A member I unsuspended or restored cannot get in
+
+- "…but they still can't sign in. Try again." after Unsuspend or Restore: the account is
+  marked active again, but Supabase Auth did not lift the ban. Press the same button again.
+- A restored member needs a new invite link ("Set invite link" on their card in Members):
+  Remove revoked the old ones. A suspended member's own link works again after Unsuspend.
+
+## Build fails on Vercel: "Type error: ..."
+
+Builds check types. The build log names the file and the line. The site keeps running the
+previous deployment, so nothing is down; fix the line, or revert the merge on GitHub. If no
+code changed and the error is inside a library, a library that one of ours brings in has
+released a new version (ours have exact versions, theirs do not): add that library under
+`overrides` in `package.json`, with the version before.
+
+## GitHub shows a red cross next to a commit
+
+The tests failed. Click the cross, then "Details": the log names the test and shows what
+it expected and what came back. Vercel deploys anyway, so merge only once the cross has
+turned into a green tick. `npm test` runs the same tests on any computer with Node 24.
 
 ## Build fails on Vercel: "Module not found: @/..."
 
@@ -168,14 +188,23 @@ second code must be the region of the Supabase project (`sin1` = Singapore =
 dashboard. With the Vercel default (`iad1`, USA) every database query crossed the
 Pacific and back.
 
-## Voice/video call stays on "Connecting…" (timer at 0:00)
+## A call says "Connecting…" and then "Couldn't connect the call"
 
-The two devices can't reach each other directly — typical when they're on
-different networks (Wi-Fi vs mobile data). STUN alone can't fix that; you
-need a TURN relay. Set `NEXT_PUBLIC_TURN_URL` / `_USERNAME` / `_CREDENTIAL`
-from a TURN provider (see `.env.example`) and redeploy. Two tabs on the same
-computer should connect without TURN. Calls exist only in 1:1 chats — the
-call icons inside a room are placeholders.
+The two devices could not reach each other. That is the normal result between two
+different networks (Wi-Fi and mobile data, two homes) while the relay is not working.
+The call gives up 30 seconds after it was answered.
+
+1. Sign in as the admin → Members → **Defaults** → **Call relay** → Check.
+   - "not set up": add `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` in Vercel
+     (`DEPLOYMENT.md` §6) and redeploy.
+   - "Cloudflare refused the key": one of the two values is wrong. Copy them again.
+   - "this network blocks it": the relay is fine, this network is not. Try mobile data.
+   - "works from this device": run the same check on the other person's network.
+2. During a call that does connect, tap the timer: the line ends with "direct" or
+   "via relay".
+
+Two tabs on the same computer connect without the relay. Calls exist only in 1:1 chats;
+the call icons inside a room are placeholders.
 
 ## The video looks soft or jerky
 
@@ -191,11 +220,18 @@ During the call, tap the timer under the name. A line appears like
 
 ## A call does not ring on the other side
 
-The other person has to have the app open, on any screen: a closed app or a
-closed tab cannot ring, because there are no push notifications. If they were
-on another call, the caller sees "On another call" and a missed call is logged
-in the chat. Whether a locked phone or a tab in the background still rings has
-not been tested.
+- **Their app is open:** it rings on any screen. If they were on another call, the caller
+  sees "On another call" and a missed call is logged in the chat.
+- **Their app is closed or in the background:** they get an "Incoming voice call"
+  notification, if notifications are on for that device (see "No notification arrives").
+  Tapping it opens the app, and the call rings there within a couple of seconds, for as long
+  as the caller is still calling. A call rings for 45 s, and 25 s more once the other
+  phone has started ringing.
+- **The caller sees "Calling…" the whole time:** no device of the other person has started
+  ringing. Once one does, it changes to "Ringing…".
+- Not yet seen on real phones: how long a phone takes from tapping the notification to
+  ringing, and whether a phone whose app slept for a long time gets its connection back in
+  time.
 
 ## A call stops with "The microphone is blocked" (or the camera)
 
@@ -204,11 +240,53 @@ Open the site's permissions in the browser (usually the icon next to the
 address), set Microphone and Camera to Allow, and call again. A blocked camera
 never ends a call: it carries on as a voice call.
 
+## No notification arrives
+
+Work down the list; the first one that fits is usually it.
+
+1. **Turning them on answers "Notifications aren't available yet"**: `supabase/v12.sql` has
+   not been run in this Supabase project.
+2. **Is it on for this device?** Notifications are switched on per phone or browser. Open
+   the menu (the avatar on the chat home, "More" in a member's chat): it must offer "Turn off
+   notifications". "Notifications blocked" means the browser was told no; the sheet behind
+   that item says how to allow them.
+3. **The app is open and in front on that device.** Then there is none, by design. Put the
+   app in the background, wait a moment, and send again.
+4. **iPhone or iPad.** Only the app opened from its Home Screen icon gets notifications
+   (iOS 16.4 or later), and it has to be turned on there, not in Safari. A Focus mode or
+   the Scheduled Summary holds them back.
+5. **Android.** Battery saver and "notifications off" for the browser (or for the installed
+   app) in the phone's settings both stop them.
+6. **Computer.** The browser has to be running, and the system's "do not disturb" off.
+7. **Brave.** Needs "Use Google services for push messaging" in its privacy settings.
+8. **Server side.** In the Vercel logs, `[push] the push service answered 403` means the
+   device was subscribed under another server key (was `push_keys` emptied?). Opening the
+   app once on that device renews it. Other codes are the push service's own trouble and
+   pass.
+
+To see which devices are subscribed, in the Supabase SQL editor:
+
+```sql
+select p.username, count(*) as devices, max(s.seen_at) as app_last_in_front
+  from public.push_subscriptions s
+  join public.profiles p on p.id = s.user_id
+ group by p.username;
+```
+
+A notification never shows what the message says, and a member's never shows a name. That
+is intended (see `docs/SECURITY.md`).
+
 ## Messages do not disappear
 
+<<<<<<< HEAD
 Disappearing messages are off until the admin switches them on: **Settings** → Chat rules
 for everyone → "Disappearing messages" (everyone), or **Members** → the person → Chat rules
 (one person). After that:
+=======
+Disappearing messages are off until the admin switches them on: Admin page → **Defaults** →
+"Disappearing messages" (everyone), or **Members** → the ⋯ menu next to a person →
+"Settings for this person" (one person). After that:
+>>>>>>> 5c1d94054047b9a8e141db7699f22c3285dc1d90
 
 - The chat has to be opened once after the switch was changed (an open chat keeps the
   setting it was loaded with).
@@ -222,6 +300,14 @@ for everyone → "Disappearing messages" (everyone), or **Members** → the pers
 - No connection at the moment of leaving: the messages are hidden on that screen at once,
   and the app tells the server again when the connection is back. If the app was closed
   before that, they show once more the next time the chat is opened, and go when it is left.
+
+## The ticks stay grey
+
+Two grey ticks mean sent, two blue ticks mean the other person has seen it. A message only
+counts as seen while their chat is on screen: the app in front, not in the background, and
+not behind the screen lock. Once they open the chat, it turns blue within about 2 seconds
+(5 seconds if your live connection was asleep). In a group, it turns blue when everyone has
+seen it. A message sent before this version may need the other person to open the chat once.
 
 ## A message was gone before I could read it
 

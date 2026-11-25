@@ -15,16 +15,13 @@ import {
 import { ChatList } from "@/components/chat/chat-list";
 import { NewChatDialog } from "@/components/chat/new-chat-dialog";
 import { UserAvatar } from "@/components/chat/user-avatar";
-import { useTheme } from "@/components/theme-toggle";
+import { NotificationsMenuItem, NotificationsPrompt } from "@/components/notifications";
+import { AccentMenuItem, useTheme } from "@/components/theme-toggle";
+import { forgetPushDevice } from "@/lib/push-client";
 import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
 import type { Profile } from "@/types/chat";
 
-/**
- * The chat home: greeting, new-chat button, account menu, then the chat list.
- * Full screen on phones, the left column from tablet up.
- * (Rooms are on hold, so there is no entry point to them here.)
- */
 export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: string }) {
   const router = useRouter();
   const profile = useSessionStore((s) => s.profile) ?? me;
@@ -36,6 +33,7 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
   const firstName = name.trim().split(/\s+/)[0] || name;
 
   async function signOut() {
+    await forgetPushDevice();
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
@@ -100,6 +98,8 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 {theme === "dark" ? "Light mode" : "Dark mode"}
               </DropdownMenuItem>
+              <AccentMenuItem />
+              <NotificationsMenuItem />
               <DropdownMenuSeparator />
               <DropdownMenuItem className="px-3 py-2.5 text-destructive" onClick={signOut}>
                 <LogOut className="h-4 w-4" /> Sign out
@@ -109,11 +109,14 @@ export function Sidebar({ me, activeChatId }: { me: Profile; activeChatId?: stri
         </div>
       </header>
 
-      <ChatList
-        me={profile}
-        activeChatId={activeChatId}
-        onNewChat={() => setNewChatOpen(true)}
-      />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <ChatList
+          me={profile}
+          activeChatId={activeChatId}
+          onNewChat={() => setNewChatOpen(true)}
+        />
+        <NotificationsPrompt place="bottom" />
+      </div>
 
       <NewChatDialog open={newChatOpen} onOpenChange={setNewChatOpen} />
     </>

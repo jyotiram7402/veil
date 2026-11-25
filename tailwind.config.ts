@@ -20,6 +20,7 @@ const config: Config = {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          ink: "hsl(var(--primary-ink))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -69,7 +70,6 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        // Chunky rounded face for the wordmark. Only the entry screens load it.
         display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
       },
       keyframes: {

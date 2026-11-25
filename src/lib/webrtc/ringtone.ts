@@ -1,24 +1,11 @@
-/**
- * Minimal in-app ringtone using the Web Audio API — no audio file, no
- * recording, no microphone. Best-effort: browser autoplay policies may block
- * sound until a user gesture, in which case this stays silent (no repeated
- * attempts, no errors surfaced). Always stops on accept/decline/end.
- *
- * Phones that support it also buzz in the same rhythm (Android; iOS has no
- * vibration from a web page).
- */
-
 type Ringtone = { stop: () => void };
 
-const RING_EVERY_MS = 2500; // classic ring cadence
+const RING_EVERY_MS = 2500;
 
-/** Buzz with each ring. Returns what stops it. Silent where it is not allowed. */
 function startBuzz(): () => void {
   if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
     return () => undefined;
   }
-  // Browsers only vibrate once the page has been touched, and log a complaint
-  // for every attempt before that. So ask first, where the browser can tell.
   const touched = () => {
     const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } })
       .userActivation;
@@ -28,9 +15,7 @@ function startBuzz(): () => void {
     if (!touched()) return;
     try {
       navigator.vibrate([350, 150, 350]);
-    } catch {
-      /* not allowed here */
-    }
+    } catch {}
   };
   buzz();
   const interval = setInterval(buzz, RING_EVERY_MS);
@@ -38,9 +23,7 @@ function startBuzz(): () => void {
     clearInterval(interval);
     try {
       navigator.vibrate(0);
-    } catch {
-      /* nothing to stop */
-    }
+    } catch {}
   };
 }
 

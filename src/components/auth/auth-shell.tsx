@@ -6,19 +6,12 @@ import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import styles from "./entry.module.css";
 
-// Order matters: emoji n takes the position class m{n} in entry.module.css.
 const STAGE_MOJI = ["🦁", "🐱", "🐭", "🦊", "🦏"];
 
-/**
- * Frame for the screens between the first screen and the app: log in, sign up
- * and the personal invite gate. A blue stage with drifting moji on top, the
- * form on a white sheet below. On tablets and up it becomes a centred card.
- */
 export function AuthShell({
   backHref = "/",
   children,
 }: {
-  /** Where the back button goes. Pass null to hide it. */
   backHref?: string | null;
   children: React.ReactNode;
 }) {
@@ -37,7 +30,7 @@ export function AuthShell({
               <span className="h-10 w-10" aria-hidden="true" />
             )}
             <span className={styles.authBrand}>{APP_NAME}</span>
-            <ThemeToggle className="text-white hover:bg-white/15 hover:text-white" />
+            <ThemeToggle className="text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground" />
           </div>
 
           <div aria-hidden="true">

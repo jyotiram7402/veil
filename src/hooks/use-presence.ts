@@ -5,11 +5,6 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { usePresenceStore } from "@/store/presence-store";
 import type { Profile } from "@/types/chat";
 
-/**
- * Joins the global "blackfoxx-presence" channel so every signed-in client tracks
- * who's online. We use Supabase Realtime presence — a built-in primitive
- * that we don't have to host ourselves.
- */
 export function usePresence(me: Profile | null) {
   const setOnline = usePresenceStore((s) => s.setOnline);
 

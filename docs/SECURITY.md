@@ -20,8 +20,19 @@ in the database (RLS), never from client-supplied role/permission/identity.
   password: they open a per-user invite link (`/i/<token>`) or a room invite
   (`/join/<selector.verifier>`), pass a gate/verifier, and the server mints an
   ephemeral Supabase session. No email/phone/PII.
-- Middleware refreshes the session and gates route prefixes; suspended/archived
-  users are signed out. `getSessionUser()` is the server-side source of identity.
+- Every page, layout and API route checks the session itself; there is no middleware.
+  Signed-out people are sent to `/login`, non-admins cannot open the admin pages
+  (`(app)/layout.tsx`), and the member page sends a suspended or archived member to
+  `/expired`. `getAuthUserId()` and `getSessionUser()` are the server-side source of
+  identity: both ask Supabase Auth to verify the session on every request.
+- Suspending or removing a member (`lockOut` in `src/lib/lockout.ts`, since 2026-11-18):
+  their password is replaced with a random one nobody knows, their account is banned in
+  Supabase Auth (a session can no longer be renewed), and their notification devices are
+  forgotten. An app they still have open signs itself out and shows `/expired` at its next
+  heartbeat (within 30 s while it is on screen), because the heartbeat now answers 403 for
+  them. With `supabase/v13.sql` the database also stops showing them any chat at once.
+  Unsuspending and Restore lift the ban (`letBackIn`); if that fails the admin sees an error
+  and can press again.
 
 ## Authorization
 
@@ -34,22 +45,32 @@ in the database (RLS), never from client-supplied role/permission/identity.
   active|locked), `can_chat_in` (adds room+participant chat permission), and
   `is_room_admin`. Effective voice/video permission lives in
   `src/lib/permissions.ts` and the `/api/calls/authorize` endpoint.
-- **Column lock-down**: `authenticated` may UPDATE only `chat_members.last_read_at`
-  (v5), so a participant cannot self-promote role or self-grant permissions.
+- **Column lock-down**: row-level security decides which rows a signed-in person may change,
+  not which columns, and anyone signed in can call the database directly. So the writable
+  columns are granted one by one: `chat_members.last_read_at` (v5); on their own profile
+  `display_name`, `bio`, `avatar_url`, `last_seen_at` (v11); on a call they are in `status`,
+  `connected_at`, `ended_at`, `end_reason` (v11). Messages cannot be updated at all, and
+  only `text` / `image` / `file` messages can be inserted (v11).
+  Until v11 a member could update every column of their own profile directly, `is_admin`,
+  `suspended` and `settings` included. Found by reading the policies on 2026-11-17, not
+  through an incident; whether it was ever used is unknown. After running v11, check once
+  that only the owner is an admin (`select username from profiles where is_admin`).
 
 ## Row Level Security
 
 | Table | RLS | Notes |
 |---|---|---|
-| profiles | on | SELECT = self OR admin OR shares-a-chat (v9, was `true`); self-UPDATE only |
+| profiles | on | SELECT = self OR admin OR shares-a-chat (v9, was `true`); self-UPDATE of display_name, bio, avatar_url, last_seen_at only (v11) |
 | chats | on | SELECT members; INSERT/UPDATE/DELETE admin-only |
 | chat_members | on | SELECT members; writes admin (service role); UPDATE column-locked to last_read_at |
-| messages | on | SELECT `can_access_chat`; INSERT `can_chat_in`; UPDATE/DELETE sender or chat admin |
+| messages | on | SELECT `can_access_chat`; INSERT `can_chat_in`, kinds text/image/file only (v11); no UPDATE (v11); DELETE sender or chat admin |
 | invite_tokens | on | admin-only SELECT; writes service-role; removed from realtime (v9) |
 | app_settings | on | admin-only; removed from realtime (v9) |
 | room_invites | on | admin-only SELECT; writes service-role after `is_room_admin` |
 | room_audit_log | on | admin-only SELECT; writes service-role |
-| call_sessions | on | SELECT members; INSERT caller; UPDATE participant |
+| call_sessions | on | SELECT members; INSERT caller; UPDATE participant, state columns only (v11) |
+| signup_codes | on | no policies: service role only (v10) |
+| push_subscriptions, push_keys | on | no policies: service role only (v12) |
 | realtime.messages | on | private `call:<chatId>` broadcast limited to chat members (v7) |
 
 Negative RLS tests: `supabase/security-tests.sql`.
@@ -89,6 +110,8 @@ account (never an admin).
   caller/callee/room IDs are not trusted; every message carries the `callId` and
   stale/ended-call messages are ignored. The name and avatar shown for an incoming
   call come from the chat's own member data, not from the signaling message.
+- The call screen opens above a member's screen lock, so a call can be answered and ended
+  without the password, as on a locked phone. The chat stays behind the lock.
 - Authorization is re-checked server-side at call start, on accept, on every
   reconnection, and every 30s while connected. Removed/blocked/suspended
   participants and ended rooms cannot start or keep a call; disabling room video
@@ -102,6 +125,11 @@ No phone, email, legal name, address, DOB, social login, or location is required
 for participants. Identities are temporary. No call recording/storage, no
 analytics on invite URLs, `Referrer-Policy` limits leakage and join pages send
 `referrer: no-referrer`.
+
+Read receipts: the other people in a chat see how far you have read it (blue ticks). The
+time comes from `chat_members.last_read_at`, which members of the chat could always read; it
+is now shown. A chat counts as read only while it is on screen and not behind the screen lock.
+Nobody can switch read receipts off.
 
 ## Disappearing messages
 
@@ -131,12 +159,51 @@ Off by default. Only an admin can switch it on: `/api/admin/settings` (everyone)
   messages on an open screen until the next 5 s check puts them back. It cannot delete
   anything: only the route above deletes.
 
+## Notifications
+
+Off on every device until its owner turns them on there. Needs `supabase/v12.sql`.
+
+- What is stored: per device, the address its browser's push service gave it and the two
+  keys a message for it is encrypted with (`push_subscriptions`); and the server's own key
+  pair (`push_keys`). Both tables have RLS on and no policies, so a browser can read
+  neither; the routes use the service role after checking the session.
+- A notification never carries what a message says. The admin's shows the sender's name; a
+  member's shows no name at all. The text is encrypted for the one device (RFC 8291), so
+  the push service (Google, Apple, Mozilla or Microsoft, whichever the browser belongs to)
+  cannot read it. It does learn that this server sent something to that device, when, and
+  how large it was.
+- The address a browser hands in must be an `https` address of a known push service
+  (`isPushEndpoint` in `src/lib/web-push.ts`), checked when it is stored and again before
+  every send. The server later makes requests to that address, so without the list a
+  member could point the server at an address of their choosing.
+- Every route needs a signed-in session, and a person can add, mark and remove only their
+  own devices. Adding is limited to 20 requests a minute, and to ten devices a person.
+- Nothing is sent to a suspended or archived person, or to someone blocked in or removed
+  from the chat. Signing out removes the device. A session that ends another way (it
+  expired) leaves the device subscribed: "New message" can still appear there until
+  somebody signs in on that browser again or the browser's permission is taken back.
+- `POST /api/calls/[id]/ring` (an incoming-call notification) needs a session, 10 requests a
+  minute, and is only sent when the caller is an active member of that 1:1 chat with the
+  admin on one side; the other member is the one told. Nothing reaches a suspended, archived,
+  blocked or removed person.
+- A tap on a notification can only open a page of this app (`public/sw.js` rebuilds the
+  address from a path and falls back to the start page).
+- Someone holding the server's private key and a device's address could send that device
+  notifications of their own. They could not read anything. Both live only in the database.
+
 ## Secrets management
 
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only (never `NEXT_PUBLIC_`), used by
   `supabaseAdmin()` in route handlers/server components only.
-- TURN is **not configured**; if added, use short-lived credentials — never
-  commit provider master secrets. `.env.example` holds placeholders only.
+- The call relay key (`CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`) is server-only.
+  Browsers get credentials that expire after 12 hours, from `/api/calls/ice`, and only when
+  the caller is signed in and may be in that chat (30 requests a minute per user). Such
+  credentials let their holder pass traffic through the owner's relay until they expire:
+  they are only ever given to invited members. Only the status code of a Cloudflare answer
+  is logged, never the request or the body. `.env.example` holds placeholders only.
+- The key pair for notifications is not an environment variable: the server creates it in
+  the `push_keys` table, which only the service role can read. Emptying that table makes
+  every device subscribe again.
 - Secrets must never be logged. Errors returned to clients are generic.
 
 ## Security headers
@@ -152,7 +219,8 @@ CSP is recommended future work.
 ## Rate limiting / abuse
 
 In-memory token-bucket (`src/lib/api.ts`) on login, invite gate, room join,
-message send, room/invite creation, lock, and the disappearing-messages route. It is per-instance (resets on
+message send, room/invite creation, lock, the disappearing-messages route and the
+notification device route. It is per-instance (resets on
 cold start, not shared across serverless instances) and keys on a spoofable
 `x-forwarded-for` — adequate as a speed bump, not a hard control. A shared store
 (e.g. Postgres/Upstash) is recommended before public launch.
@@ -175,4 +243,15 @@ disappearing messages (above) delete read messages and their files for good.
   chat UUID (low severity; IDs are unguessable). The same goes for the
   `vanished` notice of disappearing messages (it can hide, never delete).
 - Browser calls cannot run while the page is fully suspended/terminated.
-- No automated test runner in the repo (see the manual matrix in the report).
+- A suspended member's phone that ignores the sign-out keeps the access token it already has
+  until it runs out (one hour by Supabase's default; unverified for this project). Once
+  `supabase/v13.sql` has run, the database shows it no chat in that time. Before that, it can
+  still read its chat until the token runs out.
+- Library versions are fixed (since 2026-11-18), so a security fix in a library arrives only
+  when someone raises its version in `package.json`.
+- Notifications tell the browser makers' push services that a device received something
+  from this server, and when (never what).
+- The automated tests (`tests/`, run by GitHub after every push) cover disappearing
+  messages, notifications, attachment paths and the call relay credentials. API routes,
+  screens, calls and the database policies have none: they are checked by hand (see the
+  manual matrix in the report, and `supabase/security-tests.sql`).

@@ -18,7 +18,7 @@ values** — only variable names and steps. Pair it with `PRODUCTION_RUNBOOK.md`
                                                 └── Storage (avatars, attachments)
 
    Calls:  Browser A ──WebRTC (Opus/VP8, SRTP)── Browser B
-                         via STUN (built-in)  +  TURN (optional, env-driven)
+                         via STUN (built-in)  +  the Cloudflare relay (TURN)
            Signaling only (SDP/ICE) rides Supabase Realtime — never media.
 ```
 
@@ -34,12 +34,13 @@ values; `.env.example` holds placeholders only.
 - `NEXT_PUBLIC_SUPABASE_URL` — production Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — production anon key
 - `NEXT_PUBLIC_APP_URL` — canonical production origin, e.g. `https://blackfoxx.example.com`
-- `NEXT_PUBLIC_TURN_URL` / `NEXT_PUBLIC_TURN_USERNAME` / `NEXT_PUBLIC_TURN_CREDENTIAL` — optional TURN (see §6)
 
 **Secret (server-only — must NOT be `NEXT_PUBLIC_`):**
 - `SUPABASE_SERVICE_ROLE_KEY` — production service-role key (RLS bypass; used only in server routes)
 - `INTERNAL_EMAIL_DOMAIN` — stable domain for the username→email mapping (keep constant forever)
 - `ADMIN_BOOTSTRAP_TOKEN` — one-time first-admin bootstrap; rotate/remove after first admin
+- `CLOUDFLARE_TURN_KEY_ID` / `CLOUDFLARE_TURN_API_TOKEN` — the call relay (see §6). Without
+  them the app works, but calls between two different networks cannot connect.
 
 The app fails fast (`src/lib/env.ts`) if a required public var is missing;
 `requireServerEnv()` throws (without printing the value) if the service-role key
@@ -77,8 +78,9 @@ is missing when a server route needs it.
 ## 5. Vercel configuration
 
 - Framework: **Next.js** (auto-detected). Build: `npm run build`. Install:
-  `npm install` (repo uses **npm** + `package-lock.json`). Output: default.
-- Node: `engines.node >= 18.18` in `package.json` — select Node 18 or 20 LTS.
+  `npm install` (the repo uses **npm**; every library has an exact version in
+  `package.json`, and no lockfile is committed). Output: default.
+- Node: 24 (`engines.node` is `24.x` in `package.json`).
 - Production branch: **`main`** (or a dedicated `production` branch — deploy only
   from the intended branch).
 - Function region: `vercel.json` pins the functions to `sin1` (Singapore), the region of the
@@ -87,17 +89,29 @@ is missing when a server route needs it.
   If the database ever moves, change the code there (list: vercel.com/docs/regions).
 - Add all env vars (§2) to Production; give Preview its own (non-production)
   Supabase project or restricted values so previews never touch production data.
-- Note: builds run with `typescript.ignoreBuildErrors` / `eslint.ignoreDuringBuilds`
-  (see `next.config.ts`); run `npm run typecheck` locally/CI to catch type bugs.
+- Builds check types (a type error fails the build and the previous deployment stays live);
+  the linter does not run during builds (`eslint.ignoreDuringBuilds` in `next.config.ts`).
 
 ## 6. TURN configuration
 
-- **Status: NOT configured in this repo.** Calls run STUN-only by default, which
-  works on most networks but **can fail across strict/symmetric NATs**.
-- To enable: set `NEXT_PUBLIC_TURN_URL` (+ username/credential). ICE config is
-  env-driven (`src/lib/webrtc/ice.ts`) — no code change. Prefer a provider that
-  issues **short-lived** credentials; do not commit master secrets. (A future
-  hardening step can mint per-session TURN credentials from a server route.)
+Calls between two different networks (Wi-Fi and mobile data, two homes) pass through a
+relay. Without one they cannot connect; on one network they work without it.
+
+1. Cloudflare dashboard → **Realtime** → **TURN** → create a TURN key. It shows a
+   "Turn Token ID" and an "API Token": copy both right away.
+2. Vercel → Project → Settings → Environment Variables, for **Production** (and Preview if
+   previews should make calls too): `CLOUDFLARE_TURN_KEY_ID` = the Turn Token ID,
+   `CLOUDFLARE_TURN_API_TOKEN` = the API Token. Never `NEXT_PUBLIC_`.
+3. Redeploy.
+4. Check: `/api/health` answers `"relay": true` when both values are present. Then sign in
+   as the admin → Members → **Defaults** → **Call relay** → Check: it says whether Cloudflare
+   accepts the key and whether that device can reach the relay.
+
+Cost (Cloudflare's price list, read 2026-11-17): the first 1,000 GB a month are free, after
+that $0.05 per GB that passes through the relay. A video call is roughly 1 to 2 GB an
+hour (an estimate from the picture's bit rate, not measured).
+The server turns the key into credentials that expire after 12 hours (`src/lib/turn.ts`);
+the key itself never reaches a browser.
 
 ## 7. Domain configuration
 

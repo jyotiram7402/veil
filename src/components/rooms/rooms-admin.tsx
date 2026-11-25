@@ -60,9 +60,7 @@ export function RoomsAdmin() {
       if (!res.ok) return;
       const body = (await res.json().catch(() => null)) as { rooms?: RoomRow[] } | null;
       setRooms(Array.isArray(body?.rooms) ? body.rooms : []);
-    } catch {
-      // network hiccup — keep whatever we already have on screen
-    } finally {
+    } catch {} finally {
       setLoading(false);
     }
   }, []);
@@ -71,7 +69,6 @@ export function RoomsAdmin() {
     void reload();
   }, [reload]);
 
-  // Realtime: refresh the dashboard when rooms / participants / invites change.
   useEffect(() => {
     if (!me?.id) return;
     const debouncedReload = () => {
@@ -79,10 +76,6 @@ export function RoomsAdmin() {
       reloadTimer.current = setTimeout(() => void reload(), 400);
     };
     const supabase = supabaseBrowser();
-    // Unique topic per mount: newer supabase-js returns an existing channel for a
-    // reused name, and re-subscribing it throws ("subscribe can only be called a
-    // single time"), which would crash the page on quick re-visits. Live updates
-    // are a nice-to-have here, so any realtime failure must never break the page.
     let channel: ReturnType<typeof supabase.channel> | null = null;
     try {
       channel = supabase
@@ -112,7 +105,6 @@ export function RoomsAdmin() {
 
   return (
     <div>
-      {/* Overview */}
       <section className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Active rooms" value={overview.active} />
         <Stat label="Participants" value={overview.participants} />
@@ -153,7 +145,7 @@ export function RoomsAdmin() {
             <li key={r.id}>
               <div className="rounded-xl border border-border/60 bg-card/40 p-4">
                 <div className="flex items-start gap-3">
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-primary shrink-0">
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-primary-ink shrink-0">
                     <Users className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -261,7 +253,7 @@ function CreateRoomDialog({
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [maxParticipants, setMaxParticipants] = useState("10");
-  const [expiryIdx, setExpiryIdx] = useState(2); // 24h default
+  const [expiryIdx, setExpiryIdx] = useState(2);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {

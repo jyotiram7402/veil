@@ -16,6 +16,8 @@ deployable to Vercel's free tier in about ten minutes.
 - Typing indicators, online presence, read receipts, unread counts
 - Disappearing messages (off until the admin switches them on): a read message is deleted
   for both people, for good, when its reader leaves the chat
+- Notifications when the app is closed (new message, incoming call, missed call), turned on
+  per device; they never show what a message says
 - Mobile-first UI (light/dark), safe-area aware, works on phones and tablets
 - Admin panel: members, rooms, invitations, participant permissions
 - Strict Row-Level Security on every table; private storage with signed URLs
@@ -26,8 +28,8 @@ deployable to Vercel's free tier in about ten minutes.
 - **Supabase** for Postgres, Auth, Realtime, Storage — all on the free tier
 - **WebRTC** peer-to-peer for call media; Supabase Realtime for signaling
 - **Tailwind CSS** + a hand-picked subset of shadcn/ui primitives
-- **Zustand** for client state, **Zod** for validation,
-  **Framer Motion** for animation, **Lucide** for icons, **Sonner** for toasts
+- **Zustand** for client state, **Zod** for validation, **Lucide** for icons,
+  **Sonner** for toasts
 
 No separate backend, no Docker, no Redis, no paid APIs.
 
@@ -78,14 +80,15 @@ src/
     call/                  — call provider, call screen, buttons
     auth/, layout/         — login form, app shell, sidebar
   lib/
-    supabase/{client,server,admin,middleware}.ts
+    supabase/{client,server,admin}.ts
     webrtc/{ice,signaling,codec,stats,audio-level,devices,errors,ringtone,types}.ts
     {rooms,permissions,share,api,env,queries,validations,...}.ts
   hooks/                   — realtime, presence, typing, calling
   store/                   — zustand stores (session, chat, presence, call)
   types/                   — database & domain types
 supabase/                  — schema.sql, policies.sql, storage.sql, v2…v9.sql
-middleware.ts              — refreshes the Supabase session + protects routes
+tests/                     — Node tests for src/lib (`npm test`; GitHub runs them on every push)
+.github/workflows/         — that GitHub run
 ```
 
 ## Voice & video calling
@@ -120,13 +123,14 @@ Media is peer-to-peer WebRTC; Supabase Realtime carries only signaling
   call to a pill so you can keep chatting; completed/missed/failed calls leave
   one small event in the timeline.
 
-### STUN / TURN
+### STUN and the relay
 
-STUN (Google's public servers) is built in and handles most networks. TURN is
-optional and env-driven (`NEXT_PUBLIC_TURN_URL` / `_USERNAME` / `_CREDENTIAL`);
-without it, calls across strict/symmetric NATs may fail. ICE config lives in
-`src/lib/webrtc/ice.ts` so a relay can be added without touching call logic. Do
-not commit TURN secrets — prefer a provider's short-lived credentials.
+STUN (public servers) is built in and is enough when both people are on the same
+network. Between two different networks a call passes through a relay (TURN):
+Cloudflare Realtime, set up with two server-only values, `CLOUDFLARE_TURN_KEY_ID`
+and `CLOUDFLARE_TURN_API_TOKEN` (see `DEPLOYMENT.md` §6). The server hands signed-in
+callers credentials that expire; the key never reaches a browser. Without the two
+values the app works, but calls between different networks cannot connect.
 
 ### Requirements & limits
 
@@ -134,8 +138,9 @@ not commit TURN secrets — prefer a provider's short-lived credentials.
   or `http://localhost` for dev. `Permissions-Policy` allows same-origin
   camera/mic.
 - 1-to-1 only (no group calls, no SFU). A call rings on any screen while the app
-  is open; a closed app does not ring (there are no push notifications). One call
-  at a time: a second caller gets *busy* and a missed call is logged in the chat.
+  is open; a closed app gets an "Incoming call" notification (when notifications are
+  on for that device) and rings once it is opened. One call at a time: a second caller
+  gets *busy* and a missed call is logged in the chat.
 
 ## License
 

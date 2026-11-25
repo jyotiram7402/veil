@@ -22,10 +22,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   return NextResponse.json({ settings: (data?.settings as Record<string, unknown>) ?? {} });
 }
 
-/**
- * PATCH applies a partial override. Pass `null` for a key to clear the
- * per-user override (falls back to the global app_setting).
- */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");

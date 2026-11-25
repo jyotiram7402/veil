@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { useChatStore } from "@/store/chat-store";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useResumeSync } from "@/hooks/use-resume-sync";
 import { useVanishOnLeave } from "@/hooks/use-vanish-on-leave";
+import { useMarkRead } from "@/hooks/use-mark-read";
 import { LiveIndicator } from "@/components/chat/live-indicator";
 import { MessageList } from "@/components/chat/message-list";
 import { Composer } from "@/components/chat/composer";
@@ -28,7 +29,7 @@ type Props = {
   members: Profile[];
   initialMessages: MessageWithSender[];
   initialHasMore: boolean;
-  /** Disappearing messages are switched on for the person in this chat. */
+  readers?: Record<string, string>;
   disappearing?: boolean;
 };
 
@@ -41,20 +42,20 @@ export function ChatThread({
   members,
   initialMessages,
   initialHasMore,
+  readers,
   disappearing = false,
 }: Props) {
   const setInitial = useChatStore((s) => s.setInitialMessages);
-  const messages = useChatStore((s) => s.messagesByChat[chatId] ?? []);
-  const markChatRead = useChatStore((s) => s.markChatRead);
+  const noteReads = useChatStore((s) => s.noteReads);
   const [infoOpen, setInfoOpen] = useState(false);
 
-  // hydrate the store with the SSR-rendered initial page
   useEffect(() => {
     setInitial(chatId, initialMessages, initialHasMore);
-    // tell server we've read up to now
-    void fetch(`/api/chats/${chatId}/read`, { method: "POST" });
-    markChatRead(chatId, new Date().toISOString());
-  }, [chatId, initialMessages, initialHasMore, setInitial, markChatRead]);
+  }, [chatId, initialMessages, initialHasMore, setInitial]);
+  useEffect(() => {
+    if (readers) noteReads(chatId, readers);
+  }, [chatId, readers, noteReads]);
+  useMarkRead(chatId, me.id);
 
   const memberProfiles = useMemo(() => {
     const m: Record<string, Pick<Profile, "id" | "username" | "display_name" | "avatar_url">> = {};
@@ -70,12 +71,7 @@ export function ChatThread({
   }, [members]);
 
   useChatRealtime({ chatId, me, memberProfiles });
-  // With disappearing messages the screen is kept exactly like the server: a
-  // message may also have gone while this page was not listening.
   useResumeSync(chatId, me, disappearing);
-  // Disappearing messages: what the admin had read here is deleted when they
-  // leave this chat. The chat list is then loaded again, so no row goes on
-  // showing a message that no longer exists.
   const setChats = useChatStore((s) => s.setChats);
   const reloadChatList = useCallback(async () => {
     const res = await fetch("/api/chats", { cache: "no-store" }).catch(() => null);
@@ -101,20 +97,6 @@ export function ChatThread({
     return `Last seen ${lastSeen(other.last_seen_at)}`;
   }, [chatType, members.length, other, onlineOther]);
 
-  // when a new message arrives while we're viewing the chat, keep last_read fresh
-  const lastReadRef = useRef(Date.now());
-  const onMessageVisible = useCallback(() => {
-    if (Date.now() - lastReadRef.current < 1500) return;
-    lastReadRef.current = Date.now();
-    void fetch(`/api/chats/${chatId}/read`, { method: "POST" });
-    markChatRead(chatId, new Date().toISOString());
-  }, [chatId, markChatRead]);
-
-  useEffect(() => {
-    if (messages.length === 0) return;
-    onMessageVisible();
-  }, [messages.length, onMessageVisible]);
-
   return (
     <div className="flex h-full flex-col chat-bg">
       <header className="flex h-16 shrink-0 items-center gap-1 border-b border-border/70 bg-header px-2 text-header-foreground sm:px-4">
@@ -129,7 +111,6 @@ export function ChatThread({
             <ChevronLeft />
           </Link>
         </Button>
-        {/* Avatar and name open the chat details. */}
         <button
           type="button"
           onClick={() => setInfoOpen(true)}
@@ -159,8 +140,6 @@ export function ChatThread({
             </span>
           </span>
         </button>
-        {/* 1-to-1 chats can call; groups cannot. The calls themselves live in
-            CallProvider, above every screen (app-shell.tsx). */}
         {chatType === "direct" && other && (
           <>
             <CallButton chatId={chatId} mode="video" className="[&_svg]:size-5" />

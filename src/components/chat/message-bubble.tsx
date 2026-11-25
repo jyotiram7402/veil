@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { Check, CheckCheck, Download, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -16,18 +16,15 @@ type Props = {
   message: MessageWithSender;
   sender: Pick<Profile, "id" | "username" | "display_name" | "avatar_url"> | null;
   fromMe: boolean;
-  /** Show the sender's name above the bubble (group chats, first of a run). */
   showSender: boolean;
-  /** Keep a column for the sender's avatar (group chats). */
   showAvatar?: boolean;
   groupedTop: boolean;
   groupedBottom: boolean;
   readByOther?: boolean;
-  /** When true, caller is an admin in this chat — they can delete anyone's message. */
   canDeleteAny?: boolean;
 };
 
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   message,
   sender,
   fromMe,
@@ -42,7 +39,6 @@ export function MessageBubble({
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const removeMessage = useChatStore((s) => s.removeMessage);
 
-  // Close menu on outside click / escape
   useEffect(() => {
     if (!menu) return;
     const onDown = () => setMenu(null);
@@ -72,18 +68,14 @@ export function MessageBubble({
 
   const onDelete = useCallback(async () => {
     setMenu(null);
-    // Optimistic remove
     removeMessage(message.chat_id, message.id);
     const res = await fetch(`/api/messages/${message.id}`, { method: "DELETE" });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       toast.error(body.error ?? "Couldn't delete");
-      // We don't roll back the optimistic remove — realtime DELETE will
-      // re-sync or the user can refresh. Keeping it simple.
     }
   }, [message.chat_id, message.id, removeMessage]);
 
-  // Call results and similar notes sit centred between the bubbles.
   if (message.type === "system") {
     return (
       <div className="my-3 flex justify-center px-4">
@@ -94,7 +86,6 @@ export function MessageBubble({
     );
   }
 
-  // The last bubble of a run gets the time under it and one tighter corner.
   const lastOfRun = !groupedBottom;
 
   return (
@@ -166,13 +157,13 @@ export function MessageBubble({
               rel="noreferrer"
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 transition-colors",
-                fromMe ? "hover:bg-white/10" : "hover:bg-muted/60",
+                fromMe ? "hover:bg-bubble-out-foreground/10" : "hover:bg-muted/60",
               )}
             >
               <span
                 className={cn(
                   "grid h-10 w-10 shrink-0 place-items-center rounded-full",
-                  fromMe ? "bg-white/20" : "bg-muted",
+                  fromMe ? "bg-bubble-out-foreground/20" : "bg-muted",
                 )}
               >
                 <FileText className="h-5 w-5" aria-hidden="true" />
@@ -193,7 +184,6 @@ export function MessageBubble({
             <p
               className={cn(
                 "whitespace-pre-wrap break-words px-3.5 pb-2",
-                // Text under a file row sits closer to it.
                 message.type === "file" ? "pt-0.5" : "pt-2",
               )}
             >
@@ -246,4 +236,4 @@ export function MessageBubble({
       )}
     </div>
   );
-}
+});

@@ -7,12 +7,6 @@ export const runtime = "nodejs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * DELETE /api/admin/signup-codes/[id] — switch a code off.
- *
- * The row stays (so the list still shows who joined with it); it just cannot
- * be used any more. Members who already signed up with it are not affected.
- */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
