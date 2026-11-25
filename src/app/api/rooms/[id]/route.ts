@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { jsonError, parseBody } from "@/lib/api";
+import { jsonError, parseBody, serverError } from "@/lib/api";
 import { updateRoomSchema } from "@/lib/validations";
 import { assertRoomAdmin, recordAudit } from "@/lib/rooms";
 import type { Database } from "@/types/database";
@@ -110,7 +110,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const admin = supabaseAdmin();
   const { error } = await admin.from("chats").update(patch).eq("id", id).eq("type", "room");
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("rooms/[id]", error, "Couldn't save the room. Try again.");
 
   if (body.status === "ended") {
     await admin

@@ -204,7 +204,9 @@ Off on every device until its owner turns them on there. Needs `supabase/v12.sql
 - The key pair for notifications is not an environment variable: the server creates it in
   the `push_keys` table, which only the service role can read. Emptying that table makes
   every device subscribe again.
-- Secrets must never be logged. Errors returned to clients are generic.
+- Secrets must never be logged. Errors returned to clients are generic: no route sends a
+  database's own error text (`serverError` in `src/lib/api.ts` logs it instead, without the
+  request, the body or row values).
 
 ## Security headers
 
@@ -252,6 +254,7 @@ disappearing messages (above) delete read messages and their files for good.
 - Notifications tell the browser makers' push services that a device received something
   from this server, and when (never what).
 - The automated tests (`tests/`, run by GitHub after every push) cover disappearing
-  messages, notifications, attachment paths and the call relay credentials. API routes,
+  messages, notifications, attachment paths, the call relay credentials and what an error log
+  line may contain. API routes,
   screens, calls and the database policies have none: they are checked by hand (see the
   manual matrix in the report, and `supabase/security-tests.sql`).

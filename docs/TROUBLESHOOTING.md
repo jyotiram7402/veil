@@ -51,6 +51,14 @@ select id, username from public.profiles where lower(username) = lower('jay');
 - Some corporate networks block the WebSocket upgrade. Try a phone
   hotspot to confirm.
 
+## A screen keeps saying "Couldn't … Try again."
+
+The server hit a database or storage error and logged it. Vercel → the project → Logs,
+filter on errors, and look for a line that starts with the route in brackets, for example
+`[admin/users] 42501 permission denied for table profiles`. The code says what went wrong
+(`42501`: a missing grant, see `supabase/README.md` → Recovery recipes; `23505`: a value that
+must be unique already exists; `PGRST…`: the API layer of Supabase).
+
 ## Uploads fail with 403
 
 The `attachments` bucket has an RLS policy that requires you to be a

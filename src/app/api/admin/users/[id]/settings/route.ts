@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { jsonError } from "@/lib/api";
+import { jsonError, serverError } from "@/lib/api";
 import { SETTING_KEYS } from "@/lib/settings";
 
 const KNOWN = new Set<string>(SETTING_KEYS);
@@ -18,7 +18,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .select("settings")
     .eq("id", id)
     .maybeSingle();
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("admin/users/[id]/settings", error, "Couldn't load their chat rules. Try again.");
   return NextResponse.json({ settings: (data?.settings as Record<string, unknown>) ?? {} });
 }
 
@@ -57,6 +57,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     .from("profiles")
     .update({ settings: next as never })
     .eq("id", id);
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("admin/users/[id]/settings", error, "Couldn't save their chat rules. Try again.");
   return NextResponse.json({ settings: next });
 }

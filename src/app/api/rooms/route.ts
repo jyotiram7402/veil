@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
+import { clientKey, jsonError, parseBody, rateLimit, serverError } from "@/lib/api";
 import { createRoomSchema } from "@/lib/validations";
 import { expiryFromMinutes, recordAudit } from "@/lib/rooms";
 
@@ -21,7 +21,7 @@ export async function GET() {
     .eq("type", "room")
     .eq("created_by", session.id)
     .order("created_at", { ascending: false });
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("rooms", error, "Couldn't load the rooms. Try again.");
 
   const ids = (rooms ?? []).map((r) => r.id);
   const participants = new Map<string, number>();
@@ -96,14 +96,14 @@ export async function POST(req: Request) {
     })
     .select("id")
     .single();
-  if (error || !room) return jsonError(500, error?.message ?? "Could not create room");
+  if (error || !room) return serverError("rooms", error, "Couldn't create the room. Try again.");
 
   const { error: memberErr } = await admin
     .from("chat_members")
     .insert({ chat_id: room.id, user_id: session.id, role: "admin" });
   if (memberErr) {
     await admin.from("chats").delete().eq("id", room.id);
-    return jsonError(500, memberErr.message);
+    return serverError("rooms", memberErr, "Couldn't create the room. Try again.");
   }
 
   await recordAudit({

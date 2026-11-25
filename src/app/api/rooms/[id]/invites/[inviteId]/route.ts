@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { jsonError } from "@/lib/api";
+import { jsonError, serverError } from "@/lib/api";
 import { assertRoomAdmin, recordAudit } from "@/lib/rooms";
 
 export const runtime = "nodejs";
@@ -24,7 +24,7 @@ export async function DELETE(
     .eq("id", inviteId)
     .eq("room_id", id)
     .is("revoked_at", null);
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("rooms/[id]/invites/[inviteId]", error, "Couldn't remove the invite. Try again.");
 
   await recordAudit({
     roomId: id,

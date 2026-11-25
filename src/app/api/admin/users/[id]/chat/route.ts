@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { jsonError } from "@/lib/api";
+import { jsonError, serverError } from "@/lib/api";
 
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
@@ -14,7 +14,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const { data, error } = await supabase.rpc("get_or_create_admin_user_chat", {
     p_user: id,
   });
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("admin/users/[id]/chat", error, "Couldn't open the chat. Try again.");
 
   return NextResponse.json({ chatId: data });
 }

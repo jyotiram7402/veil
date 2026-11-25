@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType, type ZodTypeDef } from "zod";
+import { describeError } from "@/lib/db-errors";
 
 export function jsonError(status: number, message: string, extra?: Record<string, unknown>) {
   return NextResponse.json({ error: message, ...extra }, { status });
+}
+
+export function serverError(area: string, error: unknown, message: string) {
+  console.error(`[${area}] ${describeError(error)}`);
+  return jsonError(500, message);
 }
 
 export async function parseBody<T>(req: Request, schema: ZodType<T, ZodTypeDef, unknown>): Promise<

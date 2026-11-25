@@ -3,7 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { usernameToInternalEmail } from "@/lib/auth/username";
 import { createUserSchema } from "@/lib/validations";
-import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
+import { clientKey, jsonError, parseBody, rateLimit, serverError } from "@/lib/api";
+import { isTaken } from "@/lib/db-errors";
 import { generateInviteToken, generateEphemeralPassword } from "@/lib/invite-token";
 import { hashPassword } from "@/lib/password";
 import { inviteUrlFor } from "@/lib/url";
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
   if (wantArchived !== null) q = q.eq("archived", wantArchived);
 
   const { data: users, error } = await q;
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("admin/users", error, "Couldn't load your members. Try again.");
 
   const { data: tokens } = await admin
     .from("invite_tokens")
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
     const { count, error: countErr } = await admin
       .from("profiles")
       .select("id", { head: true, count: "exact" });
-    if (countErr) return jsonError(500, countErr.message);
+    if (countErr) return serverError("admin/users", countErr, "Couldn't add the account. Try again.");
 
     if ((count ?? 0) > 0) return jsonError(403, "Admin only");
 
@@ -121,7 +122,8 @@ export async function POST(req: Request) {
     user_metadata: { username },
   });
   if (createErr || !created.user) {
-    return jsonError(500, createErr?.message ?? "Could not create user");
+    if (isTaken(createErr)) return jsonError(409, "Username already taken");
+    return serverError("admin/users", createErr, "Couldn't add them. Try again.");
   }
 
   const { error: profileErr } = await admin.from("profiles").insert({
@@ -132,7 +134,8 @@ export async function POST(req: Request) {
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(created.user.id).catch(() => undefined);
-    return jsonError(500, profileErr.message);
+    if (isTaken(profileErr)) return jsonError(409, "Username already taken");
+    return serverError("admin/users", profileErr, "Couldn't add them. Try again.");
   }
 
   let invite: { token: string; url: string } | null = null;

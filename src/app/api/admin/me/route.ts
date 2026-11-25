@@ -4,7 +4,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { usernameToInternalEmail, USERNAME_REGEX } from "@/lib/auth/username";
-import { jsonError } from "@/lib/api";
+import { jsonError, serverError } from "@/lib/api";
+import { errorCode, isTaken } from "@/lib/db-errors";
 
 const patchSchema = z
   .object({
@@ -62,13 +63,19 @@ export async function PATCH(req: Request) {
       email: newEmail,
       email_confirm: true,
     });
-    if (emailErr) return jsonError(500, emailErr.message);
+    if (emailErr) {
+      if (isTaken(emailErr)) return jsonError(409, "Username already taken");
+      return serverError("admin/me", emailErr, "Couldn't change your username. Try again.");
+    }
 
     const { error: profErr } = await admin
       .from("profiles")
       .update({ username })
       .eq("id", session.id);
-    if (profErr) return jsonError(500, profErr.message);
+    if (profErr) {
+      if (isTaken(profErr)) return jsonError(409, "Username already taken");
+      return serverError("admin/me", profErr, "Couldn't change your username. Try again.");
+    }
   }
 
   if (displayName !== undefined) {
@@ -76,7 +83,7 @@ export async function PATCH(req: Request) {
       .from("profiles")
       .update({ display_name: displayName })
       .eq("id", session.id);
-    if (error) return jsonError(500, error.message);
+    if (error) return serverError("admin/me", error, "Couldn't save your name. Try again.");
   }
 
   if (newPassword) {
@@ -89,7 +96,15 @@ export async function PATCH(req: Request) {
     if (vErr) return jsonError(401, "Current password is wrong");
 
     const { error: updErr } = await supabase.auth.updateUser({ password: newPassword });
-    if (updErr) return jsonError(500, updErr.message);
+    if (updErr) {
+      if (errorCode(updErr) === "same_password") {
+        return jsonError(422, "That is your current password. Choose a new one.");
+      }
+      if (errorCode(updErr) === "weak_password") {
+        return jsonError(422, "That password is too easy to guess. Choose a longer one.");
+      }
+      return serverError("admin/me", updErr, "Couldn't change your password. Try again.");
+    }
   }
 
   return NextResponse.json({ ok: true });

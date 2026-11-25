@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { jsonError } from "@/lib/api";
+import { jsonError, serverError } from "@/lib/api";
 import { generateInviteToken } from "@/lib/invite-token";
 import { hashPassword } from "@/lib/password";
 import { inviteUrlFor } from "@/lib/url";
@@ -76,7 +76,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .insert({ token, user_id: id, enabled: true, gate_password_hash })
     .select()
     .single();
-  if (error || !data) return jsonError(500, error?.message ?? "Failed");
+  if (error || !data) {
+    return serverError("admin/users/[id]/invite", error, "Couldn't make the link. Try again.");
+  }
 
   return NextResponse.json({
     invite: {
@@ -117,7 +119,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     .update(patch)
     .eq("user_id", id)
     .is("revoked_at", null);
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("admin/users/[id]/invite", error, "Couldn't change the link. Try again.");
   return NextResponse.json({ ok: true });
 }
 
@@ -133,6 +135,6 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     .update({ revoked_at: new Date().toISOString(), enabled: false })
     .eq("user_id", id)
     .is("revoked_at", null);
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("admin/users/[id]/invite", error, "Couldn't remove the link. Try again.");
   return NextResponse.json({ ok: true });
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
+import { clientKey, jsonError, parseBody, rateLimit, serverError } from "@/lib/api";
 import { createInviteSchema } from "@/lib/validations";
 import {
   assertRoomAdmin,
@@ -45,7 +45,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     })
     .select("id, expires_at, max_uses")
     .single();
-  if (error || !invite) return jsonError(500, error?.message ?? "Could not create invite");
+  if (error || !invite) {
+    return serverError("rooms/[id]/invites", error, "Couldn't create the invite. Try again.");
+  }
 
   await recordAudit({
     roomId: id,

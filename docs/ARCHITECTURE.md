@@ -105,7 +105,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `redirectIfSignedIn`), `auth/username.ts` (`<username>@INTERNAL_EMAIL_DOMAIN`).
 - `entry-checks.ts` (field checks for the log-in and sign-up forms), `format.ts` (times and
   dates as the chat shows them).
-- `api.ts` — `jsonError`, `parseBody(req, zodSchema)`, in-memory `rateLimit`, `clientKey`.
+- `api.ts` — `jsonError`, `serverError`, `parseBody(req, zodSchema)`, in-memory `rateLimit`,
+  `clientKey`. `db-errors.ts` — `errorCode`, `isTaken` (a taken username, from Postgres or
+  Supabase Auth) and `describeError` (the one log line).
 - `validations.ts` — all zod schemas (login, users, messages, rooms, invites, join, display name).
 - `queries.ts` — chat list + message paging queries.
 - `rooms.ts` — access codes (`selector.verifier`, PBKDF2-hashed verifier), `validateInvite`,
@@ -434,7 +436,7 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `attachment-path.ts` are.
 - Covered: disappearing messages (`vanish.ts`, `read-cutoff.ts`), notifications
   (`web-push.ts` against the standards' own example values, `push.ts`, `push-client.ts`,
-  `public/sw.js`), `attachment-path.ts` and `turn.ts`. Not covered: API routes, screens,
+  `public/sw.js`), `attachment-path.ts`, `turn.ts` and `db-errors.ts`. Not covered: API routes, screens,
   calls, the database policies.
 - Nothing in the repository makes Vercel wait for the tests: a red cross on GitHub does not
   stop a deployment.
@@ -476,8 +478,12 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   (the Supabase host) and `src/app/api/health` (booleans only).
 - A new route: copy `src/app/api/rooms/route.ts`. Session check → 401, `is_admin` → 403,
   `parseBody(req, schema)` with a schema from `src/lib/validations.ts`, the query, then
-  `NextResponse.json` or `jsonError`. Routes that members can reach answer with general
-  error text; screens show `apiErrorMessage(body, fallback)`.
+  `NextResponse.json` or `jsonError`. No route sends a database's own error text to the
+  browser: a failure goes through `serverError(area, error, message)`, which logs
+  `[area] code status text` (never the request, the body or the row values in `details`) and
+  answers 500 with the plain sentence. Where the database's answer means something the person
+  can act on (a username already taken, the same password again), say that instead, with its
+  own status. Screens show `apiErrorMessage(body, fallback)`.
 - Every change goes through `fetch` → an API route. Realtime is only listened to
   (postgres_changes, broadcast, presence).
 - A message that is being sent has a `local-` id until the server's row replaces it.
