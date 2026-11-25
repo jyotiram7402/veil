@@ -228,6 +228,45 @@ held sideways.
   rings or is being placed. A connected call is still.
 - With "reduce motion" on, the tiles are still and nothing moves.
 
+<<<<<<< HEAD
+## Members
+
+The admin's people (`components/members/*`), at `/admin` and `/admin/<id>`.
+
+- The list is a white sheet like the chat home: the title "Members" with "N people · N online"
+  under it, an "Add someone" pill (just "Add" under 400px), then one row per person: 48px moji,
+  name, and one line that says what matters at a glance ("Online" in `text-online-ink`,
+  "Suspended · can't sign in" in `text-destructive`, "Hasn't opened their link yet", otherwise
+  "Seen …"). People are in name order. Below them the sign-up codes that still work, then the
+  codes that no longer work and the archive, each folded away behind a row.
+- A person opens on their own screen: full screen on phones and tablets (back to the list),
+  beside the list from 1280px wide. A 96px moji (`UserAvatar size="hero"`), the name,
+  "@username · seen …", a badge only when they are suspended, archived or an admin, then Chat
+  and Copy link, then grouped rows: Sign-in, Chat rules for <name>, Account.
+- "Add someone" is one sheet: Personal link or Sign-up code, a short form, then the result with
+  its copy buttons. A new code is shown once, large, in the mono face (it is data, not decoration).
+
+## Settings and grouped rows
+
+- Settings (`components/settings/*`): Profile (photo or moji, name, bio), Sign-in (username,
+  password) and Chat rules for everyone. One person's own rules are on their screen in Members.
+- Both screens use grouped rows (`components/layout/grouped.tsx`): a 15px bold heading, then
+  white rows in one card per group on the pale ground, divided by a hairline. A row is a 36px
+  icon circle, a 15px title and a 13px line under it, with a switch or a button at the end.
+  Destructive rows are red, with a red-tinted circle, and always ask first.
+- A form that belongs to a row (change a password, make a link) opens under that row inside the
+  card, not in a pop-up. Fields there are filled, borderless and 48px tall (`GROUP_FIELD`).
+- Asking first is the app's own dialog (`useConfirm()` in `ui/confirm-dialog.tsx`), never
+  `window.confirm()`: the title is the question, the text says what will happen in plain words,
+  and the button names the action ("Suspend", "Delete forever"). Focus starts on Cancel.
+- Switches are 44×24 with a white knob in both themes, and a larger invisible tap area.
+- A rule changed for one person reads "Just for <name> · Use everyone's"; otherwise
+  "Same as everyone (on)".
+
+## Not redesigned yet
+
+The room management pages still use their old layout with the new colours. Rooms are on hold.
+=======
 ## Admin and settings pages
 
 Pages the admin reaches from the menu behind their avatar: Members (`components/admin/*`) and
@@ -263,3 +302,4 @@ add nothing of their own.
 
 The room management pages still use their old layout with the new colours (they use
 `PageHeader`, the old header). Rooms are on hold.
+>>>>>>> 5c1d94054047b9a8e141db7699f22c3285dc1d90

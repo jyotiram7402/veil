@@ -56,7 +56,7 @@ You need a Supabase project and a Vercel account. Both are free.
    ```
 
    That user is promoted to admin because no profiles existed yet. Afterwards
-   the bootstrap token does nothing — new users come from the **/admin** screen.
+   the bootstrap token does nothing — new users come from **Members** (`/admin`) → Add someone.
 
 For production, see [`DEPLOYMENT.md`](DEPLOYMENT.md) and
 [`PRODUCTION_RUNBOOK.md`](PRODUCTION_RUNBOOK.md). Security notes are in
