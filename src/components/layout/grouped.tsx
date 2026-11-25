@@ -4,13 +4,6 @@ import { useEffect, useId, useRef } from "react";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/*
- * Grouped rows: the building block of the screens where you change things
- * (a person in Members, Settings). A heading, then white rows on the pale
- * ground, one card per group, rows divided by a hairline.
- */
-
-/** A text field on these screens: filled, no border, 48px. */
 export const GROUP_FIELD =
   "h-12 rounded-xl border-transparent bg-muted px-4 shadow-none focus-visible:ring-offset-0";
 
@@ -86,7 +79,6 @@ function RowText({
 const ROW = "flex min-h-[3.75rem] w-full items-center gap-3 px-4 py-3 text-left";
 const DIVIDED = "border-t border-border/70 first:border-t-0";
 
-/** A row that shows something, with an optional control at its end (a switch, a copy button). */
 export function GroupRow({
   icon,
   title,
@@ -100,7 +92,6 @@ export function GroupRow({
   description?: React.ReactNode;
   trailing?: React.ReactNode;
   destructive?: boolean;
-  /** Shown under the row, inside the same card (an open form). */
   children?: React.ReactNode;
 }) {
   return (
@@ -115,7 +106,6 @@ export function GroupRow({
   );
 }
 
-/** A row that does something when tapped. */
 export function GroupButtonRow({
   icon,
   title,
@@ -154,10 +144,6 @@ export function GroupButtonRow({
   );
 }
 
-/**
- * A row that opens a small form under itself (change a password, make a new
- * link), so the task stays on the screen instead of in a pop-up.
- */
 export function GroupDisclosureRow({
   icon,
   title,
@@ -176,8 +162,6 @@ export function GroupDisclosureRow({
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(open);
-  // When the form closes (Cancel, or it worked) the control that had focus is
-  // gone: give focus back to the row instead of losing it to the page.
   useEffect(() => {
     if (wasOpen.current && !open && document.activeElement === document.body) {
       buttonRef.current?.focus();

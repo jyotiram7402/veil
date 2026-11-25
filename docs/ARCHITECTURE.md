@@ -50,15 +50,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 | `(auth)/signup` | signed-out | sign-up with an invite code (`components/auth/signup-form.tsx` → `/api/auth/signup`); `?code=` pre-fills it |
 | `(app)/layout.tsx` | admin | requires `is_admin`; loads chat list (`loadChatsForUser`) into `AppShell` |
 | `(app)/chats`, `chats/[id]` | admin | chat list + thread (`components/chat/chat-thread.tsx`) |
-<<<<<<< HEAD
 | `(app)/admin`, `admin/[id]` | admin | Members: `admin/layout.tsx` → `components/members/members-shell.tsx` (list, data in `members-provider.tsx`) beside one person's screen (`member-screen.tsx`); "Add someone" (`add-someone-dialog.tsx`) |
 | `(app)/rooms`, `rooms/[id]` | admin | rooms dashboard + room management (`components/rooms/*`) |
 | `(app)/settings` | admin | own profile, sign-in, chat rules for everyone (`components/settings/settings-screen.tsx`) |
-=======
-| `(app)/admin` | admin | Members / Sign-up codes / Archive / Defaults / Account tabs (`components/admin/admin-screen.tsx`, one file per tab in `components/admin/`) |
-| `(app)/rooms`, `rooms/[id]` | admin | rooms dashboard + room management (`components/rooms/*`) |
-| `(app)/settings` | admin | own profile (`components/settings-form.tsx`) |
->>>>>>> 5c1d94054047b9a8e141db7699f22c3285dc1d90
 | `(user)/chat` | member | single 1:1 chat with an admin (`components/user-chat.tsx`) |
 | `(user)/expired` | anyone | dead-end page after suspension / sign-out |
 | `i/[token]` | member | per-member invite link + gate password → session |
@@ -444,6 +438,32 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   calls, the database policies.
 - Nothing in the repository makes Vercel wait for the tests: a red cross on GitHub does not
   stop a deployment.
+
+## Members and Settings
+
+- `(app)/admin/layout.tsx` renders `MembersShell`, so the list stays mounted while people are
+  opened beside it (`admin/[id]`). `MembersProvider` loads everyone (archived included) and the
+  sign-up codes once; the list and the person's screen read the same data, so a change shows on
+  both at once. A failed reload keeps the list on screen and says so in a toast.
+- Phones and tablets show one screen at a time. From 1280px (`xl`) the list stays beside the
+  person: the 380px chat column still leaves room there. `ScreenHeader`'s back button hides from
+  the width where the screen it goes back to is already showing (`hideFrom`).
+- "Joined with a sign-up code" is read from the codes' `used_by`. When the codes don't load it is
+  unknown, and the warnings about that person's own password are still shown, worded "if":
+  suspending someone (`lockOut`) and opening a personal link both replace their password.
+- Chat rule labels and fallbacks are in `components/settings/chat-rules.ts`. The fallbacks repeat
+  `DEFAULT_SETTINGS` because `lib/settings.ts` is server-only.
+- Switching disappearing messages on asks first, and so does going back to everyone's setting
+  when that switches them on for this person.
+- A failed save puts back only the keys it changed, so it never undoes a later change that worked.
+- The longest-message field is uncontrolled and keyed by the saved value plus a counter, so a
+  value the app held to its limits (100–20,000) shows as it was saved.
+- "Are you sure" is `useConfirm()` (`ui/confirm-dialog.tsx`), never `window.confirm()`; focus
+  starts on Cancel. Dialogs have `outline-none` because Radix focuses the dialog itself when the
+  focused control inside it unmounts (a step of "Add someone" changing).
+- A row's form closing gives focus back to the row. The account buttons are not disabled while a
+  request runs (a disabled, focused button drops keyboard focus); a ref stops a double action.
+- Settings → Calls → Call relay runs `checkRelay()` (`lib/webrtc/relay-check.ts`).
 
 ## Conventions
 

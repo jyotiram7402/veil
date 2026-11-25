@@ -6,6 +6,5 @@ export default async function MembersLayout({ children }: { children: React.Reac
   const session = await requireSessionUser();
   if (!session.profile.is_admin) notFound();
 
-  // The list lives in the layout, so it stays put while people are opened beside it.
   return <MembersShell>{children}</MembersShell>;
 }

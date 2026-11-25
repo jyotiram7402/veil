@@ -194,7 +194,7 @@ The two devices could not reach each other. That is the normal result between tw
 different networks (Wi-Fi and mobile data, two homes) while the relay is not working.
 The call gives up 30 seconds after it was answered.
 
-1. Sign in as the admin → Members → **Defaults** → **Call relay** → Check.
+1. Sign in as the admin → **Settings** → **Calls** → **Call relay** → Check.
    - "not set up": add `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` in Vercel
      (`DEPLOYMENT.md` §6) and redeploy.
    - "Cloudflare refused the key": one of the two values is wrong. Copy them again.
@@ -278,15 +278,9 @@ is intended (see `docs/SECURITY.md`).
 
 ## Messages do not disappear
 
-<<<<<<< HEAD
 Disappearing messages are off until the admin switches them on: **Settings** → Chat rules
 for everyone → "Disappearing messages" (everyone), or **Members** → the person → Chat rules
 (one person). After that:
-=======
-Disappearing messages are off until the admin switches them on: Admin page → **Defaults** →
-"Disappearing messages" (everyone), or **Members** → the ⋯ menu next to a person →
-"Settings for this person" (one person). After that:
->>>>>>> 5c1d94054047b9a8e141db7699f22c3285dc1d90
 
 - The chat has to be opened once after the switch was changed (an open chat keeps the
   setting it was loaded with).

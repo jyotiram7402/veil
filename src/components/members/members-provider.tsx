@@ -6,10 +6,8 @@ import { apiErrorMessage } from "@/lib/utils";
 import type { Person, SignupCode } from "@/components/members/types";
 
 type MembersState = {
-  /** Everyone, archived people included. Null until the first load. */
   people: Person[] | null;
   peopleError: string | null;
-  /** Null until loaded, and when sign-up codes could not be read (see codesError). */
   codes: SignupCode[] | null;
   codesError: string | null;
   reload: () => Promise<void>;
@@ -21,17 +19,11 @@ type MembersState = {
 
 const MembersContext = createContext<MembersState | null>(null);
 
-/**
- * The list of people and sign-up codes, loaded once for the whole Members
- * area: the list and the screen of the person beside it read the same data,
- * so a change on one shows on the other at once.
- */
 export function MembersProvider({ children }: { children: React.ReactNode }) {
   const [people, setPeople] = useState<Person[] | null>(null);
   const [peopleError, setPeopleError] = useState<string | null>(null);
   const [codes, setCodes] = useState<SignupCode[] | null>(null);
   const [codesError, setCodesError] = useState<string | null>(null);
-  // Once a list is on screen, a failed reload keeps it and says so instead.
   const loaded = useRef(false);
 
   const loadPeople = useCallback(async () => {
@@ -58,7 +50,6 @@ export function MembersProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch("/api/admin/signup-codes", { cache: "no-store" });
       const body: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        // The list still works without codes; the codes section says why they are missing.
         setCodesError(apiErrorMessage(body, "Couldn't load the sign-up codes."));
         return;
       }
@@ -113,11 +104,6 @@ export function useMembers(): MembersState {
   return ctx;
 }
 
-/**
- * Whether this person made their own account with a sign-up code, read from
- * who used which code. Null when the codes could not be loaded: then nobody
- * knows, and warnings about their own password must still be shown.
- */
 export function useJoinedWithCode(personId: string): boolean | null {
   const { codes } = useMembers();
   if (!codes) return null;

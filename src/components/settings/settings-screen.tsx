@@ -3,7 +3,18 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AtSign, Camera, KeyRound, Loader2, RefreshCw, Smile, TextCursorInput } from "lucide-react";
+import {
+  AlertTriangle,
+  AtSign,
+  Camera,
+  CheckCircle2,
+  KeyRound,
+  Loader2,
+  PhoneCall,
+  RefreshCw,
+  Smile,
+  TextCursorInput,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,19 +43,35 @@ import {
 import { LengthInput } from "@/components/settings/length-input";
 import { useSessionStore } from "@/store/session-store";
 import { AVATAR_MAX_BYTES, IMAGE_MIME_TYPES } from "@/lib/constants";
-import { apiErrorMessage, formatBytes, normalizeUsernameInput } from "@/lib/utils";
+import { checkRelay, type RelayCheckResult } from "@/lib/webrtc/relay-check";
+import { apiErrorMessage, cn, formatBytes, normalizeUsernameInput } from "@/lib/utils";
 import type { Profile } from "@/types/chat";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
+
+const RELAY_RESULTS: Record<RelayCheckResult, { good: boolean; text: string }> = {
+  ok: { good: true, text: "The relay works from this device." },
+  not_configured: {
+    good: false,
+    text: "The relay is not set up. Add the two Cloudflare values in Vercel, then redeploy.",
+  },
+  rejected: {
+    good: false,
+    text: "Cloudflare refused the key. Check the two Cloudflare values in Vercel, then redeploy.",
+  },
+  unreachable: { good: false, text: "Cloudflare did not answer. Try again in a minute." },
+  blocked: {
+    good: false,
+    text: "The relay is set up, but this network blocks it. Try on mobile data or another Wi-Fi.",
+  },
+  unsupported: { good: false, text: "This browser cannot make calls." },
+  error: { good: false, text: "Couldn't run the check. Reload the page and try again." },
+};
 
 const LINK =
   "rounded font-semibold text-foreground underline underline-offset-2 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-/**
- * Settings: you (profile, how you sign in) and the chat rules for everyone.
- * One person's own rules are on their screen in Members.
- */
 export function SettingsScreen({ me }: { me: Profile }) {
   const profile = useSessionStore((s) => s.profile) ?? me;
   const { confirm, dialog } = useConfirm();
@@ -60,10 +87,71 @@ export function SettingsScreen({ me }: { me: Profile }) {
           <ProfileGroup profile={profile} />
           {profile.is_admin && <SignInGroup profile={profile} />}
           {profile.is_admin && <RulesGroup confirm={confirm} />}
+          {profile.is_admin && <RelayGroup />}
         </div>
       </div>
       {dialog}
     </div>
+  );
+}
+
+function RelayGroup() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<RelayCheckResult | null>(null);
+
+  async function run() {
+    if (busy) return;
+    setBusy(true);
+    setResult(null);
+    try {
+      setResult(await checkRelay());
+    } catch {
+      setResult("error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const shown = result ? RELAY_RESULTS[result] : null;
+  const Icon = shown?.good ? CheckCircle2 : AlertTriangle;
+
+  return (
+    <Group title="Calls">
+      <GroupRow
+        icon={PhoneCall}
+        title="Call relay"
+        description="Calls between two different networks pass through it. Check that it is set up and that this device can reach it."
+        trailing={
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => void run()}
+            aria-busy={busy}
+            className="shrink-0 shadow-none"
+          >
+            {busy && <Loader2 className="animate-spin" aria-hidden="true" />}
+            {busy ? "Checking…" : "Check"}
+          </Button>
+        }
+      >
+        <p
+          aria-live="polite"
+          className={cn(
+            "mx-4 mb-4 flex items-start gap-2 rounded-xl px-3 py-2.5 text-[13px] font-medium leading-snug",
+            !shown && "sr-only",
+            shown?.good ? "bg-online/10 text-online-ink" : "bg-destructive/10 text-destructive",
+          )}
+        >
+          {shown && (
+            <>
+              <Icon className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{shown.text}</span>
+            </>
+          )}
+        </p>
+      </GroupRow>
+    </Group>
   );
 }
 
@@ -101,8 +189,6 @@ function FormError({ error }: { error: string | null }) {
     </p>
   );
 }
-
-// ---------------------------------------------------------------------------
 
 function ProfileGroup({ profile }: { profile: Profile }) {
   const router = useRouter();
@@ -165,7 +251,6 @@ function ProfileGroup({ profile }: { profile: Profile }) {
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: JSON_HEADERS,
-        // Empty strings are sent on purpose: they clear the field.
         body: JSON.stringify({ displayName: displayName.trim(), bio: bio.trim() }),
       });
       if (!res.ok) {
@@ -262,8 +347,6 @@ function ProfileGroup({ profile }: { profile: Profile }) {
     </Group>
   );
 }
-
-// ---------------------------------------------------------------------------
 
 function SignInGroup({ profile }: { profile: Profile }) {
   const [open, setOpen] = useState<"username" | "password" | null>(null);
@@ -456,13 +539,10 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-
 function RulesGroup({ confirm }: { confirm: (o: ConfirmOptions) => Promise<boolean> }) {
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  // Bumped to show the saved length again after a value that was not a number.
   const [lengthKey, setLengthKey] = useState(0);
 
   useEffect(() => {
@@ -485,7 +565,6 @@ function RulesGroup({ confirm }: { confirm: (o: ConfirmOptions) => Promise<boole
 
   async function save(patch: Record<string, unknown>) {
     if (!settings) return;
-    // What these keys were, so a failure puts back only them (not a later change that worked).
     const previous = Object.fromEntries(Object.keys(patch).map((key) => [key, settings[key]]));
     setSettings((current) => (current ? { ...current, ...patch } : current));
     const res = await fetch("/api/admin/settings", {

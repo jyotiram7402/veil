@@ -6,11 +6,6 @@ import { MembersProvider } from "@/components/members/members-provider";
 import { MemberList } from "@/components/members/member-list";
 import { cn } from "@/lib/utils";
 
-/**
- * The Members area. Phones and tablets show one screen at a time: the list,
- * or the person you opened (with a back button). From 1280px wide, where the
- * chat column still leaves room, the list stays beside that person.
- */
 export function MembersShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const selectedId = /^\/admin\/([^/]+)/.exec(pathname ?? "")?.[1] ?? null;
@@ -34,7 +29,6 @@ export function MembersShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The right side before anyone is opened (only shown from 1280px wide). */
 export function MemberPlaceholder() {
   return (
     <div className="grid flex-1 place-items-center p-8 text-center">

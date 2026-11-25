@@ -228,7 +228,6 @@ held sideways.
   rings or is being placed. A connected call is still.
 - With "reduce motion" on, the tiles are still and nothing moves.
 
-<<<<<<< HEAD
 ## Members
 
 The admin's people (`components/members/*`), at `/admin` and `/admin/<id>`.
@@ -259,47 +258,14 @@ The admin's people (`components/members/*`), at `/admin` and `/admin/<id>`.
 - Asking first is the app's own dialog (`useConfirm()` in `ui/confirm-dialog.tsx`), never
   `window.confirm()`: the title is the question, the text says what will happen in plain words,
   and the button names the action ("Suspend", "Delete forever"). Focus starts on Cancel.
-- Switches are 44×24 with a white knob in both themes, and a larger invisible tap area.
+- Switches are 48×28 with a white knob in both themes.
 - A rule changed for one person reads "Just for <name> · Use everyone's"; otherwise
   "Same as everyone (on)".
 
-## Not redesigned yet
-
-The room management pages still use their old layout with the new colours. Rooms are on hold.
-=======
-## Admin and settings pages
-
-Pages the admin reaches from the menu behind their avatar: Members (`components/admin/*`) and
-Settings (`settings-form.tsx`). Working screens, so they look like the rest of the app and
-add nothing of their own.
-
-- Header: the chat screen's 64px bar (`ScreenHeader`): a back chevron on phones, the page name
-  in bold. No second, larger title below it.
-- Members has five sections (Members, Sign-up codes, Archive, Defaults, Account) as pill tabs
-  under the header, in the style of the avatar picker's tabs: ink for the selected one, white
-  for the rest. The row scrolls sideways on phones and stays pinned while the page scrolls;
-  arrow keys move between tabs.
-- Content sits on the pale ground in white panels: 16px corners, a hairline border and a soft
-  offset shadow (`PANEL` in `form-styles.ts`). Content is at most 672px wide, centred.
-- A member is one panel: 48px moji, the name in bold (an Admin chip for admins), then
-  "@username · last seen …". The Chat circle and the ⋯ menu sit on the name line, so the
-  second line keeps the full width. A suspended member gets a red "Suspended" chip on a line
-  of its own; the Archive needs no chip. Under a hairline: their invite link in a grey pill
-  field with Copy, and how often it was used.
-- Chips are 24px pills: blue tint for Admin, green for an active code, red tint for
-  Suspended, grey for the rest.
-- Lists load as grey placeholder rows; a list that cannot load says so in a red note. An
-  empty list says what will appear there and how.
-- Forms: filled fields 48px tall with 16px corners (`FIELD`), semibold labels above them,
-  native selects with a chevron. Switches are 28px tall, and tapping a setting's name flips
-  it. Primary buttons are full width on phones.
-- Dialogs use the avatar picker's frame: 28px corners, an extra-bold title, Cancel and the
-  action as two 48px buttons at the bottom. Enter submits.
-- Settings: the avatar large (96px) in its own panel with the two ways to change it, then the
-  profile form.
+- The chat details drawer keeps the older panel style (`PANEL` and `ToggleRow` from
+  `form-styles.ts` and `components/admin/parts.tsx`).
 
 ## Not redesigned yet
 
 The room management pages still use their old layout with the new colours (they use
 `PageHeader`, the old header). Rooms are on hold.
->>>>>>> 5c1d94054047b9a8e141db7699f22c3285dc1d90

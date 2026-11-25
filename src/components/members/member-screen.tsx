@@ -56,10 +56,6 @@ type Confirm = (options: ConfirmOptions) => Promise<boolean>;
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
-/**
- * One person in Members: who they are, how they sign in, their chat rules and
- * what happens to their account. Everything about them on one screen.
- */
 export function MemberScreen({ id }: { id: string }) {
   const { people, peopleError, reload } = useMembers();
   const meId = useSessionStore((s) => s.profile?.id);
@@ -139,11 +135,6 @@ function HeroSkeleton() {
   );
 }
 
-/**
- * Whether someone signs in with a password of their own (they made their
- * account with a sign-up code). "maybe" when the codes did not load and they
- * have no link: the warnings about that password are shown, worded as "if".
- */
 type OwnPassword = "yes" | "maybe" | "no";
 
 function PersonPage({ person, confirm }: { person: Person; confirm: Confirm }) {
@@ -171,8 +162,6 @@ function PersonPage({ person, confirm }: { person: Person; confirm: Confirm }) {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
 
 function Hero({ person }: { person: Person }) {
   const router = useRouter();
@@ -254,8 +243,6 @@ function Hero({ person }: { person: Person }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-
 function PasswordForm({
   label,
   hint,
@@ -268,7 +255,6 @@ function PasswordForm({
   hint: string;
   submitLabel: string;
   warning?: string;
-  /** Resolves to an error to show, or null when it worked. */
   onSubmit: (password: string) => Promise<string | null>;
   onCancel: () => void;
 }) {
@@ -371,7 +357,6 @@ function SignInGroup({
     }
   }
 
-  /** POST makes a new link (the old one stops working); PATCH changes the password only. */
   async function send(method: "POST" | "PATCH", password: string): Promise<string | null> {
     try {
       const res = await fetch(`/api/admin/users/${person.id}/invite`, {
@@ -546,15 +531,12 @@ function SignInGroup({
   );
 }
 
-// ---------------------------------------------------------------------------
-
 function RulesGroup({ person, confirm }: { person: Person; confirm: Confirm }) {
   const first = firstName(person);
   const [own, setOwn] = useState<Record<string, unknown> | null>(null);
   const [everyone, setEveryone] = useState<Record<string, unknown>>({});
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  // Bumped to show the saved length again when what was typed changes nothing.
   const [lengthKey, setLengthKey] = useState(0);
 
   useEffect(() => {
@@ -583,7 +565,6 @@ function RulesGroup({ person, confirm }: { person: Person; confirm: Confirm }) {
 
   async function save(patch: Record<string, unknown>) {
     if (!own) return;
-    // What these keys were, so a failure puts back only them (not a later change that worked).
     const previous = Object.fromEntries(Object.keys(patch).map((key) => [key, own[key]]));
     const apply = (values: Record<string, unknown>) => (current: Record<string, unknown> | null) => {
       if (!current) return current;
@@ -615,7 +596,6 @@ function RulesGroup({ person, confirm }: { person: Person; confirm: Confirm }) {
     });
 
   async function backToEveryones(key: string) {
-    // Going back to everyone's setting can switch disappearing messages on: ask, as the switch does.
     if (
       key === "disappearing_messages" &&
       own?.disappearing_messages === false &&
@@ -746,8 +726,6 @@ function RulesGroup({ person, confirm }: { person: Person; confirm: Confirm }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-
 function AccountGroup({
   person,
   ownPassword,
@@ -759,7 +737,6 @@ function AccountGroup({
 }) {
   const router = useRouter();
   const { patchPerson, dropPerson } = useMembers();
-  // A ref, not disabled buttons: disabling the focused button would drop keyboard focus.
   const busy = useRef(false);
   const first = firstName(person);
 
