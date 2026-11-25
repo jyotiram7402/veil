@@ -206,8 +206,8 @@ never ends a call: it carries on as a voice call.
 
 ## Messages do not disappear
 
-Disappearing messages are off until the admin switches them on: Admin page → **Defaults** →
-"Disappearing messages" (everyone), or **Users** → a person's menu → "Per-user settings"
+Disappearing messages are off until the admin switches them on: **Settings** → Chat rules
+for everyone → "Disappearing messages" (everyone), or **Members** → the person → Chat rules
 (one person). After that:
 
 - The chat has to be opened once after the switch was changed (an open chat keeps the

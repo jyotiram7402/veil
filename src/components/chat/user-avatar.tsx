@@ -10,8 +10,8 @@ type Props = {
   username: string;
   displayName?: string | null;
   avatarUrl?: string | null;
-  /** sm 32px, md 40px, lg 48px, story 56px (the people row), xl 64px */
-  size?: "sm" | "md" | "lg" | "story" | "xl";
+  /** sm 32px, md 40px, lg 48px, story 56px (the people row), xl 64px, hero 96px (a person's screen) */
+  size?: "sm" | "md" | "lg" | "story" | "xl" | "hero";
   /** Show a green dot while this person is online. */
   showPresence?: boolean;
   className?: string;
@@ -23,6 +23,7 @@ const SIZE: Record<NonNullable<Props["size"]>, string> = {
   md: "h-10 w-10 text-[21px]",
   lg: "h-12 w-12 text-[26px]",
   story: "h-14 w-14 text-[30px]",
+  hero: "h-24 w-24 text-[52px]",
   xl: "h-16 w-16 text-[34px]",
 };
 
@@ -55,7 +56,13 @@ export function UserAvatar({
         <span
           role="img"
           aria-label="Online"
-          className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-online ring-2 ring-card"
+          className={cn(
+            "absolute rounded-full bg-online",
+            // The hero sits on the page ground, every other size on a white surface.
+            size === "hero"
+              ? "bottom-1 right-1 h-5 w-5 ring-4 ring-background"
+              : "bottom-0 right-0 h-3 w-3 ring-2 ring-card",
+          )}
         />
       )}
     </div>

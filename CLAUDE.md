@@ -51,13 +51,14 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - `middleware.ts` → `src/lib/supabase/middleware.ts`: session refresh + route gating (public
   paths, admin-only prefixes, member vs admin redirects). **Not active in production** (Gotchas).
 - `src/app/(app)` admin shell (layout requires `is_admin`): `chats`, `rooms`, `admin`, `settings`.
+  `admin` is Members: `admin/layout.tsx` keeps the list (`components/members/*`) beside `admin/[id]`.
 - `src/app/page.tsx` first screen (Log in / Sign up); `src/app/(auth)/login`, `(auth)/signup`; each calls
   `redirectIfSignedIn()`. UI in `src/components/auth/*`: `first-screen.tsx`, `auth-shell.tsx`, `entry.module.css`.
 - `src/app/(user)/chat` (member's 1:1 chat with admin), `(user)/expired`.
 - `src/app/i/[token]` member invite gate; `src/app/join[/code]` + `src/app/room/[id]` room guests.
 - `src/app/api/**/route.ts` all mutations. `src/lib/` server logic (`supabase/`, `auth/`,
   `rooms.ts`, `permissions.ts`, `signup-codes.ts`, `validations.ts`, `api.ts`, `webrtc/`).
-- `src/components/{ui,chat,call,rooms,layout,auth}`, `src/hooks/`, `src/store/` (Zustand).
+- `src/components/{ui,chat,call,rooms,layout,auth,members,settings}`, `src/hooks/`, `src/store/` (Zustand).
 - `supabase/*.sql` migrations; `src/types/database.ts` is a **hand-written** mirror of them.
 - Flow: Server Component (`getSessionUser` + RLS client; does its own redirects) → client component →
   `fetch('/api/…')` → handler auth check → `supabaseServer` (RLS) or `supabaseAdmin` (service role).
@@ -75,7 +76,8 @@ curl https://veil-cqsf.vercel.app/api/health   # liveness, no secrets
 - Rooms/invites: `src/lib/rooms.ts`, `src/lib/permissions.ts`, `src/components/rooms/*`.
 - Calls: one engine for the whole app (`src/hooks/use-call.ts`, `src/lib/webrtc/*`), mounted by
   `CallProvider` in `app-shell.tsx` / `user-chat.tsx`; screen `src/components/call/*`; `api/calls/authorize`.
-- Runtime toggles: `src/lib/settings.ts` + `app_settings` table + admin "Defaults" tab.
+- Runtime toggles: `src/lib/settings.ts` + `app_settings` table + Settings → "Chat rules for
+  everyone" (one person: their screen in Members). Labels and fallbacks: `components/settings/chat-rules.ts`.
 - Disappearing messages: `src/lib/vanish.ts` (server) + `src/hooks/use-vanish-on-leave.ts` (screen).
   Read `docs/ARCHITECTURE.md` → Disappearing messages first: a mistake there deletes real messages.
 - Styling: rules in `DESIGN.md`, tokens in `src/app/globals.css`, primitives in `src/components/ui`,
@@ -172,11 +174,13 @@ Names only — values live in Vercel (Production) and Supabase; template in `.en
 - UI redesign (started 2026-11-14), one branch per feature. Merged into `main` (PRs #4–#8) and
   live: the rename to BlackFoxx, new tokens/fonts, moji avatars and the avatar picker, the
   animated first screen, the log-in and invite-link screens, the chat home and the chat
-  screen, copy buttons that copy, sign-up with a code (`/signup`, admin tab "Sign-up codes"),
+  screen, copy buttons that copy, sign-up with a code (`/signup`, codes made in Members → Add someone),
   and the new call screen (the last two not yet confirmed by the owner). Rooms are on hold.
-  Not merged, stacked in this order: `feature/call-anywhere`, `fix/flip-camera`,
-  `fix/video-quality`, `feature/disappearing-messages`. Next: the relay, then the
-  admin/settings pages. Proposed: the route guard.
+  Merged since (PRs #9–#12): calls ring on every screen, flip camera, sharp video, disappearing
+  messages. Local branches, not pushed: `feature/turn-relay` (dormant until Cloudflare is set up
+  in a later phase) and `feature/admin-pages` (Members and Settings redesigned, one screen per
+  person, "Add someone", in-app confirmations; checked only in a local harness with a pretend
+  server, never against Supabase). Proposed: the route guard.
 - Disappearing messages (off until the admin switches them on; no migration): tested with
   simulated phones and a pretend server only, nothing of it has run on the live site yet.
 - What the assistant can check itself: public pages on the live site (built-in Browser pane),

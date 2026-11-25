@@ -37,9 +37,9 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 | `(auth)/signup` | signed-out | sign-up with an invite code (`components/auth/signup-form.tsx` → `/api/auth/signup`); `?code=` pre-fills it |
 | `(app)/layout.tsx` | admin | requires `is_admin`; loads chat list (`loadChatsForUser`) into `AppShell` |
 | `(app)/chats`, `chats/[id]` | admin | chat list + thread (`components/chat/chat-thread.tsx`) |
-| `(app)/admin` | admin | Members / Archive / Defaults / Account tabs (`components/admin-panel.tsx`) |
+| `(app)/admin`, `admin/[id]` | admin | Members: `admin/layout.tsx` → `components/members/members-shell.tsx` (list, data in `members-provider.tsx`) beside one person's screen (`member-screen.tsx`); "Add someone" (`add-someone-dialog.tsx`) |
 | `(app)/rooms`, `rooms/[id]` | admin | rooms dashboard + room management (`components/rooms/*`) |
-| `(app)/settings` | admin | own profile |
+| `(app)/settings` | admin | own profile, sign-in, chat rules for everyone (`components/settings/settings-screen.tsx`) |
 | `(user)/chat` | member | single 1:1 chat with an admin (`components/user-chat.tsx`) |
 | `(user)/expired` | anyone | dead-end page after suspension / sign-out |
 | `i/[token]` | member | per-member invite link + gate password → session |
@@ -137,10 +137,10 @@ Browser ──► middleware.ts → src/lib/supabase/middleware.ts (updateSessio
 ## Auth flows
 
 - **Admin:** `/login` → `/api/auth/login` → `signInWithPassword(<username>@domain)`.
-- **Member:** admin creates user in `/admin` → invite link `/i/<token>` → gate password →
+- **Member:** admin adds them in Members → Add someone → Personal link → invite link `/i/<token>` → gate password →
   `/api/i/[token]` rotates the auth password to a random value and signs the browser in →
   `/chat`. `SessionLock` (setting `screen_guard`) re-locks on tab hide; unlock via `/api/lock`.
-- **Sign-up member:** admin makes a code in `/admin` → "Sign-up codes" → the person opens
+- **Sign-up member:** admin makes a code in Members → Add someone → Sign-up code → the person opens
   `/signup` (or the shared `/signup?code=…` link), picks a username, password and avatar →
   `/api/auth/signup` checks the code, claims one use atomically (`claim_signup_code`), creates
   the auth user + profile and signs the browser in → `/chat`. Later they use `/login`. Their
