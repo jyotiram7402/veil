@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { jsonError, parseBody } from "@/lib/api";
+import { jsonError, parseBody, serverError } from "@/lib/api";
 import { updateParticipantSchema } from "@/lib/validations";
 import { assertRoomAdmin, recordAudit } from "@/lib/rooms";
 import type { Database } from "@/types/database";
@@ -47,7 +47,7 @@ export async function PATCH(
     .eq("chat_id", id)
     .eq("user_id", userId)
     .eq("role", "member");
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("rooms/[id]/participants", error, "Couldn't change that. Try again.");
 
   if (body.blocked !== undefined) {
     await recordAudit({
@@ -95,7 +95,7 @@ export async function DELETE(
     .eq("user_id", userId)
     .eq("role", "member")
     .is("removed_at", null);
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("rooms/[id]/participants", error, "Couldn't remove them. Try again.");
 
   await recordAudit({
     roomId: id,

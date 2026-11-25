@@ -1,15 +1,7 @@
 import { ImageIcon, Lock, MessageCircleMore, Timer, type LucideIcon } from "lucide-react";
 
-/**
- * The chat rules the admin sets for everyone (Settings) and can change for one
- * person (their screen in Members). Keys are those of `SettingsShape` in
- * src/lib/settings.ts; `user_session_ephemeral` is left out because it has no
- * effect yet.
- */
 export type RuleKey = "uploads_enabled" | "typing_indicator" | "screen_guard" | "disappearing_messages";
 
-// `fallback`: the value while the admin has never set one; the same as DEFAULT_SETTINGS in
-// src/lib/settings.ts (server-only, so it cannot be imported here).
 export const CHAT_RULES: {
   key: RuleKey;
   icon: LucideIcon;
@@ -47,7 +39,6 @@ export const CHAT_RULES: {
   },
 ];
 
-/** The value a rule has for everyone: what the admin set, or its fallback. */
 export function everyoneValue(settings: Record<string, unknown>, key: RuleKey): boolean {
   const rule = CHAT_RULES.find((r) => r.key === key);
   const value = settings[key];
@@ -61,14 +52,12 @@ export function everyoneLength(settings: Record<string, unknown>): number {
   return Number.isFinite(value) && value > 0 ? value : MAX_LENGTH.fallback;
 }
 
-/** A message length typed by the admin, held to what the app allows; null when it is not a number. */
 export function clampLength(raw: string): number | null {
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n)) return null;
   return Math.min(MAX_LENGTH.max, Math.max(MAX_LENGTH.min, n));
 }
 
-/** Asked before disappearing messages are switched on, for everyone or for one person. */
 export const DISAPPEARING_CONFIRM = {
   title: "Turn on disappearing messages?",
   confirmLabel: "Turn on",

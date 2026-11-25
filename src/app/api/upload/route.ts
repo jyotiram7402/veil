@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getAuthUserId } from "@/lib/auth/session";
-import { jsonError } from "@/lib/api";
+import { jsonError, serverError } from "@/lib/api";
 import {
   ALLOWED_ATTACHMENT_MIME,
   ATTACHMENT_MAX_BYTES,
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       contentType: file.type,
       upsert: true,
     });
-    if (error) return jsonError(500, error.message);
+    if (error) return serverError("upload", error, "The photo didn't upload. Try again.");
 
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
     return NextResponse.json({ url: data.publicUrl, path });
@@ -67,12 +67,14 @@ export async function POST(req: Request) {
       contentType: file.type,
       upsert: false,
     });
-    if (error) return jsonError(500, error.message);
+    if (error) return serverError("upload", error, "The file didn't upload. Try again.");
 
     const { data: signed, error: signErr } = await supabase.storage
       .from("attachments")
       .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
-    if (signErr || !signed) return jsonError(500, signErr?.message ?? "Failed to sign URL");
+    if (signErr || !signed) {
+      return serverError("upload", signErr, "The file didn't upload. Try again.");
+    }
 
     return NextResponse.json({
       url: signed.signedUrl,

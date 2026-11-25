@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { jsonError } from "@/lib/api";
+import { jsonError, serverError } from "@/lib/api";
 import { lockOut } from "@/lib/lockout";
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -18,7 +18,7 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
 
   if (hard) {
     const { error } = await admin.auth.admin.deleteUser(id);
-    if (error) return jsonError(500, error.message);
+    if (error) return serverError("admin/users/[id]", error, "Couldn't delete them. Try again.");
     return NextResponse.json({ ok: true, mode: "hard" });
   }
 

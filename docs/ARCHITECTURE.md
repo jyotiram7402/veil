@@ -50,15 +50,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 | `(auth)/signup` | signed-out | sign-up with an invite code (`components/auth/signup-form.tsx` → `/api/auth/signup`); `?code=` pre-fills it |
 | `(app)/layout.tsx` | admin | requires `is_admin`; loads chat list (`loadChatsForUser`) into `AppShell` |
 | `(app)/chats`, `chats/[id]` | admin | chat list + thread (`components/chat/chat-thread.tsx`) |
-<<<<<<< HEAD
 | `(app)/admin`, `admin/[id]` | admin | Members: `admin/layout.tsx` → `components/members/members-shell.tsx` (list, data in `members-provider.tsx`) beside one person's screen (`member-screen.tsx`); "Add someone" (`add-someone-dialog.tsx`) |
 | `(app)/rooms`, `rooms/[id]` | admin | rooms dashboard + room management (`components/rooms/*`) |
 | `(app)/settings` | admin | own profile, sign-in, chat rules for everyone (`components/settings/settings-screen.tsx`) |
-=======
-| `(app)/admin` | admin | Members / Sign-up codes / Archive / Defaults / Account tabs (`components/admin/admin-screen.tsx`, one file per tab in `components/admin/`) |
-| `(app)/rooms`, `rooms/[id]` | admin | rooms dashboard + room management (`components/rooms/*`) |
-| `(app)/settings` | admin | own profile (`components/settings-form.tsx`) |
->>>>>>> 5c1d94054047b9a8e141db7699f22c3285dc1d90
 | `(user)/chat` | member | single 1:1 chat with an admin (`components/user-chat.tsx`) |
 | `(user)/expired` | anyone | dead-end page after suspension / sign-out |
 | `i/[token]` | member | per-member invite link + gate password → session |
@@ -111,7 +105,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `redirectIfSignedIn`), `auth/username.ts` (`<username>@INTERNAL_EMAIL_DOMAIN`).
 - `entry-checks.ts` (field checks for the log-in and sign-up forms), `format.ts` (times and
   dates as the chat shows them).
-- `api.ts` — `jsonError`, `parseBody(req, zodSchema)`, in-memory `rateLimit`, `clientKey`.
+- `api.ts` — `jsonError`, `serverError`, `parseBody(req, zodSchema)`, in-memory `rateLimit`,
+  `clientKey`. `db-errors.ts` — `errorCode`, `isTaken` (a taken username, from Postgres or
+  Supabase Auth) and `describeError` (the one log line).
 - `validations.ts` — all zod schemas (login, users, messages, rooms, invites, join, display name).
 - `queries.ts` — chat list + message paging queries.
 - `rooms.ts` — access codes (`selector.verifier`, PBKDF2-hashed verifier), `validateInvite`,
@@ -440,10 +436,36 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `attachment-path.ts` are.
 - Covered: disappearing messages (`vanish.ts`, `read-cutoff.ts`), notifications
   (`web-push.ts` against the standards' own example values, `push.ts`, `push-client.ts`,
-  `public/sw.js`), `attachment-path.ts` and `turn.ts`. Not covered: API routes, screens,
+  `public/sw.js`), `attachment-path.ts`, `turn.ts` and `db-errors.ts`. Not covered: API routes, screens,
   calls, the database policies.
 - Nothing in the repository makes Vercel wait for the tests: a red cross on GitHub does not
   stop a deployment.
+
+## Members and Settings
+
+- `(app)/admin/layout.tsx` renders `MembersShell`, so the list stays mounted while people are
+  opened beside it (`admin/[id]`). `MembersProvider` loads everyone (archived included) and the
+  sign-up codes once; the list and the person's screen read the same data, so a change shows on
+  both at once. A failed reload keeps the list on screen and says so in a toast.
+- Phones and tablets show one screen at a time. From 1280px (`xl`) the list stays beside the
+  person: the 380px chat column still leaves room there. `ScreenHeader`'s back button hides from
+  the width where the screen it goes back to is already showing (`hideFrom`).
+- "Joined with a sign-up code" is read from the codes' `used_by`. When the codes don't load it is
+  unknown, and the warnings about that person's own password are still shown, worded "if":
+  suspending someone (`lockOut`) and opening a personal link both replace their password.
+- Chat rule labels and fallbacks are in `components/settings/chat-rules.ts`. The fallbacks repeat
+  `DEFAULT_SETTINGS` because `lib/settings.ts` is server-only.
+- Switching disappearing messages on asks first, and so does going back to everyone's setting
+  when that switches them on for this person.
+- A failed save puts back only the keys it changed, so it never undoes a later change that worked.
+- The longest-message field is uncontrolled and keyed by the saved value plus a counter, so a
+  value the app held to its limits (100–20,000) shows as it was saved.
+- "Are you sure" is `useConfirm()` (`ui/confirm-dialog.tsx`), never `window.confirm()`; focus
+  starts on Cancel. Dialogs have `outline-none` because Radix focuses the dialog itself when the
+  focused control inside it unmounts (a step of "Add someone" changing).
+- A row's form closing gives focus back to the row. The account buttons are not disabled while a
+  request runs (a disabled, focused button drops keyboard focus); a ref stops a double action.
+- Settings → Calls → Call relay runs `checkRelay()` (`lib/webrtc/relay-check.ts`).
 
 ## Conventions
 
@@ -456,8 +478,12 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   (the Supabase host) and `src/app/api/health` (booleans only).
 - A new route: copy `src/app/api/rooms/route.ts`. Session check → 401, `is_admin` → 403,
   `parseBody(req, schema)` with a schema from `src/lib/validations.ts`, the query, then
-  `NextResponse.json` or `jsonError`. Routes that members can reach answer with general
-  error text; screens show `apiErrorMessage(body, fallback)`.
+  `NextResponse.json` or `jsonError`. No route sends a database's own error text to the
+  browser: a failure goes through `serverError(area, error, message)`, which logs
+  `[area] code status text` (never the request, the body or the row values in `details`) and
+  answers 500 with the plain sentence. Where the database's answer means something the person
+  can act on (a username already taken, the same password again), say that instead, with its
+  own status. Screens show `apiErrorMessage(body, fallback)`.
 - Every change goes through `fetch` → an API route. Realtime is only listened to
   (postgres_changes, broadcast, presence).
 - A message that is being sent has a `local-` id until the server's row replaces it.

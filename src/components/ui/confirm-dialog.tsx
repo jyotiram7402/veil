@@ -13,19 +13,12 @@ import {
 export type ConfirmOptions = {
   title: string;
   body: React.ReactNode;
-  /** Names the action: "Suspend", "Delete forever". Never "OK". */
   confirmLabel: string;
   destructive?: boolean;
 };
 
-/**
- * The app's own window.confirm(): `if (!(await confirm({...}))) return;`.
- * Render `dialog` once in the component that calls it. Focus starts on
- * Cancel, so a stray Enter never confirms something destructive.
- */
 export function useConfirm() {
   const [open, setOpen] = useState(false);
-  // Kept after closing, so the dialog keeps its words while it fades out.
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const resolver = useRef<((ok: boolean) => void) | null>(null);
 

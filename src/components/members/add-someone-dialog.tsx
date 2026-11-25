@@ -39,10 +39,6 @@ async function copy(text: string, what: string) {
   else toast.error("Couldn't copy. Select it and copy it yourself.");
 }
 
-/**
- * Adding someone, both ways in one place: a personal link (you choose their
- * username and password) or a sign-up code (they choose their own).
- */
 export function AddSomeoneDialog({
   open,
   onOpenChange,
@@ -287,7 +283,6 @@ function LinkForm({ onBack, onMade }: { onBack: () => void; onMade: (step: Step)
       } else if (invite) {
         onMade({ kind: "link-made", name: name.trim() || u, url: invite.url });
       } else {
-        // The account exists but its link was not made: say so, and where to fix it.
         setError(
           `${name.trim() || u} was added, but their link wasn't made. Open them in Members and use "Make a personal link".`,
         );

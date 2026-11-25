@@ -3,11 +3,6 @@
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 
-/**
- * The "longest message" number, saved when the field is left (or on Enter).
- * Uncontrolled: give it a `key` that changes with the saved value, so a value
- * the app held to its limits shows as it was saved.
- */
 export function LengthInput({
   defaultValue,
   placeholder,

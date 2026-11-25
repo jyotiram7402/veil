@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { jsonError } from "@/lib/api";
+import { jsonError, serverError } from "@/lib/api";
 import { SETTING_KEYS } from "@/lib/settings";
 
 const KNOWN_KEYS = new Set<string>(SETTING_KEYS);
@@ -13,7 +13,7 @@ export async function GET() {
 
   const admin = supabaseAdmin();
   const { data, error } = await admin.from("app_settings").select("key, value, updated_at");
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("admin/settings", error, "Couldn't load the chat rules. Try again.");
 
   const map: Record<string, unknown> = {};
   for (const row of data ?? []) map[row.key] = row.value;
@@ -45,6 +45,6 @@ export async function PATCH(req: Request) {
 
   const admin = supabaseAdmin();
   const { error } = await admin.from("app_settings").upsert(updates, { onConflict: "key" });
-  if (error) return jsonError(500, error.message);
+  if (error) return serverError("admin/settings", error, "Couldn't save the chat rules. Try again.");
   return NextResponse.json({ ok: true });
 }

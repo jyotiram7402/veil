@@ -38,11 +38,6 @@ function byName(a: Person, b: Person): number {
   return nameOf(a).localeCompare(nameOf(b), undefined, { sensitivity: "base" });
 }
 
-/**
- * The Members list: everyone you talk to, then the sign-up codes still out
- * there, then the archive. Full screen on phones; from 1280px wide it stays
- * beside the person you opened.
- */
 export function MemberList({ selectedId }: { selectedId: string | null }) {
   const { people, peopleError, codes, codesError, reload, patchCode } = useMembers();
   const meId = useSessionStore((s) => s.profile?.id);
@@ -64,7 +59,6 @@ export function MemberList({ selectedId }: { selectedId: string | null }) {
   const pastCodes = (codes ?? []).filter((c) => !codeIsActive(c));
   const onlineCount = active.filter((p) => online.has(p.id)).length;
 
-  // Opening an archived person (a link, the back button) shows where they are.
   useEffect(() => {
     if (selectedId && archived.some((p) => p.id === selectedId)) setShowArchived(true);
   }, [selectedId, archived]);

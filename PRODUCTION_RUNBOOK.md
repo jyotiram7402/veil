@@ -61,7 +61,7 @@ setup and `docs/SECURITY.md` for the security model.
 **Calls fail**
 1. Both parties have the chat open? (signaling is scoped to `call:<chatId>`)
 2. Same network works but two different networks fail → the relay. Admin → Members →
-   Defaults → Call relay → Check says what is wrong (not set up, key refused, Cloudflare
+   Settings → Calls → Call relay → Check says what is wrong (not set up, key refused, Cloudflare
    not answering, or this network blocks it).
 3. Check WebRTC/ICE state in the call UI (reconnecting indicator).
 4. Signaling: Supabase Realtime up + `realtime.messages` policies present.

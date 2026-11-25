@@ -104,7 +104,7 @@ relay. Without one they cannot connect; on one network they work without it.
    `CLOUDFLARE_TURN_API_TOKEN` = the API Token. Never `NEXT_PUBLIC_`.
 3. Redeploy.
 4. Check: `/api/health` answers `"relay": true` when both values are present. Then sign in
-   as the admin → Members → **Defaults** → **Call relay** → Check: it says whether Cloudflare
+   as the admin → **Settings** → **Calls** → **Call relay** → Check: it says whether Cloudflare
    accepts the key and whether that device can reach the relay.
 
 Cost (Cloudflare's price list, read 2026-11-17): the first 1,000 GB a month are free, after

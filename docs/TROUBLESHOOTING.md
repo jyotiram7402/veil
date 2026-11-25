@@ -51,6 +51,14 @@ select id, username from public.profiles where lower(username) = lower('jay');
 - Some corporate networks block the WebSocket upgrade. Try a phone
   hotspot to confirm.
 
+## A screen keeps saying "Couldn't … Try again."
+
+The server hit a database or storage error and logged it. Vercel → the project → Logs,
+filter on errors, and look for a line that starts with the route in brackets, for example
+`[admin/users] 42501 permission denied for table profiles`. The code says what went wrong
+(`42501`: a missing grant, see `supabase/README.md` → Recovery recipes; `23505`: a value that
+must be unique already exists; `PGRST…`: the API layer of Supabase).
+
 ## Uploads fail with 403
 
 The `attachments` bucket has an RLS policy that requires you to be a
@@ -194,7 +202,7 @@ The two devices could not reach each other. That is the normal result between tw
 different networks (Wi-Fi and mobile data, two homes) while the relay is not working.
 The call gives up 30 seconds after it was answered.
 
-1. Sign in as the admin → Members → **Defaults** → **Call relay** → Check.
+1. Sign in as the admin → **Settings** → **Calls** → **Call relay** → Check.
    - "not set up": add `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` in Vercel
      (`DEPLOYMENT.md` §6) and redeploy.
    - "Cloudflare refused the key": one of the two values is wrong. Copy them again.
@@ -278,15 +286,9 @@ is intended (see `docs/SECURITY.md`).
 
 ## Messages do not disappear
 
-<<<<<<< HEAD
 Disappearing messages are off until the admin switches them on: **Settings** → Chat rules
 for everyone → "Disappearing messages" (everyone), or **Members** → the person → Chat rules
 (one person). After that:
-=======
-Disappearing messages are off until the admin switches them on: Admin page → **Defaults** →
-"Disappearing messages" (everyone), or **Members** → the ⋯ menu next to a person →
-"Settings for this person" (one person). After that:
->>>>>>> 5c1d94054047b9a8e141db7699f22c3285dc1d90
 
 - The chat has to be opened once after the switch was changed (an open chat keeps the
   setting it was loaded with).
