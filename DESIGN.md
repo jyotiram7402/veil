@@ -199,9 +199,17 @@ held sideways.
   message box must not answer or decline a call.
 - Chips on the stage (Chat, Muted, Your camera) are `bg-card` pills, because they have to
   read on any ground and on any picture.
-- "Chat" shrinks the call to a pill under the chat header: avatar, name, timer, Mute, End.
-  In the admin's app it also opens that person's chat, and the pill then stays on every
-  screen until the call ends. An incoming call takes the whole screen wherever the person is.
+- "Chat" shrinks the call so the chat can be used beside it. In the admin's app it also opens
+  that person's chat, and the shrunk call then stays on every screen until the call ends.
+  - A video call (either camera on) becomes a floating window: the other person on top,
+    you below (mirrored for a front camera), each tile the person's own moji ground with
+    their moji while that camera is off, a small mic-off badge on a muted tile, then Mute,
+    the timer and End. 144px wide on phones, 192px from 640px, 24px corners. It starts top
+    right under the chat header and can be dragged; it settles in the nearest corner, above
+    the message box at the bottom. Tapping a picture brings the full call back.
+  - A voice call, a call that has ended, and any call while the screen lock is up use the
+    pill under the chat header instead: avatar, name, timer, Mute, End. No live picture
+    shows over the lock. An incoming call takes the whole screen wherever the person is.
 - A member's screen lock never hides a call: the call screen and the pill sit above it, so
   a call is answered and ended without the password, and the chat stays locked behind.
   While the lock is up the pill sits at the top of the screen, since there is no header.

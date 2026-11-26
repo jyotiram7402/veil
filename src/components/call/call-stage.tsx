@@ -10,7 +10,7 @@ import styles from "./call.module.css";
 const CHIP =
   "inline-flex h-10 items-center gap-1.5 rounded-full bg-card pl-3 pr-3.5 text-sm font-semibold text-card-foreground shadow-[0_10px_22px_-14px_rgb(15_18_30/0.6)]";
 
-function stageLook(peer: PeerInfo) {
+export function stageLook(peer: PeerInfo) {
   const chosen = parseMojiValue(peer.avatarUrl);
   const moji = chosen ?? mojiFor(peer.id || peer.name);
   return {
@@ -34,7 +34,7 @@ function isPale(hex: string): boolean {
 
 const MAX_CUT = 0.25;
 
-function isSelfie(stream: MediaStream): boolean {
+export function isSelfie(stream: MediaStream): boolean {
   return stream.getVideoTracks()[0]?.getSettings().facingMode !== "environment";
 }
 
@@ -156,7 +156,7 @@ export function CallStage({
   );
 }
 
-function StreamVideo({
+export function StreamVideo({
   stream,
   label,
   mirrored,

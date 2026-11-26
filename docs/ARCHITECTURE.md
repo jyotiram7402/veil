@@ -265,7 +265,19 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - UI: `components/call/call-screen.tsx` (+ `call-stage`, `call-controls`, `call.module.css`)
   only reads `call-store` and calls the actions `use-call` returns. A closing state
   (`isCallOver`) keeps the screen up for 2.5 s; an error stays until closed (`dismiss`).
-  "Chat" shrinks the call to a pill and, for the admin, opens that chat (`onOpenChat`).
+  "Chat" shrinks the call and, for the admin, opens that chat (`onOpenChat`). Shrunk, a video
+  call is `call-float.tsx` (a floating window with both pictures) and everything else the
+  pill; while the lock is up it is always the pill. The window's corner lives in
+  `CallScreen` state, so it stays where it was put for the rest of the call. Its `<video>`
+  elements play the same `MediaStream`s as the stage (sound stays on the provider's
+  `<audio>`).
+- Dragging the window: a drag starts after 6 px, and only then does the window take pointer
+  capture (capturing on press would send the release, and so the click, to the window
+  instead of its buttons). The corner is chosen from where the pointer let go, not from the
+  window's position on screen, which React may not have drawn yet. The move to the corner is
+  a FLIP in a layout effect. A click that arrives within 350 ms of a drag ending is that
+  drag's release and is dropped; after a long touch drag the browser sends no click at all,
+  so a flag that waited for one would eat the next real tap.
 - The call screen and the pill sit above a member's screen lock (z-index 90, the lock is 80):
   a call can be answered, seen and ended without unlocking, while the chat stays behind the
   lock. While locked the pill moves to the top, where the chat header would be. The lock
