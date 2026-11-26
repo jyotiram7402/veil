@@ -508,3 +508,48 @@ await test("an incoming call never throws, whatever the database or the push ser
   await (await freshServer()).notifyIncomingCall(ring(ADMIN), ORIGIN);
 });
 
+
+await test("a test notification goes to this phone at once, even while the app is open on it", async () => {
+  world();
+  const push = await freshServer();
+  const mine = await give(push, ASHA, "asha-phone", 1);
+  assert.equal(await push.sendTestPush(ASHA, mine.endpoint, ORIGIN), "sent");
+  assert.equal(pushes.length, 1);
+  assert.equal(pushes[0].to, "asha-phone");
+  assert.equal(pushes[0].notice.title, "Test notification");
+  assert.equal(pushes[0].notice.tag, "test");
+});
+
+await test("a test is only sent to the caller's own registered phone", async () => {
+  world();
+  const push = await freshServer();
+  const ravis = await give(push, RAVI, "ravi-phone");
+  assert.equal(await push.sendTestPush(ASHA, ravis.endpoint, ORIGIN), "not-registered");
+  assert.equal(await push.sendTestPush(ASHA, "https://fcm.googleapis.com/fcm/send/nobody", ORIGIN), "not-registered");
+  assert.equal(pushes.length, 0);
+});
+
+await test("a phone the push service no longer knows is forgotten and reported", async () => {
+  world();
+  const push = await freshServer();
+  const mine = await give(push, ASHA, "asha-old");
+  globalThis.__service = () => 410;
+  assert.equal(await push.sendTestPush(ASHA, mine.endpoint, ORIGIN), "not-registered");
+  assert.equal(devices().length, 0);
+});
+
+await test("a push service that refuses the test is reported as failed, and nothing is thrown", async () => {
+  world();
+  const push = await freshServer();
+  const mine = await give(push, ASHA, "asha-refused");
+  globalThis.__service = () => 403;
+  assert.equal(await quiet(() => push.sendTestPush(ASHA, mine.endpoint, ORIGIN)), "failed");
+  assert.equal(devices().length, 1, "a refusal is not a reason to forget the phone");
+});
+
+await test("before the migration has been run, a test says so", async () => {
+  world({ migrated: false });
+  const push = await freshServer();
+  assert.equal(await push.sendTestPush(ASHA, "https://fcm.googleapis.com/fcm/send/a1", ORIGIN), "not-set-up");
+  assert.equal(pushes.length, 0);
+});

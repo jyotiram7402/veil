@@ -248,9 +248,47 @@ Open the site's permissions in the browser (usually the icon next to the
 address), set Microphone and Camera to Allow, and call again. A blocked camera
 never ends a call: it carries on as a voice call.
 
+On Android, Chrome itself must also be allowed to use the microphone: the phone's
+Settings → Apps → Chrome → Permissions → Microphone. If Chrome is not allowed there, the
+site's own Allow does nothing.
+
+## A call stops with "The microphone could not be started"
+
+The browser has permission but could not open the microphone. The browser's own name for
+the error is shown in brackets after the message.
+
+- **(NotReadableError)**: something else holds the microphone. On Android that is usually a
+  phone or WhatsApp call, a voice recorder, a voice assistant, or the same site open in
+  another tab. The app already tries twice; close the other app or tab and call again.
+  Restarting Chrome (close it from the recent-apps list) clears a microphone Chrome itself
+  still holds.
+- **(AbortError)**: the same, on some phones.
+- **(OverconstrainedError)**: the microphone chosen in the call settings has gone (a headset
+  was unplugged). The app falls back to the phone's own microphone on the second try; if
+  this still shows, pick another microphone.
+
+## A call stops with "The call couldn't be set up"
+
+Not a microphone problem. The name in brackets (for example `TypeError`) is the start of
+the answer; the browser's console has the whole error, in a line starting with
+`[call] the call could not start` (or `could not be answered`). On a phone, connect it to a
+computer and use Chrome's `chrome://inspect` to read that console.
+
 ## No notification arrives
 
-Work down the list; the first one that fits is usually it.
+First use **Send a test notification**, in the same menu as "Turn off notifications" (it is
+there while notifications are on). It goes to this device straight away, even while the app
+is open, and says what happened:
+
+- "Test sent" and nothing appears: the server and the push service did their part; the
+  phone is holding it back. Go to steps 4 to 6.
+- "isn't registered for notifications any more": turn notifications off and on again in
+  the menu, then test again.
+- "The push service didn't take the test": see step 8.
+- "aren't set up on the server yet": see step 1.
+
+If the test arrives but real notifications do not, step 3 is the usual reason. Otherwise,
+work down the list; the first one that fits is usually it.
 
 1. **Turning them on answers "Notifications aren't available yet"**: `supabase/v12.sql` has
    not been run in this Supabase project.

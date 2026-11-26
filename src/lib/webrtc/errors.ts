@@ -17,6 +17,7 @@ export type CallErrorCode =
   | "ROOM_ENDED"
   | "PERMISSION_REVOKED"
   | "UNSUPPORTED"
+  | "SETUP_FAILED"
   | "UNKNOWN";
 
 const MESSAGES: Record<CallErrorCode, string> = {
@@ -40,6 +41,7 @@ const MESSAGES: Record<CallErrorCode, string> = {
   ROOM_ENDED: "This room is no longer available.",
   PERMISSION_REVOKED: "Voice calling has been disabled by the administrator.",
   UNSUPPORTED: "This browser doesn't support voice calls.",
+  SETUP_FAILED: "The call couldn't be set up. Try again.",
   UNKNOWN: "Something went wrong with the call.",
 };
 
@@ -61,7 +63,12 @@ export function classifyMediaError(err: unknown): CallErrorCode {
         return "MIC_UNAVAILABLE";
     }
   }
-  return "MIC_UNAVAILABLE";
+  return "SETUP_FAILED";
+}
+
+export function errorTag(err: unknown): string | null {
+  if (err instanceof Error || err instanceof DOMException) return err.name || null;
+  return null;
 }
 
 export function classifyCameraError(err: unknown): CallErrorCode {

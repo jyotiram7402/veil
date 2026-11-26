@@ -105,6 +105,41 @@ export async function forgetAllDevices(userId: string): Promise<void> {
   await supabaseAdmin().from("push_subscriptions").delete().eq("user_id", userId);
 }
 
+export type TestPushResult = "sent" | "failed" | "not-set-up" | "not-registered";
+
+export async function sendTestPush(
+  userId: string,
+  endpoint: string,
+  origin: string,
+): Promise<TestPushResult> {
+  const keys = await getPushKeys();
+  if (!keys) return "not-set-up";
+  const admin = supabaseAdmin();
+  const { data: device } = await admin
+    .from("push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .eq("user_id", userId)
+    .eq("endpoint", endpoint)
+    .maybeSingle();
+  if (!device) return "not-registered";
+  const notice: Notice = {
+    title: "Test notification",
+    body: "Notifications work on this phone.",
+    tag: "test",
+    url: "/",
+  };
+  const result = await sendPush(device, notice, keys, {
+    subject: subjectFor(origin),
+    ttlSeconds: 60,
+    topic: pushTopic(notice.tag),
+  });
+  if (result === "gone") {
+    await admin.from("push_subscriptions").delete().eq("id", device.id);
+    return "not-registered";
+  }
+  return result;
+}
+
 export async function removeDevice(userId: string, endpoint: string): Promise<void> {
   await supabaseAdmin()
     .from("push_subscriptions")

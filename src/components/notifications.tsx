@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellOff, Share, SquarePlus, X } from "lucide-react";
+import { Bell, BellOff, BellRing, Share, SquarePlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,10 +17,11 @@ import {
   disablePush,
   enablePush,
   onApplePhone,
+  pushEndpoint,
   refreshPush,
   syncPush,
 } from "@/lib/push-client";
-import { cn } from "@/lib/utils";
+import { apiErrorMessage, cn } from "@/lib/utils";
 import { useCallStore } from "@/store/call-store";
 import { usePushStore, type PushHelp } from "@/store/push-store";
 
@@ -64,6 +65,50 @@ async function turnOff() {
   }
 }
 
+const TEST_RESULTS: Record<string, { ok: boolean; text: string }> = {
+  sent: {
+    ok: true,
+    text: "Test sent. It should appear within a few seconds. If it doesn't, notifications are off for Chrome or for this site in the phone's settings.",
+  },
+  failed: {
+    ok: false,
+    text: "The push service didn't take the test. The reason is in Vercel's logs, in a line starting with [push].",
+  },
+  "not-registered": {
+    ok: false,
+    text: "This phone isn't registered for notifications any more. Turn them off and on again.",
+  },
+  "not-set-up": {
+    ok: false,
+    text: "Notifications aren't set up on the server yet. Run supabase/v12.sql.",
+  },
+};
+
+async function sendTest() {
+  const endpoint = pushEndpoint();
+  if (!endpoint) {
+    toast.error("This phone isn't registered for notifications. Turn them off and on again.");
+    return;
+  }
+  try {
+    const res = await fetch("/api/push/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint }),
+    });
+    const body: unknown = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(apiErrorMessage(body, "Couldn't send a test. Try again."));
+      return;
+    }
+    const shown = TEST_RESULTS[(body as { result?: string } | null)?.result ?? ""] ?? TEST_RESULTS.failed!;
+    if (shown.ok) toast.success(shown.text, { duration: 8000 });
+    else toast.error(shown.text, { duration: 10000 });
+  } catch {
+    toast.error("No connection. Check your internet and try again.");
+  }
+}
+
 export function NotificationsMenuItem() {
   const status = usePushStore((s) => s.status);
   const busy = usePushStore((s) => s.busy);
@@ -73,9 +118,14 @@ export function NotificationsMenuItem() {
 
   if (status === "on") {
     return (
-      <DropdownMenuItem className="px-3 py-2.5" disabled={busy} onClick={() => void turnOff()}>
-        <BellOff className="h-4 w-4" /> Turn off notifications
-      </DropdownMenuItem>
+      <>
+        <DropdownMenuItem className="px-3 py-2.5" disabled={busy} onClick={() => void sendTest()}>
+          <BellRing className="h-4 w-4" /> Send a test notification
+        </DropdownMenuItem>
+        <DropdownMenuItem className="px-3 py-2.5" disabled={busy} onClick={() => void turnOff()}>
+          <BellOff className="h-4 w-4" /> Turn off notifications
+        </DropdownMenuItem>
+      </>
     );
   }
   if (status === "off") {

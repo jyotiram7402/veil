@@ -5,7 +5,6 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCallStore } from "@/store/call-store";
 import { basicRtcConfig, getRtcConfig, isWebRtcSupported } from "@/lib/webrtc/ice";
 import {
-  audioConstraints,
   keepResolution,
   preferOpus,
   relaxedVideoConstraints,
@@ -20,9 +19,11 @@ import {
   callErrorMessage,
   classifyCameraError,
   classifyMediaError,
+  errorTag,
   type CallErrorCode,
 } from "@/lib/webrtc/errors";
 import { SignalingChannel } from "@/lib/webrtc/signaling";
+import { openMicrophone } from "@/lib/webrtc/microphone";
 import {
   CALL_RING_TIMEOUT_MS,
   MAX_RING_MS,
@@ -334,7 +335,8 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
   );
 
   const finishWithError = useCallback(
-    (code: CallErrorCode) => finish("failed", callErrorMessage(code)),
+    (code: CallErrorCode, detail?: string | null) =>
+      finish("failed", detail ? `${callErrorMessage(code)} (${detail})` : callErrorMessage(code)),
     [finish],
   );
 
@@ -535,7 +537,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
 
   const attachLocalMedia = useCallback(
     async (pc: RTCPeerConnection, role: "caller" | "callee"): Promise<boolean> => {
-      const stream = await navigator.mediaDevices.getUserMedia(audioConstraints());
+      const stream = await openMicrophone(navigator.mediaDevices);
       if (pcRef.current !== pc) {
         for (const track of stream.getTracks()) track.stop();
         return false;
@@ -656,9 +658,10 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         ringRepeatRef.current = repeat;
       } catch (err) {
         if (!stillOurs()) return;
+        console.error("[call] the call could not start", err);
         send("call_cancelled", { reason: "error" });
         postOutcome("failed");
-        finishWithError(classifyMediaError(err));
+        finishWithError(classifyMediaError(err), errorTag(err));
       }
     },
     [store, me, authorize, createPeer, attachLocalMedia, send, ringUntil, finishWithError, postOutcome],
@@ -699,8 +702,9 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
         if (withVideo) void startCameraRef.current?.(undefined, true);
       } catch (err) {
         if (!stillOurs()) return;
+        console.error("[call] the call could not be answered", err);
         send("call_rejected", { reason: "error" });
-        finishWithError(classifyMediaError(err));
+        finishWithError(classifyMediaError(err), errorTag(err));
       }
     },
     [store, authorize, createPeer, attachLocalMedia, adoptOfferedVideo, drainCandidates, send, finishWithError, expectConnection],
@@ -902,7 +906,7 @@ export function useCall({ me, chats, remoteAudioRef }: UseCallArgs) {
     const sender = senderRef.current;
     if (!sender) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(audioConstraints(deviceId));
+      const stream = await openMicrophone(navigator.mediaDevices, deviceId);
       const [track] = stream.getAudioTracks();
       if (!track) return;
       track.enabled = !store.getState().muted;

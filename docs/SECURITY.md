@@ -178,6 +178,9 @@ Off on every device until its owner turns them on there. Needs `supabase/v12.sql
   member could point the server at an address of their choosing.
 - Every route needs a signed-in session, and a person can add, mark and remove only their
   own devices. Adding is limited to 20 requests a minute, and to ten devices a person.
+- `POST /api/push/test` sends one fixed text ("Test notification") to a device only when its
+  address is one of the caller's own devices, 5 requests a minute. It answers with the push
+  service's outcome only, never the service's reply.
 - Nothing is sent to a suspended or archived person, or to someone blocked in or removed
   from the chat. Signing out removes the device. A session that ends another way (it
   expired) leaves the device subscribed: "New message" can still appear there until
