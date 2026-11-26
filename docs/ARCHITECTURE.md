@@ -91,7 +91,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `calls/[id]/event` — caller posts one call-outcome system message (idempotent); a missed
   or cancelled call is announced to the other person's closed app.
 - `push/key` (the server's public key for notifications), `push/subscriptions` (POST: this
-  device wants notifications; DELETE: it no longer does).
+  device wants notifications; DELETE: it no longer does), `push/test` (POST: send one test
+  notification to this device now).
 - `profile`, `profile/heartbeat` (last_seen, and "the app is in front on this device" /
   "away" for notifications; answers 403 to a suspended or archived person, read from the same
   update, so it costs no extra query), `users/search` (admin picker), `health`.
@@ -135,7 +136,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `signaling.ts` (private broadcast channel; a message sent while it is joining waits),
   `codec.ts` (audio/video constraints, Opus preference), `stats.ts` (quality from getStats),
   `video-governor.ts` (how large a picture to send), `audio-level.ts`,
-  `errors.ts` (error codes → friendly text), `ringtone.ts` (ring + buzz),
+  `errors.ts` (error codes → friendly text), `microphone.ts` (opening the microphone, with
+  one more try), `ringtone.ts` (ring + buzz),
   `devices.ts` (which cameras / sound outputs can be switched), `types.ts`.
 
 ## Client state & hooks
@@ -249,6 +251,21 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   on/off is `replaceTrack` (no renegotiation). The side that answers takes over that same
   line after reading the offer (`adoptOfferedVideo`); a transceiver it added itself would
   never be negotiated and its camera would not be sent. Caller-only ICE restart with backoff.
+- Microphone (`openMicrophone` in `webrtc/microphone.ts`): the first try asks for the
+  cleaned-up voice (echo cancellation and the rest, `codec.ts`). If the browser answers
+  `NotReadableError`, `AbortError` or `OverconstrainedError` it waits 400 ms and asks once
+  more for a plain `{ audio: true }`. Android Chrome gives `NotReadableError` when another app
+  still holds the microphone (a phone call, a voice note, another tab) and sometimes for a
+  moment right after the permission was granted; a chosen microphone that was unplugged gives
+  `OverconstrainedError`. A refusal (`NotAllowedError`) is never asked twice.
+- When a call cannot start or be answered, `classifyMediaError` (`errors.ts`) picks the
+  message. Only the browser's microphone errors say "microphone"; anything else (a bug, a
+  failed offer) is `SETUP_FAILED`, "The call couldn't be set up". Until 2026-11-26 every
+  unknown error said "The microphone could not be started", which sent people to their
+  microphone settings for a fault that was not there. The error's name (never its message)
+  goes on screen in brackets, and the whole error to the console as
+  `[call] the call could not start` (or `be answered`). Both are tested with a pretend
+  browser in `tests/microphone.test.mjs`; the rest of calling is not.
 - Camera (`startCamera` / `switchCamera` in `use-call.ts`): a phone can have one camera open
   at a time, so the one in use is let go before another is opened, and comes back if the other
   does not start. "Flip" asks a phone for the other *side* (front / back) and lets the browser
@@ -423,6 +440,12 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   the pill says "Get notifications" and shows the steps. On those devices every push must
   show a notification or the permission is withdrawn: that is why the service worker always
   shows one, and why the choice to stay quiet is made on the server.
+- "Send a test notification" (in the menu while notifications are on) posts this device's
+  push address to `/api/push/test`; `sendTestPush` sends it a fixed notification at once,
+  even while the app is open on it, and the toast says what the push service answered:
+  `sent`, `failed`, `not-registered` (the address is not one of this person's devices, or
+  the push service said it is gone, and the row is deleted) or `not-set-up`. It is the quick
+  way to tell a phone that does not show notifications from a server that does not send them.
 - Before `supabase/v12.sql` has been run both routes answer 503, the screen says
   notifications are not available yet, and sending is skipped without an error.
 - Not built: muting one chat, and answering straight from the notification (it opens the
@@ -569,5 +592,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   handler on purpose, so it never sits between a page and the network.
 - The list of open windows a service worker gets from `clients.matchAll()` is read-only:
   copy it before sorting.
+- With `tailwindcss-animate` installed, `ease-`, `duration-` and `delay-` with an arbitrary
+  value in brackets (`ease-[cubic-bezier(…)]`) match two utilities, the transition one and the
+  animation one. Tailwind then prints "is ambiguous and matches multiple utilities" in the
+  build log and leaves the class out: no CSS at all. Name the property instead
+  (`[animation-timing-function:cubic-bezier(…)]`). Named values (`duration-300`) are fine.
 - Old names that must stay: `INTERNAL_EMAIL_DOMAIN=rooms.local` is part of every login, and
   the GitHub repository and the Vercel address are still called `veil`.
