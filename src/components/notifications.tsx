@@ -276,7 +276,7 @@ export function NotificationsPrompt({
             aria-label="Notifications"
             className={cn(
               "pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/70 bg-card p-1 shadow-[0_18px_34px_-20px_rgb(15_18_30/0.55)]",
-              "duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] animate-in fade-in-0 motion-reduce:animate-none",
+              "duration-300 [animation-timing-function:cubic-bezier(0.16,1,0.3,1)] animate-in fade-in-0 motion-reduce:animate-none",
               place === "top" ? "slide-in-from-top-2" : "slide-in-from-bottom-2",
             )}
           >

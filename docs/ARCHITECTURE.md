@@ -592,5 +592,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   handler on purpose, so it never sits between a page and the network.
 - The list of open windows a service worker gets from `clients.matchAll()` is read-only:
   copy it before sorting.
+- With `tailwindcss-animate` installed, `ease-`, `duration-` and `delay-` with an arbitrary
+  value in brackets (`ease-[cubic-bezier(…)]`) match two utilities, the transition one and the
+  animation one. Tailwind then prints "is ambiguous and matches multiple utilities" in the
+  build log and leaves the class out: no CSS at all. Name the property instead
+  (`[animation-timing-function:cubic-bezier(…)]`). Named values (`duration-300`) are fine.
 - Old names that must stay: `INTERNAL_EMAIL_DOMAIN=rooms.local` is part of every login, and
   the GitHub repository and the Vercel address are still called `veil`.
