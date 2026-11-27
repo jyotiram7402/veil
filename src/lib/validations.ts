@@ -2,7 +2,6 @@ import { z } from "zod";
 import { USERNAME_REGEX } from "@/lib/auth/username";
 import { DISPLAY_NAME_RE } from "@/lib/entry-checks";
 import { isMojiValue } from "@/lib/moji";
-import { isCompleteSignupCode } from "@/lib/signup-code";
 
 export const usernameSchema = z
   .string()
@@ -24,6 +23,21 @@ export const gatePasswordSchema = z
   .string()
   .min(4, "At least 4 characters")
   .max(128, "Too long");
+
+export const hashcodeSchema = gatePasswordSchema;
+
+export const memberLoginSchema = z.object({
+  name: z.string().trim().min(1, "Type your name").max(60, "Too long"),
+  hashcode: z.string().min(1, "Type your hashcode").max(128, "Too long"),
+});
+
+export const forgotHashcodeSchema = z.object({
+  name: z.string().trim().min(1, "Type your name").max(60, "Too long"),
+});
+
+export const directSignInSchema = z.object({
+  hashcode: z.string().min(1, "Type your hashcode").max(128, "Too long"),
+});
 
 export const createUserSchema = z.object({
   username: usernameSchema,
@@ -127,24 +141,3 @@ export const updateParticipantSchema = z
     canVideo: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
-
-export const signupSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .max(40)
-    .refine(isCompleteSignupCode, "Enter all 10 characters of your invite code"),
-  username: usernameSchema,
-  password: passwordSchema,
-  displayName: z
-    .union([displayNameSchema, z.literal("")])
-    .optional()
-    .transform((v) => (v ? v : undefined)),
-  avatar: z.string().max(60).refine(isMojiValue, "Pick an avatar from the list").optional(),
-});
-
-export const createSignupCodeSchema = z.object({
-  label: z.string().trim().max(60).optional(),
-  maxUses: z.number().int().min(1).max(100).optional(),
-  expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
-});

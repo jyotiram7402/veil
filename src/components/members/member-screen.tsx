@@ -7,6 +7,8 @@ import {
   Archive,
   ArchiveRestore,
   Ban,
+  BellRing,
+  Clock,
   Copy,
   KeyRound,
   Link as LinkIcon,
@@ -15,6 +17,7 @@ import {
   Power,
   RefreshCw,
   RotateCcw,
+  Send,
   ShieldCheck,
   TextCursorInput,
   Trash2,
@@ -36,7 +39,8 @@ import {
   GroupDisclosureRow,
   GroupRow,
 } from "@/components/layout/grouped";
-import { useJoinedWithCode, useMembers } from "@/components/members/members-provider";
+import { LinkBox, copyLink } from "@/components/members/link-box";
+import { useMembers, useRequestFor } from "@/components/members/members-provider";
 import { firstName, nameOf, seen, type Person } from "@/components/members/types";
 import {
   CHAT_RULES,
@@ -48,6 +52,15 @@ import {
 import { LengthInput } from "@/components/settings/length-input";
 import { copyText } from "@/lib/clipboard";
 import { lastSeen } from "@/lib/format";
+import {
+  DIRECT_LINK_HOURS,
+  INVITE_HOURS,
+  KEEP_OPEN,
+  KEEP_OPEN_LABELS,
+  endsLine,
+  linkState,
+  type KeepOpen,
+} from "@/lib/invite-window";
 import { usePresenceStore } from "@/store/presence-store";
 import { useSessionStore } from "@/store/session-store";
 import { apiErrorMessage, cn } from "@/lib/utils";
@@ -135,12 +148,7 @@ function HeroSkeleton() {
   );
 }
 
-type OwnPassword = "yes" | "maybe" | "no";
-
 function PersonPage({ person, confirm }: { person: Person; confirm: Confirm }) {
-  const joined = useJoinedWithCode(person.id);
-  const ownPassword: OwnPassword =
-    joined === true ? "yes" : joined === null && !person.invite ? "maybe" : "no";
   const member = !person.is_admin && !person.archived;
   return (
     <>
@@ -151,14 +159,14 @@ function PersonPage({ person, confirm }: { person: Person; confirm: Confirm }) {
             <GroupRow
               icon={ShieldCheck}
               title="Admin"
-              description="Signs in at Log in with their own password."
+              description="Signs in at Admin login with their own password."
             />
           </Group>
         ) : (
-          <SignInGroup person={person} ownPassword={ownPassword} confirm={confirm} />
+          <SignInGroup person={person} confirm={confirm} />
         ))}
       {member && <RulesGroup person={person} confirm={confirm} />}
-      <AccountGroup person={person} ownPassword={ownPassword} confirm={confirm} />
+      <AccountGroup person={person} confirm={confirm} />
     </>
   );
 }
@@ -185,12 +193,6 @@ function Hero({ person }: { person: Person }) {
     } finally {
       setOpening(false);
     }
-  }
-
-  async function copyLink() {
-    if (!invite) return;
-    if (await copyText(invite.url)) toast.success("Link copied");
-    else toast.error("Couldn't copy. Select the link and copy it yourself.");
   }
 
   const badge = person.archived
@@ -233,7 +235,12 @@ function Hero({ person }: { person: Person }) {
             {opening ? <Loader2 className="animate-spin" /> : <MessageSquare />} Chat
           </Button>
           {invite?.enabled && (
-            <Button size="lg" variant="secondary" className="flex-1" onClick={() => void copyLink()}>
+            <Button
+              size="lg"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => void copyLink(invite.url)}
+            >
               <Copy /> Copy link
             </Button>
           )}
@@ -243,56 +250,52 @@ function Hero({ person }: { person: Person }) {
   );
 }
 
-function PasswordForm({
+function HashcodeForm({
   label,
   hint,
   submitLabel,
-  warning,
   onSubmit,
   onCancel,
 }: {
   label: string;
   hint: string;
   submitLabel: string;
-  warning?: string;
-  onSubmit: (password: string) => Promise<string | null>;
+  onSubmit: (hashcode: string) => Promise<string | null>;
   onCancel: () => void;
 }) {
   const id = useId();
-  const [password, setPassword] = useState("");
+  const [hashcode, setHashcode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 4) {
+    if (hashcode.trim().length < 4) {
       setError("Use at least 4 characters.");
       return;
     }
     setBusy(true);
-    setError(await onSubmit(password));
+    setError(await onSubmit(hashcode.trim()));
     setBusy(false);
   }
 
   return (
     <form onSubmit={submit} className="space-y-3" noValidate>
-      {warning && (
-        <p className="rounded-xl bg-destructive/10 px-3 py-2.5 text-[13px] leading-snug text-destructive">
-          {warning}
-        </p>
-      )}
       <div className="space-y-1.5">
-        <Label htmlFor={`${id}-pw`} className="text-[13px] font-semibold">
+        <Label htmlFor={`${id}-hashcode`} className="text-[13px] font-semibold">
           {label}
         </Label>
         <Input
-          id={`${id}-pw`}
-          type="password"
-          autoComplete="new-password"
+          id={`${id}-hashcode`}
+          autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           autoFocus
-          value={password}
+          maxLength={128}
+          value={hashcode}
           onChange={(e) => {
-            setPassword(e.target.value);
+            setHashcode(e.target.value);
             setError(null);
           }}
           aria-invalid={error ? true : undefined}
@@ -321,27 +324,20 @@ function PasswordForm({
   );
 }
 
-function SignInGroup({
-  person,
-  ownPassword,
-  confirm,
-}: {
-  person: Person;
-  ownPassword: OwnPassword;
-  confirm: Confirm;
-}) {
-  const { reload, patchPerson } = useMembers();
-  const [open, setOpen] = useState<"password" | "new-link" | null>(null);
+type Panel = "keep" | "hashcode" | "direct" | "new-link" | "make-link";
+
+function SignInGroup({ person, confirm }: { person: Person; confirm: Confirm }) {
+  const { reload, patchPerson, dropRequestsFor } = useMembers();
+  const request = useRequestFor(person.id);
+  const [open, setOpen] = useState<Panel | null>(null);
+  const [directUrl, setDirectUrl] = useState<string | null>(null);
+  const [making, setMaking] = useState(false);
   const first = firstName(person);
   const invite = person.invite;
-  const toggle = (which: "password" | "new-link") => (next: boolean) =>
+  const toggle = (which: Panel) => (next: boolean) => {
     setOpen(next ? which : null);
-
-  async function copyLink() {
-    if (!invite) return;
-    if (await copyText(invite.url)) toast.success("Link copied");
-    else toast.error("Couldn't copy. Select the link and copy it yourself.");
-  }
+    setDirectUrl(null);
+  };
 
   async function setEnabled(enabled: boolean) {
     if (!invite) return;
@@ -357,27 +353,42 @@ function SignInGroup({
     }
   }
 
-  async function send(method: "POST" | "PATCH", password: string): Promise<string | null> {
+  async function keepOpen(choice: KeepOpen) {
+    if (!invite) return;
     try {
       const res = await fetch(`/api/admin/users/${person.id}/invite`, {
-        method,
+        method: "PATCH",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ keepOpen: choice }),
+      });
+      const body: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(apiErrorMessage(body, "Couldn't change the link. Try again."));
+        return;
+      }
+      const expires_at = (body as { expires_at?: string | null } | null)?.expires_at ?? null;
+      patchPerson(person.id, { invite: { ...invite, expires_at } });
+      toast.success(
+        choice === "always"
+          ? "The link never runs out now"
+          : `The link is open for ${KEEP_OPEN_LABELS[choice]}`,
+      );
+      setOpen(null);
+    } catch {
+      toast.error("No connection. Check your internet and try again.");
+    }
+  }
+
+  async function changeHashcode(hashcode: string): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/admin/users/${person.id}/invite`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ password: hashcode }),
       });
       const body: unknown = await res.json().catch(() => null);
       if (!res.ok) return apiErrorMessage(body, "That didn't work. Try again.");
-      if (method === "POST") {
-        const url = (body as { invite: { url: string } }).invite.url;
-        const copied = await copyText(url);
-        toast.success(
-          copied
-            ? `New link copied. Send it to ${first} with the password.`
-            : "New link made. Copy it from Personal link.",
-        );
-        await reload();
-      } else {
-        toast.success("Password changed");
-      }
+      toast.success(`Hashcode changed. Tell ${first} the new one.`);
       setOpen(null);
       return null;
     } catch {
@@ -385,9 +396,72 @@ function SignInGroup({
     }
   }
 
+  async function makeLink(hashcode?: string): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/admin/users/${person.id}/invite`, {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify(hashcode ? { password: hashcode } : {}),
+      });
+      const body: unknown = await res.json().catch(() => null);
+      if (!res.ok) return apiErrorMessage(body, "That didn't work. Try again.");
+      const url = (body as { invite: { url: string } }).invite.url;
+      const copied = await copyText(url);
+      toast.success(
+        copied
+          ? `New link copied. Send it to ${first}${hashcode ? " with the hashcode" : ""}.`
+          : "New link made. Copy it from Invite link.",
+      );
+      setOpen(null);
+      await reload();
+      return null;
+    } catch {
+      return "No connection. Check your internet and try again.";
+    }
+  }
+
+  async function makeNewLink() {
+    if (making) return;
+    setMaking(true);
+    const error = await makeLink();
+    setMaking(false);
+    if (error) toast.error(error);
+  }
+
+  async function makeDirect(hashcode: string): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/admin/users/${person.id}/direct-link`, {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ hashcode }),
+      });
+      const body: unknown = await res.json().catch(() => null);
+      if (!res.ok) return apiErrorMessage(body, "Couldn't make the link. Try again.");
+      setDirectUrl((body as { url: string }).url);
+      dropRequestsFor(person.id);
+      void reload();
+      return null;
+    } catch {
+      return "No connection. Check your internet and try again.";
+    }
+  }
+
+  async function dismissRequest() {
+    if (!request) return;
+    const res = await fetch(`/api/admin/hashcode-requests/${request.id}`, {
+      method: "DELETE",
+    }).catch(() => null);
+    if (!res?.ok) {
+      toast.error("Couldn't dismiss the request. Try again.");
+      return;
+    }
+    dropRequestsFor(person.id);
+    toast.success("Request dismissed");
+  }
+
   async function removeLink() {
     const ok = await confirm({
-      title: `Remove ${first}'s link?`,
+      title: `Remove ${first}'s invite link?`,
       body: `The link stops working for good, and ${first} can't sign in until you make a new one.`,
       confirmLabel: "Remove link",
       destructive: true,
@@ -404,69 +478,109 @@ function SignInGroup({
     toast.success("Link removed");
   }
 
+  const requestRow = request && (
+    <GroupRow
+      icon={BellRing}
+      title="Asked for their hashcode"
+      description={`${lastSeen(request.created_at)} · typed “${request.typed_name}”${
+        request.device ? ` · ${request.device}` : ""
+      }. Check it's really them, then send them a direct link.`}
+      trailing={
+        <Button size="sm" variant="ghost" onClick={() => void dismissRequest()} className="shrink-0">
+          Dismiss
+        </Button>
+      }
+    />
+  );
+
+  const directRow = (
+    <GroupDisclosureRow
+      icon={Send}
+      title="Send a direct link"
+      description={`Opens straight to their hashcode, already filled in. Works once, for ${DIRECT_LINK_HOURS} hours.`}
+      open={open === "direct"}
+      onOpenChange={toggle("direct")}
+    >
+      {directUrl ? (
+        <div className="space-y-3">
+          <p className="text-[13px] leading-snug text-muted-foreground">
+            Send it to {first} only: whoever opens it can sign in as them.
+          </p>
+          <LinkBox url={directUrl} />
+          <Button variant="ghost" className="w-full" onClick={() => toggle("direct")(false)}>
+            Done
+          </Button>
+        </div>
+      ) : (
+        <HashcodeForm
+          label="Their hashcode"
+          hint="Type the one they have, or a new one. It becomes their hashcode."
+          submitLabel="Make direct link"
+          onSubmit={makeDirect}
+          onCancel={() => setOpen(null)}
+        />
+      )}
+    </GroupDisclosureRow>
+  );
+
   if (!invite) {
     return (
       <Group title="Sign-in">
+        {requestRow}
         <GroupRow
           icon={KeyRound}
-          title={ownPassword === "yes" ? "Their own password" : "No personal link"}
-          description={
-            ownPassword === "yes"
-              ? `${first} made an account with a sign-up code and signs in at Log in.`
-              : ownPassword === "maybe"
-                ? `If ${first} made their own account with a sign-up code, they sign in at Log in. If not, they can't sign in until you make a link.`
-                : `${first} can't sign in until you make one.`
-          }
+          title="No invite link"
+          description={`${first} can't sign in until you make one. If they're signed in now, they stay signed in.`}
         />
         <GroupDisclosureRow
           icon={LinkIcon}
-          title="Make a personal link"
-          description="You choose the password that goes with it."
-          open={open === "new-link"}
-          onOpenChange={toggle("new-link")}
+          title="Make an invite link"
+          description={`You choose the hashcode. The link works for ${INVITE_HOURS} hours.`}
+          open={open === "make-link"}
+          onOpenChange={toggle("make-link")}
         >
-          <PasswordForm
-            label="Password for the link"
-            hint="At least 4 characters. Send it with the link."
+          <HashcodeForm
+            label="Hashcode"
+            hint="At least 4 characters, emoji too. Send it with the link."
             submitLabel="Make link"
-            warning={
-              ownPassword === "yes"
-                ? `Once ${first} opens the link, their own password stops working. After that they sign in with the link.`
-                : ownPassword === "maybe"
-                  ? `If ${first} made their own account with a sign-up code, that password stops working once they open the link.`
-                  : undefined
-            }
-            onSubmit={(pw) => send("POST", pw)}
+            onSubmit={(hashcode) => makeLink(hashcode)}
             onCancel={() => setOpen(null)}
           />
         </GroupDisclosureRow>
+        {directRow}
       </Group>
     );
   }
 
-  const opened =
+  const state = linkState(invite);
+  const openLine = state === "off" ? "Switched off" : endsLine(invite.expires_at);
+  const used =
     invite.use_count === 0
-      ? "Not opened yet"
-      : `Opened ${invite.use_count} ${invite.use_count === 1 ? "time" : "times"}${
+      ? "Not used to sign in yet"
+      : `Signed in ${invite.use_count} ${invite.use_count === 1 ? "time" : "times"}${
           invite.last_used_at ? ` · last ${lastSeen(invite.last_used_at)}` : ""
         }`;
 
   return (
     <Group title="Sign-in">
+      {requestRow}
       <GroupRow
         icon={LinkIcon}
-        title="Personal link"
+        title="Invite link"
         description={
           <>
             <span className="block truncate">{invite.url.replace(/^https?:\/\//, "")}</span>
-            <span className="block">{opened}</span>
+            <span className={cn("block", state === "ended" && "font-medium text-destructive")}>
+              {openLine}
+            </span>
+            <span className="block">{used}</span>
           </>
         }
         trailing={
           <Button
             size="icon"
             variant="ghost"
-            onClick={() => void copyLink()}
+            onClick={() => void copyLink(invite.url)}
             aria-label="Copy link"
             className="shrink-0"
           >
@@ -474,13 +588,32 @@ function SignInGroup({
           </Button>
         }
       />
+      <GroupDisclosureRow
+        icon={Clock}
+        title="Keep it open"
+        description={
+          state === "ended"
+            ? `It ran out, so ${first} can't sign in. Open it again for a while.`
+            : `${first} can sign in with their name and hashcode while it's open.`
+        }
+        open={open === "keep"}
+        onOpenChange={toggle("keep")}
+      >
+        <div className="flex flex-wrap gap-2">
+          {KEEP_OPEN.map((choice) => (
+            <Button key={choice} variant="secondary" onClick={() => void keepOpen(choice)}>
+              {choice === "always" ? "Always" : `${KEEP_OPEN_LABELS[choice]} from now`}
+            </Button>
+          ))}
+        </div>
+      </GroupDisclosureRow>
       <GroupRow
         icon={Power}
         title="Link works"
         description={
           invite.enabled
-            ? `The link and its password let ${first} in.`
-            : "Switched off: the link won't open until you switch it back on."
+            ? `${first} can sign in while the link is open.`
+            : "Switched off: nobody can sign in with it until you switch it back on."
         }
         trailing={
           <Switch
@@ -492,33 +625,36 @@ function SignInGroup({
       />
       <GroupDisclosureRow
         icon={KeyRound}
-        title="Change the password"
-        description={`${first} types it after opening the link.`}
-        open={open === "password"}
-        onOpenChange={toggle("password")}
+        title="Change the hashcode"
+        description={`Only you can set it. ${first} types it with their name.`}
+        open={open === "hashcode"}
+        onOpenChange={toggle("hashcode")}
       >
-        <PasswordForm
-          label="New password"
-          hint="At least 4 characters. The link stays the same."
-          submitLabel="Change password"
-          onSubmit={(pw) => send("PATCH", pw)}
+        <HashcodeForm
+          label="New hashcode"
+          hint="At least 4 characters, emoji too. The link stays the same."
+          submitLabel="Change hashcode"
+          onSubmit={changeHashcode}
           onCancel={() => setOpen(null)}
         />
       </GroupDisclosureRow>
+      {directRow}
       <GroupDisclosureRow
         icon={RefreshCw}
-        title="New link and password"
-        description="The old link stops working at once."
+        title="New invite link"
+        description="The old link stops working at once. The hashcode stays the same."
         open={open === "new-link"}
         onOpenChange={toggle("new-link")}
       >
-        <PasswordForm
-          label="Password for the new link"
-          hint="At least 4 characters. Send it with the new link."
-          submitLabel="Make new link"
-          onSubmit={(pw) => send("POST", pw)}
-          onCancel={() => setOpen(null)}
-        />
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => void makeNewLink()} disabled={making}>
+            {making && <Loader2 className="animate-spin" />}
+            Make new link
+          </Button>
+          <Button variant="ghost" onClick={() => setOpen(null)} disabled={making}>
+            Cancel
+          </Button>
+        </div>
       </GroupDisclosureRow>
       <GroupButtonRow
         icon={Unlink}
@@ -726,15 +862,7 @@ function RulesGroup({ person, confirm }: { person: Person; confirm: Confirm }) {
   );
 }
 
-function AccountGroup({
-  person,
-  ownPassword,
-  confirm,
-}: {
-  person: Person;
-  ownPassword: OwnPassword;
-  confirm: Confirm;
-}) {
+function AccountGroup({ person, confirm }: { person: Person; confirm: Confirm }) {
   const router = useRouter();
   const { patchPerson, dropPerson } = useMembers();
   const busy = useRef(false);
@@ -763,23 +891,7 @@ function AccountGroup({
     if (next) {
       const ok = await confirm({
         title: `Suspend ${first}?`,
-        body: (
-          <>
-            <p>{first} is signed out and can&apos;t sign in until you reinstate them. Your chat stays as it is.</p>
-            {ownPassword === "yes" && (
-              <p>
-                Their own password stops working for good. To let them back in later, reinstate
-                them and make them a personal link.
-              </p>
-            )}
-            {ownPassword === "maybe" && (
-              <p>
-                If they made their own account with a sign-up code, that password stops working for
-                good. To let them back in later, reinstate them and make them a personal link.
-              </p>
-            )}
-          </>
-        ),
+        body: `${first} is signed out and can't sign in until you reinstate them. Your chat stays as it is.`,
         confirmLabel: "Suspend",
         destructive: true,
       });
@@ -816,7 +928,7 @@ function AccountGroup({
   async function restore() {
     const ok = await confirm({
       title: `Restore ${first}?`,
-      body: `${first} comes back to Members. To sign in they need a new personal link, which you can make on this page.`,
+      body: `${first} comes back to Members. To sign in they need a new invite link, which you can make on this page.`,
       confirmLabel: "Restore",
     });
     if (!ok) return;
@@ -862,7 +974,7 @@ function AccountGroup({
         <GroupButtonRow
           icon={ArchiveRestore}
           title="Restore"
-          description="Back to Members. They need a new link to sign in."
+          description="Back to Members. They need a new invite link to sign in."
           onClick={() => void restore()}
         />
         <GroupButtonRow
@@ -883,11 +995,7 @@ function AccountGroup({
           <GroupButtonRow
             icon={RotateCcw}
             title="Reinstate"
-            description={
-              ownPassword === "no"
-                ? "Lets them sign in with their link again."
-                : "Lets them sign in again. Make them a personal link too: their password was reset."
-            }
+            description="Lets them sign in again while their invite link is open."
             onClick={() => void setSuspended(false)}
           />
         ) : (

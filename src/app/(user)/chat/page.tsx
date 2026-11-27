@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function UserChatPage() {
   const userId = await getAuthUserId();
-  if (!userId) redirect("/login");
+  if (!userId) redirect("/enter");
 
   const supabase = await supabaseServer();
   const [session, membershipResult, settings] = await Promise.all([

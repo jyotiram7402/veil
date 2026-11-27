@@ -2,27 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Archive, ChevronDown, Ticket, UserPlus } from "lucide-react";
-import { toast } from "sonner";
+import { Archive, ChevronDown, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useConfirm } from "@/components/ui/confirm-dialog";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { AddSomeoneDialog } from "@/components/members/add-someone-dialog";
 import { useMembers } from "@/components/members/members-provider";
-import {
-  codeIsActive,
-  codeLine,
-  codeTitle,
-  nameOf,
-  statusOf,
-  type Person,
-  type SignupCode,
-} from "@/components/members/types";
+import { nameOf, statusOf, type HashcodeRequest, type Person } from "@/components/members/types";
+import { lastSeen } from "@/lib/format";
 import { usePresenceStore } from "@/store/presence-store";
 import { useSessionStore } from "@/store/session-store";
-import { apiErrorMessage, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const ROW =
   "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors " +
@@ -31,6 +22,7 @@ const ROW =
 const TONE = {
   online: "font-medium text-online-ink",
   blocked: "text-destructive",
+  attention: "font-semibold text-foreground",
   plain: "text-muted-foreground",
 };
 
@@ -39,13 +31,11 @@ function byName(a: Person, b: Person): number {
 }
 
 export function MemberList({ selectedId }: { selectedId: string | null }) {
-  const { people, peopleError, codes, codesError, reload, patchCode } = useMembers();
+  const { people, peopleError, requests, reload } = useMembers();
   const meId = useSessionStore((s) => s.profile?.id);
   const online = usePresenceStore((s) => s.online);
-  const { confirm, dialog } = useConfirm();
   const [addOpen, setAddOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [showPastCodes, setShowPastCodes] = useState(false);
 
   const active = useMemo(
     () => (people ?? []).filter((p) => !p.archived && p.id !== meId).sort(byName),
@@ -55,37 +45,19 @@ export function MemberList({ selectedId }: { selectedId: string | null }) {
     () => (people ?? []).filter((p) => p.archived && p.id !== meId).sort(byName),
     [people, meId],
   );
-  const liveCodes = (codes ?? []).filter(codeIsActive);
-  const pastCodes = (codes ?? []).filter((c) => !codeIsActive(c));
+  const asked = useMemo(() => {
+    const byId = new Map((people ?? []).map((p) => [p.id, p]));
+    return requests.flatMap((r) => {
+      const person = byId.get(r.user_id);
+      return person && !person.archived ? [{ request: r, person }] : [];
+    });
+  }, [people, requests]);
+  const askedIds = useMemo(() => new Set(asked.map((a) => a.person.id)), [asked]);
   const onlineCount = active.filter((p) => online.has(p.id)).length;
 
   useEffect(() => {
     if (selectedId && archived.some((p) => p.id === selectedId)) setShowArchived(true);
   }, [selectedId, archived]);
-
-  async function switchOff(code: SignupCode) {
-    const ok = await confirm({
-      title: "Switch this code off?",
-      body: "Nobody new can sign up with it. People who already joined with it keep their accounts.",
-      confirmLabel: "Switch off",
-      destructive: true,
-    });
-    if (!ok) return;
-    const res = await fetch(`/api/admin/signup-codes/${code.id}`, { method: "DELETE" }).catch(
-      () => null,
-    );
-    if (!res) {
-      toast.error("No connection. Check your internet and try again.");
-      return;
-    }
-    if (!res.ok) {
-      const body: unknown = await res.json().catch(() => null);
-      toast.error(apiErrorMessage(body, "Couldn't switch the code off. Try again."));
-      return;
-    }
-    patchCode(code.id, { revoked_at: new Date().toISOString() });
-    toast.success("Code switched off");
-  }
 
   const count = active.length;
   const subtitle =
@@ -135,11 +107,29 @@ export function MemberList({ selectedId }: { selectedId: string | null }) {
           </ul>
         ) : (
           <>
+            {asked.length > 0 && (
+              <section aria-labelledby="requests-heading" className="mb-4">
+                <h2 id="requests-heading" className="px-3 pb-1 pt-1 text-[15px] font-bold">
+                  Hashcode requests
+                </h2>
+                <ul>
+                  {asked.map(({ request, person }) => (
+                    <RequestRow
+                      key={request.id}
+                      request={request}
+                      person={person}
+                      selected={person.id === selectedId}
+                    />
+                  ))}
+                </ul>
+              </section>
+            )}
+
             {active.length === 0 ? (
               <div className="px-6 py-12 text-center">
                 <p className="text-base font-bold">No one here yet</p>
                 <p className="mx-auto mt-1 max-w-[17rem] text-sm text-muted-foreground">
-                  Add someone and they get a personal link, or a code to sign up with.
+                  Add someone, then send them their invite link, name and hashcode.
                 </p>
                 <Button className="mt-5" onClick={() => setAddOpen(true)}>
                   <UserPlus /> Add someone
@@ -152,59 +142,11 @@ export function MemberList({ selectedId }: { selectedId: string | null }) {
                     key={p.id}
                     person={p}
                     online={online.has(p.id)}
+                    asked={askedIds.has(p.id)}
                     selected={p.id === selectedId}
                   />
                 ))}
               </ul>
-            )}
-
-            {(liveCodes.length > 0 || pastCodes.length > 0 || (codes === null && codesError)) && (
-              <section aria-labelledby="codes-heading" className="mt-6">
-                <h2 id="codes-heading" className="px-3 pb-1 text-[15px] font-bold">
-                  Sign-up codes
-                </h2>
-                {codes === null ? (
-                  <p role="alert" className="px-3 py-2 text-[13px] text-destructive">
-                    {codesError}
-                  </p>
-                ) : liveCodes.length === 0 ? (
-                  <p className="px-3 py-2 text-[13px] text-muted-foreground">
-                    No code works right now. Make one with Add someone.
-                  </p>
-                ) : (
-                  <ul>
-                    {liveCodes.map((c) => (
-                      <CodeRow key={c.id} code={c} onSwitchOff={() => void switchOff(c)} />
-                    ))}
-                  </ul>
-                )}
-                {pastCodes.length > 0 && (
-                  <>
-                    <button
-                      type="button"
-                      aria-expanded={showPastCodes}
-                      onClick={() => setShowPastCodes((v) => !v)}
-                      className={cn(ROW, "py-2 text-[13px] font-semibold hover:bg-muted/70")}
-                    >
-                      <span className="flex-1">Codes that no longer work · {pastCodes.length}</span>
-                      <ChevronDown
-                        aria-hidden="true"
-                        className={cn(
-                          "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                          showPastCodes && "rotate-180",
-                        )}
-                      />
-                    </button>
-                    {showPastCodes && (
-                      <ul>
-                        {pastCodes.map((c) => (
-                          <CodeRow key={c.id} code={c} />
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                )}
-              </section>
             )}
 
             {archived.length > 0 && (
@@ -247,7 +189,6 @@ export function MemberList({ selectedId }: { selectedId: string | null }) {
       </div>
 
       <AddSomeoneDialog open={addOpen} onOpenChange={setAddOpen} />
-      {dialog}
     </>
   );
 }
@@ -255,13 +196,15 @@ export function MemberList({ selectedId }: { selectedId: string | null }) {
 function PersonRow({
   person,
   online,
+  asked = false,
   selected,
 }: {
   person: Person;
   online: boolean;
+  asked?: boolean;
   selected: boolean;
 }) {
-  const status = statusOf(person, online);
+  const status = statusOf(person, online, asked);
   return (
     <li>
       <Link
@@ -293,34 +236,40 @@ function PersonRow({
   );
 }
 
-function CodeRow({ code, onSwitchOff }: { code: SignupCode; onSwitchOff?: () => void }) {
-  const joined = code.used_by.map((u) => `@${u.username}`).join(", ");
+function RequestRow({
+  request,
+  person,
+  selected,
+}: {
+  request: HashcodeRequest;
+  person: Person;
+  selected: boolean;
+}) {
   return (
-    <li className="flex items-center gap-3 px-3 py-2.5">
-      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-muted">
-        <Ticket className="h-5 w-5" aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold">{codeTitle(code)}</p>
-        <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
-          {code.label?.trim() && `Ends ${code.code_hint} · `}
-          {codeLine(code)}
-        </p>
-        {joined && (
-          <p className="mt-0.5 truncate text-[13px] text-muted-foreground">Joined: {joined}</p>
-        )}
-      </div>
-      {onSwitchOff && (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onSwitchOff}
-          aria-label={`Switch off ${codeTitle(code)}`}
-          className="shrink-0"
-        >
-          Switch off
-        </Button>
-      )}
+    <li>
+      <Link
+        href={`/admin/${person.id}`}
+        aria-current={selected ? "page" : undefined}
+        className={cn(ROW, selected ? "bg-accent" : "bg-muted/60 hover:bg-muted active:bg-muted")}
+      >
+        <UserAvatar
+          userId={person.id}
+          username={person.username}
+          displayName={person.display_name}
+          avatarUrl={person.avatar_url}
+          size="lg"
+        />
+        <div className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold">{nameOf(person)}</span>
+          <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+            Asked {lastSeen(request.created_at)}
+            {request.device ? ` · ${request.device}` : ""}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-primary px-2.5 py-1 text-[12px] font-semibold text-primary-foreground">
+          Answer
+        </span>
+      </Link>
     </li>
   );
 }

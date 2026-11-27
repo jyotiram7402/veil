@@ -141,8 +141,30 @@ deliberately email-less.
 
 - "…but they still can't sign in. Try again." after Unsuspend or Restore: the account is
   marked active again, but Supabase Auth did not lift the ban. Press the same button again.
-- A restored member needs a new invite link ("Set invite link" on their card in Members):
-  Remove revoked the old ones. A suspended member's own link works again after Unsuspend.
+- A restored member needs a new invite link (Members → the person → Make an invite link):
+  archiving removed the old one. A suspended member's own link works again after Reinstate,
+  while it is open (see the next section).
+
+## A member can't sign in with their name and hashcode
+
+- **"That name or hashcode is wrong"**: the name is their username (`rahul`) or their name
+  (`Rahul Sharma`) when nobody else has it; capitals and extra spaces in the name don't
+  matter, in the hashcode capitals do. If in doubt, Members → the person → Change the
+  hashcode, and tell them the new one.
+- **"Your invite link has run out"**, or the link shows "This invite link has run out":
+  Members → the person → Keep it open → 48 hours, 7 days, 30 days or Always.
+- **"Your invite link is switched off"**: switch "Link works" back on.
+- **They forgot the hashcode**: they tap "Forgot hashcode?" and type their name. The request
+  shows at the top of Members, with what they typed and their phone, and as a notification
+  on your phone. Check it is really them (call them), open them, Send a direct link, type
+  their hashcode (the old one or a new one) and send them the link. It opens with the
+  hashcode filled in, and works once, for 48 hours.
+- **"This direct link has been used"**: they opened it before, a newer one replaced it, or 48
+  hours passed. Make a new one.
+- **Direct links or requests say they "aren't available"**: `supabase/v16.sql` has not been
+  run.
+- **Someone who joined with a sign-up code** (before codes were removed): Admin login turns
+  members away now. Make them an invite link with a hashcode.
 
 ## Build fails on Vercel: "Type error: ..."
 

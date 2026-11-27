@@ -553,3 +553,16 @@ await test("before the migration has been run, a test says so", async () => {
   assert.equal(await push.sendTestPush(ASHA, "https://fcm.googleapis.com/fcm/send/a1", ORIGIN), "not-set-up");
   assert.equal(pushes.length, 0);
 });
+
+await test("a hashcode request tells the admin's phones, and only theirs", async () => {
+  world();
+  const push = await freshServer();
+  await give(push, ADMIN, "jay-phone");
+  await give(push, ASHA, "asha-phone");
+  await push.notifyHashcodeRequest({ id: ASHA, username: "asha", display_name: "Asha Rao" }, ORIGIN);
+  assert.equal(pushes.length, 1);
+  assert.equal(pushes[0].to, "jay-phone");
+  assert.equal(pushes[0].notice.title, "Hashcode request");
+  assert.equal(pushes[0].notice.body, "Asha Rao asked for their hashcode.");
+  assert.equal(pushes[0].notice.url, `/admin/${ASHA}`);
+});
