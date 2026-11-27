@@ -5,14 +5,14 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { usePresenceStore } from "@/store/presence-store";
 import type { Profile } from "@/types/chat";
 
-export function usePresence(me: Profile | null) {
+export function usePresence(me: Profile | null, topic: string) {
   const setOnline = usePresenceStore((s) => s.setOnline);
 
   useEffect(() => {
     if (!me) return;
     const supabase = supabaseBrowser();
 
-    const channel = supabase.channel("blackfoxx-presence", {
+    const channel = supabase.channel(topic, {
       config: { presence: { key: me.id } },
     });
 
@@ -35,5 +35,5 @@ export function usePresence(me: Profile | null) {
       void channel.untrack();
       supabase.removeChannel(channel);
     };
-  }, [me, setOnline]);
+  }, [me, topic, setOnline]);
 }

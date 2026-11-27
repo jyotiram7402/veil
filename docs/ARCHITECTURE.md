@@ -165,7 +165,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   broadcast.
 - `use-chat-list-realtime` — channel `chats:<userId>`: previews, unread, new memberships; a
   deleted message makes it load the list again. Joined once, not again on every message.
-- `use-presence` — channel `blackfoxx-presence` (online dots only; never used for auth).
+- `use-presence` — channel `presence:<32 hex>` (online dots only; never used for auth). The
+  server makes the name from the service-role key (`lib/presence-topic.ts`, HMAC-SHA-256 of a
+  fixed label) and the admin, member and room pages hand it down, so the public code and the
+  anon key don't reveal it. Changing the service-role key moves everyone to a new name.
 - `use-resume-sync` — 5 s poll while visible + immediate resync on focus/visibility/online.
   An empty chat asks for the newest page; `exact` mode (disappearing chats) also takes off
   the screen what the server no longer has.
@@ -633,8 +636,10 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - Supabase keys: the app uses the legacy `anon` and `service_role` keys, and the JWT signing
   key is HS256. The newer publishable / secret keys and asymmetric signing keys have not
   been tried with `@supabase/ssr` 0.5 (unverified).
-- Channel names: `chat:<chatId>`, `call:<chatId>` and `blackfoxx-presence` must be spelled the
-  same on both sides. The room dashboards (`admin-rooms:`, `admin-room:`) add a random
+- Channel names: `chat:<chatId>`, `call:<chatId>` and the presence name from
+  `presenceTopic()` must be spelled the same on both sides. A tab opened before the presence
+  name changed (the 2026-11-27 deploy, or a new service-role key) keeps the old name until it
+  reloads, so old and new tabs don't see each other online until then. The room dashboards (`admin-rooms:`, `admin-room:`) add a random
   suffix, because newer supabase-js hands back an existing channel of the same name and a
   second `subscribe()` on it throws.
 - `profiles.avatar_url` is either a photo URL or a moji choice (`moji:fox:sky`). Never use

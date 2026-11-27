@@ -273,10 +273,15 @@ disappearing messages (above) delete read messages and their files for good.
   per-instance only.
 - Legacy `invite_tokens` stored in plaintext (path secret).
 - CSP allows `'unsafe-inline'` for scripts/styles (no nonce yet).
-- Public chat realtime channels (`chat:<id>`, presence) are not private —
-  typing/presence could be observed/spoofed by someone who knows the random
-  chat UUID (low severity; IDs are unguessable). The same goes for the
-  `vanished` notice of disappearing messages (it can hide, never delete).
+- Realtime channels are Supabase public channels whose names are hard to guess:
+  `chat:<id>` and `call:<id>` use the chat's random UUID, and the presence channel's name is
+  made from the service-role key and handed only to signed-in pages. Until 2026-11-27 it was
+  the fixed `blackfoxx-presence`, so anyone with the public anon key could watch which member
+  IDs were online (names stayed hidden: `profiles` isn't readable without a shared chat).
+  Someone who knows a name, such as a removed member who kept it, can still watch or fake
+  typing, online dots, call setup messages and the `vanished` notice of disappearing
+  messages (it can hide, never delete). Supabase's private channels (Realtime
+  Authorization) would close this; not set up.
 - Browser calls cannot run while the page is fully suspended/terminated.
 - A suspended member's phone that ignores the sign-out keeps the access token it already has
   until it runs out (one hour by Supabase's default; unverified for this project). Once

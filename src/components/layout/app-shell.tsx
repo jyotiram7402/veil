@@ -15,10 +15,12 @@ import { cn } from "@/lib/utils";
 
 export function AppShell({
   me,
+  presenceTopic,
   initialChats,
   children,
 }: {
   me: Profile;
+  presenceTopic: string;
   initialChats: ChatSummary[];
   children: React.ReactNode;
 }) {
@@ -34,7 +36,7 @@ export function AppShell({
   useEffect(() => setProfile(me), [me, setProfile]);
   useEffect(() => setChats(initialChats), [initialChats, setChats]);
 
-  usePresence(me);
+  usePresence(me, presenceTopic);
   useHeartbeat(true);
   useTypingPrune();
 

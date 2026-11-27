@@ -26,6 +26,7 @@ type ClosedReason = { title: string; message: string } | null;
 
 export function RoomChat({
   me,
+  presenceTopic,
   roomId,
   roomName,
   locked: initialLocked,
@@ -42,6 +43,7 @@ export function RoomChat({
   settings,
 }: {
   me: Profile;
+  presenceTopic: string;
   roomId: string;
   roomName: string;
   locked: boolean;
@@ -75,7 +77,7 @@ export function RoomChat({
     setInitial(roomId, initialMessages, initialHasMore);
   }, [roomId, initialMessages, initialHasMore, setInitial]);
 
-  usePresence(me);
+  usePresence(me, presenceTopic);
   useTypingPrune();
   useChatRealtime({ chatId: roomId, me, memberProfiles });
   useResumeSync(roomId, me);
