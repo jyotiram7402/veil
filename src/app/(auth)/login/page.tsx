@@ -4,7 +4,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
 import { redirectIfSignedIn } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Log in" };
+export const metadata: Metadata = { title: "Admin login" };
 
 export default async function LoginPage({
   searchParams,
@@ -16,24 +16,21 @@ export default async function LoginPage({
 
   return (
     <AuthShell>
-      <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-tight">Log in</h1>
+      <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-tight">Admin login</h1>
       <p className="mt-1.5 text-[15px] leading-relaxed text-muted-foreground">
-        Use your username and password.
+        For the admin. Use your username and password.
       </p>
 
       <LoginForm nextPath={next} />
 
       <p className="mt-6 text-center text-[15px] text-muted-foreground">
-        New here?{" "}
+        A member?{" "}
         <Link
-          href="/signup"
+          href="/enter"
           className="rounded-sm font-semibold text-foreground underline decoration-2 underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Sign up
+          User login
         </Link>
-      </p>
-      <p className="mt-3 text-center text-[13px] leading-relaxed text-muted-foreground">
-        Were you sent a personal invite link? Open that link instead, it logs you in.
       </p>
     </AuthShell>
   );

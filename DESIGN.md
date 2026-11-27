@@ -10,7 +10,7 @@ The look was set by the owner from reference screenshots:
 - **App screens** (chat list, chat thread): clean white surfaces on a pale
   ground, one vivid blue, round emoji avatars, pill-shaped controls.
 - **First screen**: a wall of coloured, rounded tiles floating around a big
-  chunky wordmark, with Log in and Sign up at the bottom.
+  chunky wordmark, with User login and Admin login at the bottom.
 - **Avatars**: playful emoji characters on bright coloured grounds.
 - **Yellow theme**: the owner also asked for a Snapchat-like look. It is a choice next to the
   blue, not a replacement: blue stays the default.
@@ -221,8 +221,11 @@ held sideways.
   above the buttons) and sized in design pixels times `--u`, which follows
   whichever of width or height is tighter. That keeps tiles off the wordmark on
   short phones. Re-check 320x568, 390x844 and 1440x900 after moving a tile.
-- `/login`, `/signup`, `/i/<token>` (`auth-shell.tsx`): a stage in the brand colour (blue,
+- A member's invite link (`/i/<token>`) shows the first screen itself.
+- `/login`, `/enter`, `/d/<token>` (`auth-shell.tsx`): a stage in the brand colour (blue,
   or yellow with ink text and lines) with drifting emoji on top, the form on a white sheet. From 640px up it is a centred card.
+- `/d/<token>`: the member's moji and name, then their hashcode filled in, large and centred,
+  so it can be read and remembered.
 - Styles are in `entry.module.css` (plain CSS, no JavaScript).
 
 ## Motion
@@ -243,15 +246,16 @@ The admin's people (`components/members/*`), at `/admin` and `/admin/<id>`.
 - The list is a white sheet like the chat home: the title "Members" with "N people · N online"
   under it, an "Add someone" pill (just "Add" under 400px), then one row per person: 48px moji,
   name, and one line that says what matters at a glance ("Online" in `text-online-ink`,
-  "Suspended · can't sign in" in `text-destructive`, "Hasn't opened their link yet", otherwise
-  "Seen …"). People are in name order. Below them the sign-up codes that still work, then the
-  codes that no longer work and the archive, each folded away behind a row.
+  "Suspended · can't sign in" in `text-destructive`, "Asked for their hashcode" in bold,
+  "Link ran out", "Hasn't signed in yet", otherwise "Seen …"). People are in name order.
+  Hashcode requests come first, above everyone, each with an Answer pill; the archive is
+  folded away behind a row at the end.
 - A person opens on their own screen: full screen on phones and tablets (back to the list),
   beside the list from 1280px wide. A 96px moji (`UserAvatar size="hero"`), the name,
   "@username · seen …", a badge only when they are suspended, archived or an admin, then Chat
   and Copy link, then grouped rows: Sign-in, Chat rules for <name>, Account.
-- "Add someone" is one sheet: Personal link or Sign-up code, a short form, then the result with
-  its copy buttons. A new code is shown once, large, in the mono face (it is data, not decoration).
+- "Add someone" is one sheet: username, name, hashcode, then the invite link with Copy and, on
+  phones, Share. Hashcodes are typed in plain view: the admin reads them back to the member.
 
 ## Settings and grouped rows
 

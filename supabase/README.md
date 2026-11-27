@@ -28,7 +28,8 @@ Run these files in order in **Supabase Studio → SQL Editor → New query**:
     removes `invite_tokens`/`app_settings` from the realtime publication, and re-asserts RLS.
 12. `v10.sql` — sign-up with an invite code: the `signup_codes` table (hashes only, no
     policies, service role only), `profiles.signup_code_id`, and the atomic
-    `claim_signup_code()` / `release_signup_code()` functions.
+    `claim_signup_code()` / `release_signup_code()` functions. No longer used by the app
+    (sign-up codes were removed); nothing breaks whether or not it has run.
 13. `v11.sql` — column lock-down. A signed-in person may change only `display_name`, `bio`,
     `avatar_url` and `last_seen_at` of their own profile (before, every column, `is_admin`
     included), may no longer UPDATE messages, may INSERT only `text` / `image` / `file`
@@ -40,6 +41,10 @@ Run these files in order in **Supabase Studio → SQL Editor → New query**:
     that is still signed in: `is_active_profile()`, required by `can_access_chat()` and
     `is_chat_member()`. Run v11 first.
 16. `v14.sql` — mute one chat: `chat_members.muted`. Written only by the server (no grant).
+17. `v16.sql` — invite links that run out (`invite_tokens.expires_at`; links made before keep
+    no end), direct links (`direct_links`) and Forgot hashcode (`hashcode_requests`), both
+    service role only. Until it has run, links never run out and direct links and requests
+    say they are not available. (`v15.sql` is the shared rate limit, on its own branch.)
 
 Optionally run `security-tests.sql` with **psql** afterwards (see its header) to verify the
 RLS negative cases — it uses psql `\set` variables, so it won't run in the dashboard editor.

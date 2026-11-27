@@ -100,7 +100,7 @@ export function UserChat({
   async function signOut() {
     await forgetPushDevice();
     await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/expired");
+    router.replace("/enter");
   }
 
   const chat = (

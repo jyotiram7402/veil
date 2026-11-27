@@ -297,3 +297,28 @@ export async function notifyMissedCall(
     console.error("[push] a missed-call notification failed", err);
   }
 }
+
+export async function notifyHashcodeRequest(
+  member: { id: string; username: string; display_name: string | null },
+  origin: string,
+): Promise<void> {
+  try {
+    const { data: admins } = await supabaseAdmin()
+      .from("profiles")
+      .select("id")
+      .eq("is_admin", true)
+      .eq("suspended", false)
+      .eq("archived", false);
+    const notice: Notice = {
+      title: "Hashcode request",
+      body: `${member.display_name?.trim() || member.username} asked for their hashcode.`,
+      tag: `hashcode-${member.id}`,
+      url: `/admin/${member.id}`,
+    };
+    const notices = new Map<string, Notice>();
+    for (const a of admins ?? []) notices.set(a.id, notice);
+    await deliver(notices, origin);
+  } catch (err) {
+    console.error("[push] a hashcode-request notification failed", err);
+  }
+}

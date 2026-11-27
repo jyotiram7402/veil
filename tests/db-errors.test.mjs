@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { describeError, errorCode, isTaken } from "../src/lib/db-errors.ts";
+import { describeError, errorCode, isNotSetUp, isTaken } from "../src/lib/db-errors.ts";
 
 test("a taken username is recognised from Postgres and from Supabase Auth", () => {
   assert.equal(isTaken({ code: "23505", message: 'duplicate key value violates unique constraint "profiles_username_key"' }), true);
@@ -37,4 +37,14 @@ test("a missing or odd error still gives a line", () => {
   assert.equal(describeError("boom"), "boom");
   assert.equal(describeError(7), "7");
   assert.equal(describeError("x".repeat(500)).length, 300);
+});
+
+test("a table or column that a migration has not made yet is told apart from other errors", () => {
+  assert.equal(isNotSetUp({ code: "42P01", message: 'relation "public.direct_links" does not exist' }), true);
+  assert.equal(isNotSetUp({ code: "PGRST205", message: "Could not find the table 'public.direct_links' in the schema cache" }), true);
+  assert.equal(isNotSetUp({ code: "42703", message: 'column "expires_at" does not exist' }), true);
+  assert.equal(isNotSetUp({ code: "PGRST204", message: "Could not find the 'expires_at' column of 'invite_tokens' in the schema cache" }), true);
+  for (const error of [null, undefined, {}, { code: "23505" }, { code: "42501" }, { message: "does not exist" }]) {
+    assert.equal(isNotSetUp(error), false, JSON.stringify(error));
+  }
 });

@@ -11,9 +11,9 @@ There is no middleware: every page, layout and API route checks the session itse
 ```
 Browser ──► Server Components (src/app/**/page.tsx, layout.tsx)
               │  getSessionUser() (React-cached per request) + supabaseServer() → RLS as the user
-              │  / /login /signup: signed in → /chats or /chat (redirectIfSignedIn)
+              │  / /login /enter /i/<token> /d/<token>: signed in → /chats or /chat (redirectIfSignedIn)
               │  (app)/layout.tsx: signed out → /login; not an admin → /chat
-              │  /chat: signed out → /login; an admin → /chats; suspended or archived → /expired
+              │  /chat: signed out → /enter; an admin → /chats; suspended or archived → /expired
               ▼
         Client Components ──► fetch /api/** for every mutation
               │                  └─ route handler: auth check → zod parse → supabaseServer (RLS)
@@ -36,7 +36,7 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   checks `is_admin`. Both are verified by Supabase on every request; nothing trusts the cookie.
 - A read that row-level security already guards runs alongside the session check (the 5 s
   message poll is one step instead of three). A write waits for the session check.
-- In the browser: the log-in and sign-up forms check their fields with `entry-checks.ts`
+- In the browser: the admin's log-in form checks its fields with `entry-checks.ts`
   (no validation library is shipped to them; the server still validates with zod), dates are
   formatted by `format.ts` without a library, the image viewer animates with CSS, and the
   image compressor is fetched only when a large photo is attached.
@@ -45,29 +45,34 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 
 | Path | Who | What |
 |---|---|---|
-| `page.tsx` | signed-out | first screen: animated moji wall, Log in / Sign up (`components/auth/first-screen.tsx`); signed-in visitors are redirected by the page |
-| `(auth)/login` | admin | username + password sign-in (`/api/auth/login`), inside `components/auth/auth-shell.tsx` |
-| `(auth)/signup` | signed-out | sign-up with an invite code (`components/auth/signup-form.tsx` → `/api/auth/signup`); `?code=` pre-fills it |
+| `page.tsx` | signed-out | first screen: animated moji wall, User login / Admin login (`components/auth/first-screen.tsx`); signed-in visitors are redirected by the page |
+| `(auth)/login` | admin | Admin login: username + password (`/api/auth/login`, admins only), inside `components/auth/auth-shell.tsx` |
+| `(auth)/enter` | member | User login: name + hashcode (`components/auth/member-login.tsx` → `/api/auth/member-login`), and "Forgot hashcode?" (`/api/auth/forgot`) |
 | `(app)/layout.tsx` | admin | requires `is_admin`; loads chat list (`loadChatsForUser`) into `AppShell` |
 | `(app)/chats`, `chats/[id]` | admin | chat list + thread (`components/chat/chat-thread.tsx`) |
 | `(app)/admin`, `admin/[id]` | admin | Members: `admin/layout.tsx` → `components/members/members-shell.tsx` (list, data in `members-provider.tsx`) beside one person's screen (`member-screen.tsx`); "Add someone" (`add-someone-dialog.tsx`) |
 | `(app)/rooms`, `rooms/[id]` | admin | rooms dashboard + room management (`components/rooms/*`) |
 | `(app)/settings` | admin | own profile, sign-in, chat rules for everyone (`components/settings/settings-screen.tsx`) |
 | `(user)/chat` | member | single 1:1 chat with an admin (`components/user-chat.tsx`) |
-| `(user)/expired` | anyone | dead-end page after suspension / sign-out |
-| `i/[token]` | member | per-member invite link + gate password → session |
+| `(user)/expired` | anyone | dead end for a link that has run out, is off, was used or is gone (`?why=ended\|off\|direct`) |
+| `i/[token]` | member | a member's invite link: the first screen while the link is open, else `/expired` |
+| `d/[token]` | member | a direct link: the member's hashcode, filled in from the link's `#` part (`components/auth/direct-sign-in.tsx` → `/api/d/[token]`) |
 | `join`, `join/[code]` | guest | room access-code form (`components/rooms/join-form.tsx`) |
 | `room/[id]` | guest | room chat view (`components/rooms/room-chat.tsx`) |
 | `error.tsx` | — | error boundary; shows `Ref: <digest>` to match against Vercel logs |
 
 ## API routes (`src/app/api`)
 
-- `auth/` — `login`, `logout`, `signup` (public; an invite code + username + password → a
-  member account, signed in).
-- `admin/signup-codes` — list / create (the code is returned once), `[id]` DELETE switches one off.
+- `auth/` — `login` (the admin's: username + password; anyone else is signed out again and
+  told to use User login), `logout`, `member-login` (public; name + hashcode, only while that
+  member's invite link is open), `forgot` (public; files a hashcode request for the admin and
+  always answers the same).
+- `admin/hashcode-requests` — the open requests (GET), `[id]` DELETE dismisses one.
 - `admin/` — `users` (list; create — bootstrap-token path when `profiles` is empty),
   `users/[id]` (archive / `?hard=1` delete), `.../suspend`, `.../restore`, `.../invite`
-  (rotate/enable/revoke invite link), `.../settings` (per-user overrides), `.../chat`
+  (a new link, keeping the hashcode unless a new one is given; on/off; change the hashcode;
+  keep it open for 48 hours, 7 or 30 days, or always; remove), `.../direct-link` (POST: set the
+  hashcode and make a direct link), `.../settings` (per-user overrides), `.../chat`
   (open admin↔member chat), `settings` (global `app_settings`), `me` (own username/password).
 - `chats/` — list/create (admin), `[id]` (rename/delete), `[id]/messages` (page via
   `before=`, resync via `after=`; every answer also carries `readers`, each member's
@@ -77,8 +82,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `{ muted }` on the caller's own membership, written with the service role; 503 "Muting isn't
   available yet" until `v14.sql` has run).
 - `messages/[id]` — delete. `upload` — avatars (public) / attachments (signed URLs).
-- `i/[token]` — gate password check → rotate the member's auth password → sign in.
-- `lock` — unlock `SessionLock` with the gate password.
+- `d/[token]` — direct link + hashcode → rotate the member's auth password → sign in. The link
+  is claimed before the sign-in, so it works once; a failed sign-in gives it back.
+- `lock` — unlock `SessionLock` with the hashcode.
 - `rooms/` — list/create, `[id]` (detail / patch status+flags), `[id]/invites`,
   `[id]/invites/[inviteId]` (revoke), `[id]/participants/[userId]` (perms/block/remove),
   `join` (public; access code → guest session).
@@ -104,7 +110,7 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `supabase/client.ts` (browser), `server.ts` (cookies, RLS), `admin.ts` (service role).
 - `auth/session.ts` (`getAuthUserId`, `getSessionUser`, `requireSessionUser`,
   `redirectIfSignedIn`), `auth/username.ts` (`<username>@INTERNAL_EMAIL_DOMAIN`).
-- `entry-checks.ts` (field checks for the log-in and sign-up forms), `format.ts` (times and
+- `entry-checks.ts` (field checks for the admin's log-in form), `format.ts` (times and
   dates as the chat shows them).
 - `api.ts` — `jsonError`, `serverError`, `parseBody(req, zodSchema)`, in-memory `rateLimit`,
   `clientKey`. `db-errors.ts` — `errorCode`, `isTaken` (a taken username, from Postgres or
@@ -117,8 +123,13 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `vanish.ts` (server only: is this a disappearing chat, delete what was read),
   `read-cutoff.ts` and `attachment-path.ts` (its two pure rules: the cutoff time, and the
   storage path inside a signed link).
-- `signup-code.ts` (shape of a sign-up code, shared with the form), `signup-codes.ts`
-  (server only: generate, SHA-256 hash, hint).
+- `member-access.ts` (server only): finding a member by name (their username, or their display
+  name when nobody else has it; never an admin or a room guest), checking a hashcode against
+  their invite link and its open window, direct links, and hashcode requests.
+  `invite-window.ts` (pure, shared with the screens): how long links stay open and how that
+  reads. `device-label.ts`: "Android · Chrome" from a user agent. `auth/sign-in-member.ts`:
+  set a member's auth password to a new random one and sign the browser in. `db-errors.ts` also
+  tells a table or column that a migration has not made yet (`isNotSetUp`).
 - `password.ts` (PBKDF2), `invite-token.ts`, `url.ts` (app origin for links), `clipboard.ts`
   (`copyText`: copy buttons copy, they never open the share sheet), `utils.ts` (`cn`, `apiErrorMessage`, `normalizeUsernameInput`),
   `moji.ts` (emoji avatars: the catalog and the stable pick per user id).
@@ -176,10 +187,11 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `max_participants`, `chat/voice/video_enabled`), `chat_members` (`role`, `blocked`,
   `removed_at`, `can_chat/voice/video`, `last_read_at`), `messages` (`text|image|file|system`),
   `invite_tokens`, `app_settings`, `room_invites`, `room_audit_log`, `call_sessions`,
-  `signup_codes` (v10; hash + hint only, RLS on with no policies, so service role only;
-  `profiles.signup_code_id` says which code a member joined with), `push_subscriptions`
+  `signup_codes` (v10; no longer used: sign-up codes were removed on 2026-11-27, the table is
+  left as it was), `push_subscriptions`
   (v12; one row per device that wants notifications) and `push_keys` (v12; the server's
-  one key pair), both service role only.
+  one key pair), both service role only. v16 adds `invite_tokens.expires_at`, `direct_links`
+  and `hashcode_requests` (service role only).
 - SECURITY DEFINER helpers used by RLS: `is_chat_member`, `is_chat_admin`, `is_admin`,
   `is_room_admin`, `can_access_chat`, `can_chat_in`, `shares_chat`; RPCs
   `claim_room_seat` (advisory-locked seat claim), `get_or_create_admin_user_chat`,
@@ -192,15 +204,24 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 
 ## Auth flows
 
-- **Admin:** `/login` → `/api/auth/login` → `signInWithPassword(<username>@domain)`.
-- **Member:** admin adds them in Members → Add someone → Personal link → invite link `/i/<token>` → gate password →
-  `/api/i/[token]` rotates the auth password to a random value and signs the browser in →
-  `/chat`. `SessionLock` (setting `screen_guard`) re-locks on tab hide; unlock via `/api/lock`.
-- **Sign-up member:** admin makes a code in Members → Add someone → Sign-up code → the person opens
-  `/signup` (or the shared `/signup?code=…` link), picks a username, password and avatar →
-  `/api/auth/signup` checks the code, claims one use atomically (`claim_signup_code`), creates
-  the auth user + profile and signs the browser in → `/chat`. Later they use `/login`. Their
-  lock-screen password is their login password (`/api/lock` falls back to it).
+- **Admin:** Admin login (`/login`) → `/api/auth/login` → `signInWithPassword(<username>@domain)`,
+  then `is_admin` is checked; anyone else is signed out again (this session only).
+- **Member:** the admin adds them in Members → Add someone (username, name, hashcode) and sends
+  the invite link `/i/<token>`. It shows the first screen while it is open; User login (`/enter`)
+  takes the name and hashcode → `/api/auth/member-login` finds the member, checks the hashcode
+  against their invite link, refuses if the link is off or past `expires_at`, sets the auth
+  password to a new random value and signs the browser in → `/chat`. The same works from `/`
+  for as long as the link is open. A new link is open for 48 hours; the admin keeps it open
+  longer from the person's screen.
+- **Forgot hashcode:** `/enter` → "Forgot hashcode?" → name → `/api/auth/forgot` files one open
+  request for that member and notifies the admins. The admin checks it is really them, then
+  Send a direct link: `/api/admin/users/[id]/direct-link` sets the hashcode they typed and
+  returns `/d/<token>#<hashcode>`. The member opens it, sees the hashcode filled in, taps
+  Start → `/api/d/[token]` → `/chat`. Works once, for 48 hours, even while the invite link is
+  off or has run out.
+- `SessionLock` (setting `screen_guard`) re-locks on tab hide; unlock with the hashcode via
+  `/api/lock`. A member who joined with a sign-up code before codes were removed still
+  unlocks with their own password (`/api/lock` falls back to it).
 - **Room guest:** admin creates room + invitation → `/join/<code>` → `/api/rooms/join`
   creates an ephemeral `is_room_guest` user, claims a seat, consumes one invite use →
   `/room/<id>`.
@@ -415,6 +436,9 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   suspended, archived, blocked or removed. Rooms send nothing, and a member is only ever
   told about the admin's messages. Someone who muted the chat (`chat_members.muted`, v14) is
   not told about its messages; calls ignore mute and still ring.
+- A hashcode request (`auth/forgot`) tells the admins (`notifyHashcodeRequest`): "Hashcode
+  request", "<name> asked for their hashcode.", opening that person in Members. Only a name
+  that belongs to a member who can sign in makes one.
 - `notifyNewMessage` and the chat list (`loadChatsForUser`) read `chat_members` with `*`,
   not by naming `muted`: before `v14.sql` has run the column is missing, and naming it would
   break the chat list and every message notification.
@@ -475,19 +499,24 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   calls, the database policies.
 - Nothing in the repository makes Vercel wait for the tests: a red cross on GitHub does not
   stop a deployment.
+- Also covered: invite links, hashcodes, direct links and hashcode requests
+  (`member-access.ts` against the in-memory database, `invite-window.ts`, `device-label.ts`).
 
 ## Members and Settings
 
 - `(app)/admin/layout.tsx` renders `MembersShell`, so the list stays mounted while people are
   opened beside it (`admin/[id]`). `MembersProvider` loads everyone (archived included) and the
-  sign-up codes once; the list and the person's screen read the same data, so a change shows on
+  open hashcode requests once, and the requests again whenever the app comes back to the front;
+  the list and the person's screen read the same data, so a change shows on
   both at once. A failed reload keeps the list on screen and says so in a toast.
 - Phones and tablets show one screen at a time. From 1280px (`xl`) the list stays beside the
   person: the 380px chat column still leaves room there. `ScreenHeader`'s back button hides from
   the width where the screen it goes back to is already showing (`hideFrom`).
-- "Joined with a sign-up code" is read from the codes' `used_by`. When the codes don't load it is
-  unknown, and the warnings about that person's own password are still shown, worded "if":
-  suspending someone (`lockOut`) and opening a personal link both replace their password.
+- Hashcode requests head the list, each with an Answer pill that opens the person. There,
+  "Send a direct link" answers it (the request is cleared by the server and in the list);
+  Dismiss drops it without a link.
+- Hashcodes are typed in plain view, not as passwords: the admin has to read them back to the
+  member. The server never returns one; a direct link carries it after `#`.
 - Chat rule labels and fallbacks are in `components/settings/chat-rules.ts`. The fallbacks repeat
   `DEFAULT_SETTINGS` because `lib/settings.ts` is server-only.
 - Switching disappearing messages on asks first, and so does going back to everyone's setting
@@ -508,7 +537,7 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   admin means `profiles.is_admin`; room actions also call `assertRoomAdmin()`.
   `supabaseAdmin()` (service role) only after those checks, and only on the server.
 - Server-only modules start with `import "server-only"` (`rooms`, `permissions`, `queries`,
-  `settings`, `invite-token`, `signup-codes`, `vanish`, `turn`, `push`, `web-push`).
+  `settings`, `invite-token`, `member-access`, `vanish`, `turn`, `push`, `web-push`).
 - Environment variables are read through `src/lib/env.ts`. The exceptions: `next.config.ts`
   (the Supabase host) and `src/app/api/health` (booleans only).
 - A new route: copy `src/app/api/rooms/route.ts`. Session check → 401, `is_admin` → 403,
@@ -564,10 +593,19 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `.default()` field is never `undefined`.
 - `src/lib/env.ts` stops a build ("Collecting page data") when a required variable is missing
   in that Vercel environment. Preview builds need the variables ticked for Preview as well.
-- Two kinds of member. One who came through an invite link has a throwaway auth password
-  (every visit to the link sets a new one). One who signed up with a code logs in at
-  `/login` with their own. Giving a sign-up member an invite link, or suspending them,
-  destroys that password.
+- A member never knows their auth password: every sign-in (name + hashcode, or a direct link)
+  sets a new random one first. Members who joined with a sign-up code before codes were
+  removed keep their own password until then. Admin login turns them away, so once they are
+  signed out they need an invite link and a hashcode.
+- The hashcode in a direct link sits after `#`: browsers never send that part, so it is in no
+  server log, and the page takes it out of the address bar after reading it. Link previews
+  (WhatsApp and the like) only fetch the page; the link is claimed by the POST from Start.
+- Hashcodes are compared after NFC, without emoji variation selectors (U+FE0E, U+FE0F) and
+  without spaces at the ends: phone keyboards differ in all three. A password set before this
+  rule still matches exactly as it was typed.
+- An invite link made before `v16.sql` has no `expires_at`, so it never runs out until the
+  admin chooses how long to keep it open. Every read of `invite_tokens` uses `*`, so the
+  members list still loads before v16 has run.
 - Supabase keys: the app uses the legacy `anon` and `service_role` keys, and the JWT signing
   key is HS256. The newer publishable / secret keys and asymmetric signing keys have not
   been tried with `@supabase/ssr` 0.5 (unverified).
