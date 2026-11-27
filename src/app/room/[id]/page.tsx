@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { loadMessagesPage } from "@/lib/queries";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
 import { effectiveSettingsForUser } from "@/lib/settings";
+import { presenceTopic } from "@/lib/presence-topic";
 import { RoomChat } from "@/components/rooms/room-chat";
 import { RoomClosed } from "@/components/rooms/room-closed";
 import type { Profile } from "@/types/chat";
@@ -70,11 +71,15 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
     .eq("chat_id", id)
     .eq("user_id", session.id);
 
-  const settings = await effectiveSettingsForUser(session.id);
+  const [settings, topic] = await Promise.all([
+    effectiveSettingsForUser(session.id),
+    presenceTopic(),
+  ]);
 
   return (
     <RoomChat
       me={session.profile}
+      presenceTopic={topic}
       roomId={id}
       roomName={room.name ?? "Private room"}
       locked={room.status === "locked"}

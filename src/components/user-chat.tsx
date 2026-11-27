@@ -38,6 +38,7 @@ import type { MessageWithSender, Profile } from "@/types/chat";
 
 export function UserChat({
   me,
+  presenceTopic,
   adminProfile,
   chatId,
   initialMessages,
@@ -46,6 +47,7 @@ export function UserChat({
   settings,
 }: {
   me: Profile;
+  presenceTopic: string;
   adminProfile: Profile;
   chatId: string;
   initialMessages: MessageWithSender[];
@@ -67,7 +69,7 @@ export function UserChat({
   }, [chatId, readers, noteReads]);
   useMarkRead(chatId, me.id);
 
-  usePresence(me);
+  usePresence(me, presenceTopic);
   useHeartbeat(true);
   useTypingPrune();
 

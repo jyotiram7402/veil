@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { loadMessagesPage } from "@/lib/queries";
 import { MESSAGE_PAGE_SIZE } from "@/lib/constants";
 import { effectiveSettingsForUser } from "@/lib/settings";
+import { presenceTopic } from "@/lib/presence-topic";
 import { UserChat } from "@/components/user-chat";
 import type { Profile } from "@/types/chat";
 
@@ -15,7 +16,7 @@ export default async function UserChatPage() {
   if (!userId) redirect("/enter");
 
   const supabase = await supabaseServer();
-  const [session, membershipResult, settings] = await Promise.all([
+  const [session, membershipResult, settings, topic] = await Promise.all([
     requireSessionUser(),
     Promise.resolve(
       supabase
@@ -35,6 +36,7 @@ export default async function UserChatPage() {
         .eq("user_id", userId),
     ),
     effectiveSettingsForUser(userId),
+    presenceTopic(),
   ]);
 
   if (session.profile.is_admin) redirect("/chats");
@@ -122,6 +124,7 @@ export default async function UserChatPage() {
   return (
     <UserChat
       me={session.profile}
+      presenceTopic={topic}
       adminProfile={adminProfile!}
       chatId={chatId!}
       initialMessages={initialMessages}
