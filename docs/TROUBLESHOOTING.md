@@ -141,8 +141,30 @@ deliberately email-less.
 
 - "…but they still can't sign in. Try again." after Unsuspend or Restore: the account is
   marked active again, but Supabase Auth did not lift the ban. Press the same button again.
-- A restored member needs a new invite link ("Set invite link" on their card in Members):
-  Remove revoked the old ones. A suspended member's own link works again after Unsuspend.
+- A restored member needs a new invite link (Members → the person → Make an invite link):
+  archiving removed the old one. A suspended member's own link works again after Reinstate,
+  while it is open (see the next section).
+
+## A member can't sign in with their name and hashcode
+
+- **"That name or hashcode is wrong"**: the name is their username (`rahul`) or their name
+  (`Rahul Sharma`) when nobody else has it; capitals and extra spaces in the name don't
+  matter, in the hashcode capitals do. If in doubt, Members → the person → Change the
+  hashcode, and tell them the new one.
+- **"Your invite link has run out"**, or the link shows "This invite link has run out":
+  Members → the person → Keep it open → 48 hours, 7 days, 30 days or Always.
+- **"Your invite link is switched off"**: switch "Link works" back on.
+- **They forgot the hashcode**: they tap "Forgot hashcode?" and type their name. The request
+  shows at the top of Members, with what they typed and their phone, and as a notification
+  on your phone. Check it is really them (call them), open them, Send a direct link, type
+  their hashcode (the old one or a new one) and send them the link. It opens with the
+  hashcode filled in, and works once, for 48 hours.
+- **"This direct link has been used"**: they opened it before, a newer one replaced it, or 48
+  hours passed. Make a new one.
+- **Direct links or requests say they "aren't available"**: `supabase/v16.sql` has not been
+  run.
+- **Someone who joined with a sign-up code** (before codes were removed): Admin login turns
+  members away now. Make them an invite link with a hashcode.
 
 ## Build fails on Vercel: "Type error: ..."
 
@@ -248,9 +270,47 @@ Open the site's permissions in the browser (usually the icon next to the
 address), set Microphone and Camera to Allow, and call again. A blocked camera
 never ends a call: it carries on as a voice call.
 
+On Android, Chrome itself must also be allowed to use the microphone: the phone's
+Settings → Apps → Chrome → Permissions → Microphone. If Chrome is not allowed there, the
+site's own Allow does nothing.
+
+## A call stops with "The microphone could not be started"
+
+The browser has permission but could not open the microphone. The browser's own name for
+the error is shown in brackets after the message.
+
+- **(NotReadableError)**: something else holds the microphone. On Android that is usually a
+  phone or WhatsApp call, a voice recorder, a voice assistant, or the same site open in
+  another tab. The app already tries twice; close the other app or tab and call again.
+  Restarting Chrome (close it from the recent-apps list) clears a microphone Chrome itself
+  still holds.
+- **(AbortError)**: the same, on some phones.
+- **(OverconstrainedError)**: the microphone chosen in the call settings has gone (a headset
+  was unplugged). The app falls back to the phone's own microphone on the second try; if
+  this still shows, pick another microphone.
+
+## A call stops with "The call couldn't be set up"
+
+Not a microphone problem. The name in brackets (for example `TypeError`) is the start of
+the answer; the browser's console has the whole error, in a line starting with
+`[call] the call could not start` (or `could not be answered`). On a phone, connect it to a
+computer and use Chrome's `chrome://inspect` to read that console.
+
 ## No notification arrives
 
-Work down the list; the first one that fits is usually it.
+First use **Send a test notification**, in the same menu as "Turn off notifications" (it is
+there while notifications are on). It goes to this device straight away, even while the app
+is open, and says what happened:
+
+- "Test sent" and nothing appears: the server and the push service did their part; the
+  phone is holding it back. Go to steps 4 to 6.
+- "isn't registered for notifications any more": turn notifications off and on again in
+  the menu, then test again.
+- "The push service didn't take the test": see step 8.
+- "aren't set up on the server yet": see step 1.
+
+If the test arrives but real notifications do not, step 3 is the usual reason. Otherwise,
+work down the list; the first one that fits is usually it.
 
 1. **Turning them on answers "Notifications aren't available yet"**: `supabase/v12.sql` has
    not been run in this Supabase project.

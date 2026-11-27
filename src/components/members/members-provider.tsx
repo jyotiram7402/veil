@@ -3,18 +3,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { apiErrorMessage } from "@/lib/utils";
-import type { Person, SignupCode } from "@/components/members/types";
+import type { HashcodeRequest, Person } from "@/components/members/types";
 
 type MembersState = {
   people: Person[] | null;
   peopleError: string | null;
-  codes: SignupCode[] | null;
-  codesError: string | null;
+  requests: HashcodeRequest[];
   reload: () => Promise<void>;
   patchPerson: (id: string, patch: Partial<Person>) => void;
   dropPerson: (id: string) => void;
-  addCode: (code: SignupCode) => void;
-  patchCode: (id: string, patch: Partial<SignupCode>) => void;
+  dropRequestsFor: (userId: string) => void;
 };
 
 const MembersContext = createContext<MembersState | null>(null);
@@ -22,8 +20,7 @@ const MembersContext = createContext<MembersState | null>(null);
 export function MembersProvider({ children }: { children: React.ReactNode }) {
   const [people, setPeople] = useState<Person[] | null>(null);
   const [peopleError, setPeopleError] = useState<string | null>(null);
-  const [codes, setCodes] = useState<SignupCode[] | null>(null);
-  const [codesError, setCodesError] = useState<string | null>(null);
+  const [requests, setRequests] = useState<HashcodeRequest[]>([]);
   const loaded = useRef(false);
 
   const loadPeople = useCallback(async () => {
@@ -45,28 +42,30 @@ export function MembersProvider({ children }: { children: React.ReactNode }) {
     else setPeopleError(error);
   }, []);
 
-  const loadCodes = useCallback(async () => {
+  const loadRequests = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/signup-codes", { cache: "no-store" });
-      const body: unknown = await res.json().catch(() => null);
-      if (!res.ok) {
-        setCodesError(apiErrorMessage(body, "Couldn't load the sign-up codes."));
-        return;
-      }
-      setCodesError(null);
-      setCodes((body as { codes: SignupCode[] }).codes);
-    } catch {
-      setCodesError("No connection, so the sign-up codes didn't load.");
-    }
+      const res = await fetch("/api/admin/hashcode-requests", { cache: "no-store" });
+      if (!res.ok) return;
+      const body = (await res.json()) as { requests?: HashcodeRequest[] };
+      setRequests(body.requests ?? []);
+    } catch {}
   }, []);
 
   const reload = useCallback(async () => {
-    await Promise.all([loadPeople(), loadCodes()]);
-  }, [loadPeople, loadCodes]);
+    await Promise.all([loadPeople(), loadRequests()]);
+  }, [loadPeople, loadRequests]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadRequests();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadRequests]);
 
   const patchPerson = useCallback((id: string, patch: Partial<Person>) => {
     setPeople((list) => list?.map((p) => (p.id === id ? { ...p, ...patch } : p)) ?? list);
@@ -74,26 +73,21 @@ export function MembersProvider({ children }: { children: React.ReactNode }) {
   const dropPerson = useCallback((id: string) => {
     setPeople((list) => list?.filter((p) => p.id !== id) ?? list);
   }, []);
-  const addCode = useCallback((code: SignupCode) => {
-    setCodes((list) => [code, ...(list ?? [])]);
-  }, []);
-  const patchCode = useCallback((id: string, patch: Partial<SignupCode>) => {
-    setCodes((list) => list?.map((c) => (c.id === id ? { ...c, ...patch } : c)) ?? list);
+  const dropRequestsFor = useCallback((userId: string) => {
+    setRequests((list) => list.filter((r) => r.user_id !== userId));
   }, []);
 
   const value = useMemo(
     () => ({
       people,
       peopleError,
-      codes,
-      codesError,
+      requests,
       reload,
       patchPerson,
       dropPerson,
-      addCode,
-      patchCode,
+      dropRequestsFor,
     }),
-    [people, peopleError, codes, codesError, reload, patchPerson, dropPerson, addCode, patchCode],
+    [people, peopleError, requests, reload, patchPerson, dropPerson, dropRequestsFor],
   );
   return <MembersContext.Provider value={value}>{children}</MembersContext.Provider>;
 }
@@ -104,8 +98,7 @@ export function useMembers(): MembersState {
   return ctx;
 }
 
-export function useJoinedWithCode(personId: string): boolean | null {
-  const { codes } = useMembers();
-  if (!codes) return null;
-  return codes.some((c) => c.used_by.some((u) => u.id === personId));
+export function useRequestFor(personId: string): HashcodeRequest | null {
+  const { requests } = useMembers();
+  return requests.find((r) => r.user_id === personId) ?? null;
 }

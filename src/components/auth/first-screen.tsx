@@ -45,14 +45,14 @@ export function FirstScreen() {
 
       <div className={styles.actions}>
         <div className={styles.buttons}>
-          <Link href="/login" className={cn(styles.cta, styles.ctaPrimary)}>
-            Log in
+          <Link href="/enter" className={cn(styles.cta, styles.ctaPrimary)}>
+            User login
           </Link>
-          <Link href="/signup" className={cn(styles.cta, styles.ctaInk)}>
-            Sign up
+          <Link href="/login" className={cn(styles.cta, styles.ctaInk)}>
+            Admin login
           </Link>
         </div>
-        <p className={styles.note}>Invite only. Signing up needs a code.</p>
+        <p className={styles.note}>Invite only. Your admin gives you your name and hashcode.</p>
       </div>
     </main>
   );

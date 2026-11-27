@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { verifyPassword } from "@/lib/password";
+import { hashcodeMatches } from "@/lib/member-access";
 import { clientKey, jsonError } from "@/lib/api";
 import { sharedRateLimit } from "@/lib/shared-rate-limit";
 import { usernameToInternalEmail } from "@/lib/auth/username";
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     return jsonError(403, "No active invite — sign in again");
   }
 
-  const ok = await verifyPassword(password, row.gate_password_hash);
+  const ok = await hashcodeMatches(password, row.gate_password_hash);
   if (!ok) return jsonError(401, "Wrong password");
 
   return NextResponse.json({ ok: true });

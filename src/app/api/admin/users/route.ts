@@ -6,8 +6,8 @@ import { createUserSchema } from "@/lib/validations";
 import { clientKey, jsonError, parseBody, serverError } from "@/lib/api";
 import { sharedRateLimit } from "@/lib/shared-rate-limit";
 import { isTaken } from "@/lib/db-errors";
-import { generateInviteToken, generateEphemeralPassword } from "@/lib/invite-token";
-import { hashPassword } from "@/lib/password";
+import { generateEphemeralPassword } from "@/lib/invite-token";
+import { createInviteLink, hashHashcode } from "@/lib/member-access";
 import { inviteUrlFor } from "@/lib/url";
 import { env } from "@/lib/env";
 
@@ -37,16 +37,27 @@ export async function GET(req: Request) {
 
   const { data: tokens } = await admin
     .from("invite_tokens")
-    .select("user_id, token, enabled, use_count, last_used_at, gate_password_hash")
+    .select("*")
     .is("revoked_at", null);
 
-  const tokenByUser = new Map<string, { token: string; enabled: boolean; use_count: number; last_used_at: string | null; has_password: boolean }>();
+  const tokenByUser = new Map<
+    string,
+    {
+      token: string;
+      enabled: boolean;
+      use_count: number;
+      last_used_at: string | null;
+      expires_at: string | null;
+      has_password: boolean;
+    }
+  >();
   for (const t of tokens ?? []) {
     tokenByUser.set(t.user_id, {
       token: t.token,
       enabled: t.enabled,
       use_count: t.use_count,
       last_used_at: t.last_used_at,
+      expires_at: t.expires_at ?? null,
       has_password: !!t.gate_password_hash,
     });
   }
@@ -62,6 +73,7 @@ export async function GET(req: Request) {
               enabled: t.enabled,
               use_count: t.use_count,
               last_used_at: t.last_used_at,
+              expires_at: t.expires_at,
               has_password: t.has_password,
             }
           : null,
@@ -104,7 +116,7 @@ export async function POST(req: Request) {
   const finalIsAdmin = isBootstrap ? true : Boolean(isAdmin);
 
   if (!password) {
-    return jsonError(400, finalIsAdmin ? "Admin needs a password" : "Set an invite password");
+    return jsonError(400, finalIsAdmin ? "Admin needs a password" : "Set a hashcode");
   }
 
   const { data: existing } = await admin
@@ -141,14 +153,8 @@ export async function POST(req: Request) {
 
   let invite: { token: string; url: string } | null = null;
   if (!finalIsAdmin) {
-    const token = generateInviteToken();
-    const gate_password_hash = await hashPassword(password);
-    const { error: tokenErr } = await admin
-      .from("invite_tokens")
-      .insert({ token, user_id: created.user.id, enabled: true, gate_password_hash });
-    if (!tokenErr) {
-      invite = { token, url: await inviteUrlFor(token) };
-    }
+    const made = await createInviteLink(created.user.id, await hashHashcode(password));
+    if (made) invite = { token: made.token, url: await inviteUrlFor(made.token) };
   }
 
   return NextResponse.json({

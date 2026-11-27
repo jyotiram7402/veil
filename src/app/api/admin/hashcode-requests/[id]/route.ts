@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/session";
 import { jsonError } from "@/lib/api";
+import { dismissHashcodeRequest } from "@/lib/member-access";
 
 export const runtime = "nodejs";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSessionUser();
@@ -13,15 +12,9 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   if (!session.profile.is_admin) return jsonError(403, "Admin only");
 
   const { id } = await ctx.params;
-  if (!UUID.test(id)) return jsonError(400, "Unknown code");
-
-  const admin = supabaseAdmin();
-  const { error } = await admin
-    .from("signup_codes")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", id)
-    .is("revoked_at", null);
-  if (error) return jsonError(500, "Couldn't switch the code off. Try again.");
-
+  if (!z.string().uuid().safeParse(id).success) return jsonError(404, "No such request");
+  if (!(await dismissHashcodeRequest(id))) {
+    return jsonError(500, "Couldn't dismiss the request. Try again.");
+  }
   return NextResponse.json({ ok: true });
 }

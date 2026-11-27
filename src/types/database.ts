@@ -135,6 +135,7 @@ type InviteTokenRow = {
   last_used_at: string | null;
   use_count: number;
   gate_password_hash: string | null;
+  expires_at: string | null;
 };
 type InviteTokenInsert = {
   token: string;
@@ -145,8 +146,43 @@ type InviteTokenInsert = {
   last_used_at?: string | null;
   use_count?: number;
   gate_password_hash?: string | null;
+  expires_at?: string | null;
 };
 type InviteTokenUpdate = Partial<InviteTokenInsert>;
+
+type DirectLinkRow = {
+  token: string;
+  user_id: string;
+  created_at: string;
+  expires_at: string;
+  used_at: string | null;
+};
+type DirectLinkInsert = {
+  token: string;
+  user_id: string;
+  created_at?: string;
+  expires_at: string;
+  used_at?: string | null;
+};
+type DirectLinkUpdate = Partial<DirectLinkInsert>;
+
+type HashcodeRequestRow = {
+  id: string;
+  user_id: string;
+  typed_name: string;
+  device: string | null;
+  created_at: string;
+  resolved_at: string | null;
+};
+type HashcodeRequestInsert = {
+  id?: string;
+  user_id: string;
+  typed_name: string;
+  device?: string | null;
+  created_at?: string;
+  resolved_at?: string | null;
+};
+type HashcodeRequestUpdate = Partial<HashcodeRequestInsert>;
 
 type AppSettingRow = {
   key: string;
@@ -379,6 +415,18 @@ export type Database = {
         Row: PushKeyRow;
         Insert: PushKeyInsert;
         Update: PushKeyUpdate;
+        Relationships: [];
+      };
+      direct_links: {
+        Row: DirectLinkRow;
+        Insert: DirectLinkInsert;
+        Update: DirectLinkUpdate;
+        Relationships: [];
+      };
+      hashcode_requests: {
+        Row: HashcodeRequestRow;
+        Insert: HashcodeRequestInsert;
+        Update: HashcodeRequestUpdate;
         Relationships: [];
       };
     };

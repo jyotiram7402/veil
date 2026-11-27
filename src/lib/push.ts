@@ -105,6 +105,41 @@ export async function forgetAllDevices(userId: string): Promise<void> {
   await supabaseAdmin().from("push_subscriptions").delete().eq("user_id", userId);
 }
 
+export type TestPushResult = "sent" | "failed" | "not-set-up" | "not-registered";
+
+export async function sendTestPush(
+  userId: string,
+  endpoint: string,
+  origin: string,
+): Promise<TestPushResult> {
+  const keys = await getPushKeys();
+  if (!keys) return "not-set-up";
+  const admin = supabaseAdmin();
+  const { data: device } = await admin
+    .from("push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .eq("user_id", userId)
+    .eq("endpoint", endpoint)
+    .maybeSingle();
+  if (!device) return "not-registered";
+  const notice: Notice = {
+    title: "Test notification",
+    body: "Notifications work on this phone.",
+    tag: "test",
+    url: "/",
+  };
+  const result = await sendPush(device, notice, keys, {
+    subject: subjectFor(origin),
+    ttlSeconds: 60,
+    topic: pushTopic(notice.tag),
+  });
+  if (result === "gone") {
+    await admin.from("push_subscriptions").delete().eq("id", device.id);
+    return "not-registered";
+  }
+  return result;
+}
+
 export async function removeDevice(userId: string, endpoint: string): Promise<void> {
   await supabaseAdmin()
     .from("push_subscriptions")
@@ -260,5 +295,30 @@ export async function notifyMissedCall(
     await deliver(new Map([[callee.id, notice]]), origin);
   } catch (err) {
     console.error("[push] a missed-call notification failed", err);
+  }
+}
+
+export async function notifyHashcodeRequest(
+  member: { id: string; username: string; display_name: string | null },
+  origin: string,
+): Promise<void> {
+  try {
+    const { data: admins } = await supabaseAdmin()
+      .from("profiles")
+      .select("id")
+      .eq("is_admin", true)
+      .eq("suspended", false)
+      .eq("archived", false);
+    const notice: Notice = {
+      title: "Hashcode request",
+      body: `${member.display_name?.trim() || member.username} asked for their hashcode.`,
+      tag: `hashcode-${member.id}`,
+      url: `/admin/${member.id}`,
+    };
+    const notices = new Map<string, Notice>();
+    for (const a of admins ?? []) notices.set(a.id, notice);
+    await deliver(notices, origin);
+  } catch (err) {
+    console.error("[push] a hashcode-request notification failed", err);
   }
 }

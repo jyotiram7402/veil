@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { CallControl } from "@/components/call/call-controls";
+import { CallFloat, type FloatCorner } from "@/components/call/call-float";
 import { CallStage } from "@/components/call/call-stage";
 import { UserAvatar } from "@/components/chat/user-avatar";
 import { useMediaDevices } from "@/hooks/use-media-devices";
@@ -101,6 +102,8 @@ export function CallScreen({
   const call = useCallStore();
   const { state, peer, setMinimized } = call;
   const locked = useSessionStore((s) => s.locked);
+  const me = useSessionStore((s) => s.profile);
+  const [corner, setCorner] = useState<FloatCorner>("top-right");
 
   const live = state === "connected" || state === "reconnecting";
   const over = isCallOver(state);
@@ -199,6 +202,24 @@ export function CallScreen({
 
   if (asPill) {
     const line = over ? status : state === "connected" ? duration : status;
+    if (!over && !locked && me && (call.videoEnabled || call.remoteVideoOn)) {
+      return (
+        <CallFloat
+          peer={peer}
+          me={{ id: me.id, name: me.display_name || me.username, avatarUrl: me.avatar_url }}
+          theirVideo={live && call.remoteVideoOn ? call.remoteStream : null}
+          myVideo={call.videoEnabled ? call.localStream : null}
+          theirMicOff={live && !call.remoteAudioOn}
+          muted={call.muted}
+          line={line}
+          corner={corner}
+          onCorner={setCorner}
+          onExpand={() => setMinimized(false)}
+          onToggleMute={toggleMute}
+          onHangUp={hangUp}
+        />
+      );
+    }
     return (
       <div
         className={cn(styles.pill, locked && styles.pillHigh)}

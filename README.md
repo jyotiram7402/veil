@@ -1,8 +1,8 @@
 # BlackFoxx
 
 A small, private, real-time chat for people you actually want to talk to.
-Username + password, no email, no phone, no open signups — the admin either
-creates an account or hands out a one-off sign-up code.
+Name + hashcode, no email, no phone, no open signups — the admin adds each
+person and sends them an invite link.
 
 It's deliberately minimal: one Next.js 15 app, one Supabase project,
 deployable to Vercel's free tier in about ten minutes.
@@ -67,10 +67,11 @@ For production, see [`DEPLOYMENT.md`](DEPLOYMENT.md) and
 ```
 src/
   app/
-    (auth)/login           — sign-in page
+    (auth)/login, enter    — Admin login, User login
     (app)/                 — admin shell: chats, rooms, settings, admin
     (user)/chat            — participant view
-    i/[token], join/[code] — invite / room-join flows
+    i/[token], d/[token]   — invite link, direct link
+    join/[code]            — room-join flow
     room/[id]              — participant room view
     api/                   — auth, admin, chats, rooms, calls, profile, upload
   components/

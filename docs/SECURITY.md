@@ -16,12 +16,14 @@ in the database (RLS), never from client-supplied role/permission/identity.
 
 - Supabase Auth (email+password grant) over httpOnly SSR cookies; usernames map
   to synthetic internal emails. No custom JWT/session table.
-- **Admins** sign in with username+password. **Participants** never hold a known
-  password: they open a per-user invite link (`/i/<token>`) or a room invite
-  (`/join/<selector.verifier>`), pass a gate/verifier, and the server mints an
-  ephemeral Supabase session. No email/phone/PII.
+- **Admins** sign in with username+password at Admin login; a non-admin who gets the
+  password right there is signed out again. **Members** never hold a known auth password:
+  they type their name and the hashcode the admin set (only while their invite link is open),
+  or open a direct link the admin sent; **room guests** open a room invite
+  (`/join/<selector.verifier>`) and pass its verifier. The server then sets a random auth
+  password and mints a Supabase session. No email/phone/PII.
 - Every page, layout and API route checks the session itself; there is no middleware.
-  Signed-out people are sent to `/login`, non-admins cannot open the admin pages
+  Signed-out people are sent to `/login` (admin pages) or `/enter` (the member page), non-admins cannot open the admin pages
   (`(app)/layout.tsx`), and the member page sends a suspended or archived member to
   `/expired`. `getAuthUserId()` and `getSessionUser()` are the server-side source of
   identity: both ask Supabase Auth to verify the session on every request.
@@ -69,7 +71,8 @@ in the database (RLS), never from client-supplied role/permission/identity.
 | room_invites | on | admin-only SELECT; writes service-role after `is_room_admin` |
 | room_audit_log | on | admin-only SELECT; writes service-role |
 | call_sessions | on | SELECT members; INSERT caller; UPDATE participant, state columns only (v11) |
-| signup_codes | on | no policies: service role only (v10) |
+| signup_codes | on | no policies: service role only (v10); no longer used |
+| direct_links, hashcode_requests | on | no policies: service role only (v16) |
 | push_subscriptions, push_keys | on | no policies: service role only (v12) |
 | realtime.messages | on | private `call:<chatId>` broadcast limited to chat members (v7) |
 
@@ -88,20 +91,36 @@ Negative RLS tests: `supabase/security-tests.sql`.
   Recommended future work: migrate to the selector/verifier hashed scheme (a
   non-destructive dual-read migration).
 
-### Sign-up codes
+### Member sign-in: invite links, hashcodes and direct links
 
-A second, self-service way in. The admin creates a code; whoever holds it can make one member
-account (never an admin).
+Since 2026-11-27 the admin is the only way in: sign-up codes were removed (`signup_codes` and
+`claim_signup_code` stay in the database, unused).
 
-- Codes are 10 random characters (about 49 bits). The database stores only a SHA-256 hash and
-  the last 4 characters; the code itself is shown once, when it is created.
-- `signup_codes` has RLS on and no policies, and the claim/release functions are executable by
-  the service role only, so the browser cannot read or use them directly.
-- Each code has a use limit and (by default) an expiry, and can be switched off. A use is
-  claimed in a single SQL statement, so the last use cannot be taken twice.
-- `POST /api/auth/signup` is public and rate-limited per IP. Every bad-code case returns the
-  same message, and the username check only runs after the code check, so the endpoint cannot
-  be used to list usernames without a valid code.
+- The hashcode is set only by the admin, at least 4 characters, emoji allowed. It is stored
+  as PBKDF2 (SHA-256, 100,000 rounds, its own salt) in `invite_tokens.gate_password_hash`, and
+  compared after NFC, without emoji variation selectors and without spaces at the ends. The
+  server never sends it back.
+- Name + hashcode (`POST /api/auth/member-login`) works only while that member's invite link
+  is on and before its `expires_at` (48 hours by default; the admin can keep it open longer
+  or for good). An unknown name, an admin, a room guest, a suspended or archived member and
+  a wrong hashcode all get the same answer, after the same PBKDF2 work (a decoy hash when
+  there is no member), so names cannot be listed by timing. That the link has run out or is
+  off is said only after the right hashcode. A display name two members share never signs
+  in, and LIKE wildcards in a typed name are escaped.
+- Tries are limited to 10 a minute per address and 6 per 5 minutes per name, counted once for
+  every server instance (see Rate limiting). A short hashcode such as `Hi😂` can still be guessed by someone who knows
+  the name and has time and many addresses: the open window is the main control, so keep a
+  link open no longer than needed.
+- Direct links (`/d/<token>`): a 256-bit token, one use (claimed in one update before the
+  sign-in, given back if the sign-in fails), 48 hours, retired when a newer one is made,
+  refused for a suspended or archived member. The hashcode rides after `#`, which browsers
+  never send to a server, so it is in no log; the page removes it from the address bar and
+  sends no referrer. Whoever holds the link can sign in as that member, so the admin sends it
+  to them only.
+- Forgot hashcode (`POST /api/auth/forgot`) is public and answers the same whether or not the
+  name exists. 3 requests per 10 minutes per address; past 3 an hour for one name, requests
+  are dropped silently. One open request per member (a unique partial index). The admins'
+  notification names the member; the admin checks it is really them before sending a link.
 
 ## WebRTC / calling security
 
@@ -178,6 +197,9 @@ Off on every device until its owner turns them on there. Needs `supabase/v12.sql
   member could point the server at an address of their choosing.
 - Every route needs a signed-in session, and a person can add, mark and remove only their
   own devices. Adding is limited to 20 requests a minute, and to ten devices a person.
+- `POST /api/push/test` sends one fixed text ("Test notification") to a device only when its
+  address is one of the caller's own devices, 5 requests a minute. It answers with the push
+  service's outcome only, never the service's reply.
 - Nothing is sent to a suspended or archived person, or to someone blocked in or removed
   from the chat. Signing out removes the device. A session that ends another way (it
   expired) leaves the device subscribed: "New message" can still appear there until
@@ -220,16 +242,17 @@ CSP is recommended future work.
 
 ## Rate limiting / abuse
 
-Everything that can be guessed — logging in, an invite link's password, the screen lock,
-sign-up codes, room access codes and the first-admin token — takes from a token bucket in
-Postgres that every server instance shares (`sharedRateLimit`, `supabase/v15.sql`). Keys are
-SHA-256 hashes made by the server, so the table holds no address, username or token. Until
-`v15.sql` has run, or while the database cannot answer, each instance counts on its own
-(as before) and logs that once.
+Everything that can be guessed — Admin login, a member's name and hashcode (per address and
+per name), a direct link's hashcode, the screen lock, room access codes and the first-admin
+token — takes from a token bucket in Postgres that every server instance shares
+(`sharedRateLimit`, `supabase/v15.sql`). Keys are SHA-256 hashes made by the server, so the
+table holds no address, name or token. Until `v15.sql` has run, or while the database cannot
+answer, each instance counts on its own (as before) and logs that once.
 
-Floods (message send, call ring, room and invite creation, the disappearing-messages route,
-the notification device route, relay credentials) are slowed by an in-memory bucket per
-instance (`rateLimit` in `src/lib/api.ts`): a speed bump, not a hard control.
+Floods (message send, call ring, hashcode requests, room and invite creation, the
+disappearing-messages route, the notification device route, relay credentials) are slowed by
+an in-memory bucket per instance (`rateLimit` in `src/lib/api.ts`): a speed bump, not a hard
+control.
 
 Addresses come from `x-forwarded-for`, which Vercel overwrites with the client's address
 (per Vercel's documentation); behind another proxy it could be chosen by the client.
@@ -244,8 +267,9 @@ disappearing messages (above) delete read messages and their files for good.
 
 ## Remaining risks
 
-- Rate limits on guessing are per address and per target (link, person), not per account
-  alone: many addresses together can still try more often. The flood guards are
+- Rate limits on guessing are per address and per target (a member's name, a direct link, a
+  person's lock), so many addresses together can still try more often against one target
+  than one address can; a short hashcode is the weak point. The flood guards are
   per-instance only.
 - Legacy `invite_tokens` stored in plaintext (path secret).
 - CSP allows `'unsafe-inline'` for scripts/styles (no nonce yet).

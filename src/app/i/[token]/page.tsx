@@ -1,50 +1,19 @@
 import { redirect } from "next/navigation";
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import { AuthShell } from "@/components/auth/auth-shell";
-import { GateForm } from "@/components/gate-form";
+import { FirstScreen } from "@/components/auth/first-screen";
+import { redirectIfSignedIn } from "@/lib/auth/session";
+import { inviteLinkState } from "@/lib/member-access";
 
 export const dynamic = "force-dynamic";
 
-export default async function InviteGatePage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ token: string }>;
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const { error } = await searchParams;
-
   if (!token || token.length < 16) redirect("/expired");
+  await redirectIfSignedIn();
 
-  const admin = supabaseAdmin();
-  const { data: row } = await admin
-    .from("invite_tokens")
-    .select("token, user_id, enabled, revoked_at")
-    .eq("token", token)
-    .maybeSingle();
+  const state = await inviteLinkState(token);
+  if (state === "ended") redirect("/expired?why=ended");
+  if (state === "off") redirect("/expired?why=off");
+  if (state !== "open") redirect("/expired");
 
-  if (!row || !row.enabled || row.revoked_at) redirect("/expired");
-
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("username, display_name, avatar_url, suspended, archived, is_admin")
-    .eq("id", row.user_id)
-    .maybeSingle();
-
-  if (!profile || profile.suspended || profile.archived) redirect("/expired");
-  if (profile.is_admin) redirect("/login");
-
-  return (
-    <AuthShell backHref={null}>
-      <GateForm
-        token={token}
-        userId={row.user_id}
-        displayName={profile.display_name ?? profile.username}
-        username={profile.username}
-        avatarUrl={profile.avatar_url}
-        error={error}
-      />
-    </AuthShell>
-  );
+  return <FirstScreen />;
 }

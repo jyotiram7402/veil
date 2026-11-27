@@ -11,6 +11,13 @@ export function isTaken(error: unknown): boolean {
   return code !== null && TAKEN.has(code);
 }
 
+const NOT_SET_UP = new Set(["42P01", "PGRST205", "42703", "PGRST204"]);
+
+export function isNotSetUp(error: unknown): boolean {
+  const code = errorCode(error);
+  return code !== null && NOT_SET_UP.has(code);
+}
+
 export function describeError(error: unknown): string {
   if (error === null || error === undefined) return "no error object";
   if (typeof error === "string") return error.slice(0, 300) || "empty error";

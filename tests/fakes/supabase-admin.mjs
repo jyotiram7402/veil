@@ -17,6 +17,31 @@ function compare(a, b) {
 
 let nextId = 1;
 
+const DEFAULTS = {
+  invite_tokens: () => ({
+    enabled: true,
+    revoked_at: null,
+    last_used_at: null,
+    use_count: 0,
+    gate_password_hash: null,
+    expires_at: null,
+  }),
+  direct_links: () => ({ used_at: null }),
+  hashcode_requests: () => ({ id: `request-${nextId++}`, device: null, resolved_at: null }),
+};
+
+function likeToRegExp(pattern) {
+  let source = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\" && i + 1 < pattern.length) source += pattern[++i].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    else if (ch === "%") source += ".*";
+    else if (ch === "_") source += ".";
+    else source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(`^${source}$`, "iu");
+}
+
 class Query {
   constructor(db, table) {
     this.db = db;
@@ -27,6 +52,13 @@ class Query {
   }
   select(cols) {
     this.said.push(`select(${cols})`);
+    if (this.op === "update" || this.op === "insert") this.returning = true;
+    return this;
+  }
+  insert(rows) {
+    this.op = "insert";
+    this.values = rows;
+    this.said.push(`insert(${Object.keys(Array.isArray(rows) ? (rows[0] ?? {}) : rows)})`);
     return this;
   }
   delete() {
@@ -76,6 +108,17 @@ class Query {
     this.filters.push((r) => micros(r[col]) <= micros(v));
     return this;
   }
+  is(col, v) {
+    this.said.push(`is(${col})`);
+    this.filters.push((r) => (r[col] ?? null) === v);
+    return this;
+  }
+  ilike(col, pattern) {
+    this.said.push(`ilike(${col})`);
+    const re = likeToRegExp(pattern);
+    this.filters.push((r) => typeof r[col] === "string" && re.test(r[col]));
+    return this;
+  }
   order(col, { ascending }) {
     this.sort = (a, b) => compare(a[col], b[col]) * (ascending ? 1 : -1);
     return this;
@@ -98,7 +141,19 @@ class Query {
     if (db.down) return { data: null, error: { message: "the database is down" } };
     const rows = db.tables[this.table];
     if (!rows) {
-      return { data: null, error: { message: `relation "public.${this.table}" does not exist` } };
+      return {
+        data: null,
+        error: { code: "42P01", message: `relation "public.${this.table}" does not exist` },
+      };
+    }
+    const missing = (db.missing?.[this.table] ?? []).find(
+      (col) => this.values && !Array.isArray(this.values) && col in this.values,
+    );
+    if (missing && (this.op === "insert" || this.op === "update")) {
+      return {
+        data: null,
+        error: { code: "PGRST204", message: `Could not find the '${missing}' column` },
+      };
     }
     const hit = rows.filter((r) => this.filters.every((f) => f(r)));
 
@@ -109,7 +164,16 @@ class Query {
     }
     if (this.op === "update") {
       for (const r of hit) Object.assign(r, this.values);
-      return { data: null, error: null };
+      return { data: this.returning ? hit.map((r) => ({ ...r })) : null, error: null };
+    }
+    if (this.op === "insert") {
+      const added = (Array.isArray(this.values) ? this.values : [this.values]).map((row) => {
+        const defaults = { created_at: db.clock(), ...(DEFAULTS[this.table]?.() ?? {}) };
+        for (const col of db.missing?.[this.table] ?? []) delete defaults[col];
+        return { ...defaults, ...row };
+      });
+      rows.push(...added);
+      return { data: this.returning ? added.map((r) => ({ ...r })) : null, error: null };
     }
     if (this.op === "upsert") {
       const key = this.options.onConflict;

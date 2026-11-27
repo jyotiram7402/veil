@@ -89,7 +89,7 @@ export function SessionLock({
           return;
         }
         if (res.status === 401) {
-          setError("Wrong password.");
+          setError("Wrong hashcode.");
         } else if (res.status === 429) {
           setError("Too many attempts. Wait a minute.");
         } else {
@@ -134,7 +134,7 @@ export function SessionLock({
                 ref={inputRef}
                 type="password"
                 autoComplete="current-password"
-                placeholder="Enter your password"
+                placeholder="Enter your hashcode"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
