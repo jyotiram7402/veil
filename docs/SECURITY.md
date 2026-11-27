@@ -107,8 +107,8 @@ Since 2026-11-27 the admin is the only way in: sign-up codes were removed (`sign
   there is no member), so names cannot be listed by timing. That the link has run out or is
   off is said only after the right hashcode. A display name two members share never signs
   in, and LIKE wildcards in a typed name are escaped.
-- Tries are limited to 10 a minute per address and 6 per 5 minutes per name (in memory, per
-  server instance). A short hashcode such as `Hi😂` can still be guessed by someone who knows
+- Tries are limited to 10 a minute per address and 6 per 5 minutes per name, counted once for
+  every server instance (see Rate limiting). A short hashcode such as `Hi😂` can still be guessed by someone who knows
   the name and has time and many addresses: the open window is the main control, so keep a
   link open no longer than needed.
 - Direct links (`/d/<token>`): a 256-bit token, one use (claimed in one update before the
@@ -242,13 +242,20 @@ CSP is recommended future work.
 
 ## Rate limiting / abuse
 
-In-memory token-bucket (`src/lib/api.ts`) on login, member login (per address and per
-name), direct links, hashcode requests, room join,
-message send, room/invite creation, lock, the disappearing-messages route and the
-notification device route. It is per-instance (resets on
-cold start, not shared across serverless instances) and keys on a spoofable
-`x-forwarded-for` — adequate as a speed bump, not a hard control. A shared store
-(e.g. Postgres/Upstash) is recommended before public launch.
+Everything that can be guessed — Admin login, a member's name and hashcode (per address and
+per name), a direct link's hashcode, the screen lock, room access codes and the first-admin
+token — takes from a token bucket in Postgres that every server instance shares
+(`sharedRateLimit`, `supabase/v15.sql`). Keys are SHA-256 hashes made by the server, so the
+table holds no address, name or token. Until `v15.sql` has run, or while the database cannot
+answer, each instance counts on its own (as before) and logs that once.
+
+Floods (message send, call ring, hashcode requests, room and invite creation, the
+disappearing-messages route, the notification device route, relay credentials) are slowed by
+an in-memory bucket per instance (`rateLimit` in `src/lib/api.ts`): a speed bump, not a hard
+control.
+
+Addresses come from `x-forwarded-for`, which Vercel overwrites with the client's address
+(per Vercel's documentation); behind another proxy it could be chosen by the client.
 
 ## Data retention
 
@@ -260,7 +267,10 @@ disappearing messages (above) delete read messages and their files for good.
 
 ## Remaining risks
 
-- Distributed rate limiting not implemented (in-memory only).
+- Rate limits on guessing are per address and per target (a member's name, a direct link, a
+  person's lock), so many addresses together can still try more often against one target
+  than one address can; a short hashcode is the weak point. The flood guards are
+  per-instance only.
 - Legacy `invite_tokens` stored in plaintext (path secret).
 - CSP allows `'unsafe-inline'` for scripts/styles (no nonce yet).
 - Public chat realtime channels (`chat:<id>`, presence) are not private —

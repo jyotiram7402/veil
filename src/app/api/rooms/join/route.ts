@@ -3,7 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 import { usernameToInternalEmail } from "@/lib/auth/username";
 import { generateEphemeralPassword } from "@/lib/invite-token";
-import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
+import { clientKey, jsonError, parseBody } from "@/lib/api";
+import { sharedRateLimit } from "@/lib/shared-rate-limit";
 import { joinRoomSchema } from "@/lib/validations";
 import {
   JOIN_FAILURE,
@@ -15,7 +16,7 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  if (!rateLimit(`room-join:${clientKey(req)}`, 10, 60_000)) {
+  if (!(await sharedRateLimit(`room-join:${clientKey(req)}`, 10, 60_000))) {
     return jsonError(429, "Too many attempts. Try again in a minute.");
   }
 

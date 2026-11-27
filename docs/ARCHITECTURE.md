@@ -113,7 +113,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
 - `entry-checks.ts` (field checks for the admin's log-in form), `format.ts` (times and
   dates as the chat shows them).
 - `api.ts` — `jsonError`, `serverError`, `parseBody(req, zodSchema)`, in-memory `rateLimit`,
-  `clientKey`. `db-errors.ts` — `errorCode`, `isTaken` (a taken username, from Postgres or
+  `clientKey`. `shared-rate-limit.ts` (server only) — `sharedRateLimit`, the limit every
+  server instance shares; `token-bucket.ts` — the counting both use. `db-errors.ts` — `errorCode`, `isTaken` (a taken username, from Postgres or
   Supabase Auth) and `describeError` (the one log line).
 - `validations.ts` — all zod schemas (login, users, messages, rooms, invites, join, display name).
 - `queries.ts` — chat list + message paging queries.
@@ -179,6 +180,28 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   signs out and goes to `/expired`: that is how a suspended member's open app ends.
 - `use-call` — the WebRTC engine (see below). `use-media-devices` — the device list for the
   call screen.
+
+## Rate limits
+
+- Two kinds. `sharedRateLimit(key, limit, perMs)` (`lib/shared-rate-limit.ts`) guards what can
+  be guessed: Admin login (10 a minute per address), a member's name and hashcode (10 a minute
+  per address, 6 per 5 minutes per name), a direct link's hashcode (8 a minute per link and
+  address), the screen lock (8 a minute per person and address), room access codes (10 a
+  minute per address) and the first-admin token. `rateLimit` (`lib/api.ts`) only stops floods
+  (message send, call ring, push devices, hashcode requests, room and invite creation, the
+  disappearing-messages route, relay credentials).
+- The shared one is a token bucket in Postgres (`v15.sql`, `take_rate_token`): every server
+  instance takes from the same row, under a row lock, so a cold start hands out nothing new.
+  The key is SHA-256-hashed in the server first: the table never holds an address, a
+  name or a token. Rows idle for a day go now and then (1 call in 100).
+- One database call (20–60 ms) per guarded attempt. Flood guards stay in memory so that
+  sending a message waits for nothing extra.
+- When the database cannot answer (before `v15.sql` has run, or an outage), the route falls
+  back to an in-memory bucket and logs `[rate-limit] shared limit unavailable…` once per
+  instance. Attempts are never let through unlimited.
+- The address is the first entry of `x-forwarded-for`. Vercel overwrites that header with
+  the client's address (its docs: "to prevent IP spoofing"), so on Vercel it cannot be
+  chosen by the client.
 
 ## Database (`supabase/*.sql`, mirrored by hand in `src/types/database.ts`)
 
@@ -495,7 +518,8 @@ So what a page or route costs is mostly how many calls it makes *one after anoth
   `attachment-path.ts` are.
 - Covered: disappearing messages (`vanish.ts`, `read-cutoff.ts`), notifications
   (`web-push.ts` against the standards' own example values, `push.ts`, `push-client.ts`,
-  `public/sw.js`), `attachment-path.ts`, `turn.ts` and `db-errors.ts`. Not covered: API routes, screens,
+  `public/sw.js`), `attachment-path.ts`, `turn.ts`, `db-errors.ts`, `token-bucket.ts` and
+  `shared-rate-limit.ts`. Not covered: API routes, screens,
   calls, the database policies.
 - Nothing in the repository makes Vercel wait for the tests: a red cross on GitHub does not
   stop a deployment.

@@ -41,10 +41,13 @@ Run these files in order in **Supabase Studio → SQL Editor → New query**:
     that is still signed in: `is_active_profile()`, required by `can_access_chat()` and
     `is_chat_member()`. Run v11 first.
 16. `v14.sql` — mute one chat: `chat_members.muted`. Written only by the server (no grant).
-17. `v16.sql` — invite links that run out (`invite_tokens.expires_at`; links made before keep
+17. `v15.sql` — one shared limit on guessing for every server instance: `rate_limits` (hashed
+    keys only, no policies) and the atomic `take_rate_token()`, service role only. The app
+    works without it (each instance then counts on its own).
+18. `v16.sql` — invite links that run out (`invite_tokens.expires_at`; links made before keep
     no end), direct links (`direct_links`) and Forgot hashcode (`hashcode_requests`), both
     service role only. Until it has run, links never run out and direct links and requests
-    say they are not available. (`v15.sql` is the shared rate limit, on its own branch.)
+    say they are not available. v15 and v16 can run in either order.
 
 Optionally run `security-tests.sql` with **psql** afterwards (see its header) to verify the
 RLS negative cases — it uses psql `\set` variables, so it won't run in the dashboard editor.

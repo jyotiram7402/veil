@@ -479,6 +479,10 @@ export type Database = {
         Args: { p_id: string };
         Returns: undefined;
       };
+      take_rate_token: {
+        Args: { p_key: string; p_limit: number; p_per_ms: number };
+        Returns: boolean;
+      };
     };
     Views: Record<string, never>;
     Enums: Record<string, never>;

@@ -3,10 +3,11 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 import { usernameToInternalEmail } from "@/lib/auth/username";
 import { loginSchema } from "@/lib/validations";
-import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
+import { clientKey, jsonError, parseBody } from "@/lib/api";
+import { sharedRateLimit } from "@/lib/shared-rate-limit";
 
 export async function POST(req: Request) {
-  if (!rateLimit(`login:${clientKey(req)}`, 10, 60_000)) {
+  if (!(await sharedRateLimit(`login:${clientKey(req)}`, 10, 60_000))) {
     return jsonError(429, "Too many attempts. Try again in a minute.");
   }
 

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { clientKey, jsonError, parseBody, rateLimit } from "@/lib/api";
+import { clientKey, jsonError, parseBody } from "@/lib/api";
 import { signInMember } from "@/lib/auth/sign-in-member";
+import { sharedRateLimit } from "@/lib/shared-rate-limit";
 import { checkMemberLogin, normalizeName, recordSignIn } from "@/lib/member-access";
 import { memberLoginSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  if (!rateLimit(`member-login:${clientKey(req)}`, 10, 60_000)) {
+  if (!(await sharedRateLimit(`member-login:${clientKey(req)}`, 10, 60_000))) {
     return jsonError(429, "Too many tries. Wait a minute and try again.");
   }
 
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   const { name, hashcode } = parsed.data;
 
-  if (!rateLimit(`member-login-name:${normalizeName(name)}`, 6, 5 * 60_000)) {
+  if (!(await sharedRateLimit(`member-login-name:${normalizeName(name)}`, 6, 5 * 60_000))) {
     return jsonError(429, "Too many tries for this name. Wait a few minutes and try again.");
   }
 

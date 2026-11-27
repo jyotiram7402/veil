@@ -3,7 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { hashcodeMatches } from "@/lib/member-access";
-import { clientKey, jsonError, rateLimit } from "@/lib/api";
+import { clientKey, jsonError } from "@/lib/api";
+import { sharedRateLimit } from "@/lib/shared-rate-limit";
 import { usernameToInternalEmail } from "@/lib/auth/username";
 import { env } from "@/lib/env";
 
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
   const session = await getSessionUser();
   if (!session) return jsonError(401, "Sign in required");
 
-  if (!rateLimit(`lock:${session.id}:${clientKey(req)}`, 8, 60_000)) {
+  if (!(await sharedRateLimit(`lock:${session.id}:${clientKey(req)}`, 8, 60_000))) {
     return jsonError(429, "Too many attempts. Wait a minute.");
   }
 
